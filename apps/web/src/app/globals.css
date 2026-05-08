@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root,
+  [data-theme="dark"] {
+    --accent:     #9DD0B0;
+    --accent-bg:  rgba(157, 208, 176, 0.10);
+    --pass:       #7FB394;
+    --warn:       #D9B566;
+    --fail:       #E07B6E;
+    --fail-bg:    rgba(224, 123, 110, 0.07);
+
+    --bg-0: #0D0D0D;
+    --bg-1: #141414;
+    --bg-2: #1A1A1A;
+    --bg-3: #202020;
+    --line:   #262626;
+    --line-2: #1E1E1E;
+    --line-3: #2E2E2E;
+    --fg-0: #F0F0F0;
+    --fg-1: #A0A0A0;
+    --fg-2: #606060;
+    --fg-3: #383838;
+  }
+
+  [data-theme="light"] {
+    --pass: #5A8F70;
+    --warn: #B89540;
+    --fail: #C25D52;
+
+    --bg-0: #FAFAFA;
+    --bg-1: #FFFFFF;
+    --bg-2: #F5F5F5;
+    --bg-3: #EEEEEE;
+    --line:   #E4E4E7;
+    --line-2: #F0F0F0;
+    --line-3: #D4D4D8;
+    --fg-0: #09090B;
+    --fg-1: #52525B;
+    --fg-2: #A1A1AA;
+    --fg-3: #D4D4D8;
+  }
+
+  * {
+    border-color: var(--line);
+  }
+
+  body {
+    background-color: var(--bg-0);
+    color: var(--fg-0);
+    font-feature-settings: "ss01" 1, "cv11" 1;
+  }
+}
+
+.t-display { font-size: 32px; font-weight: 200; letter-spacing: -0.02em; }
+.t-h1      { font-size: 24px; font-weight: 300; letter-spacing: -0.01em; }
+.t-h2      { font-size: 18px; font-weight: 400; }
+.t-h3      { font-size: 14px; font-weight: 500; }
+.t-body    { font-size: 13px; font-weight: 400; }
+.t-small   { font-size: 12px; font-weight: 400; }
+.t-micro   { font-size: 10px; font-weight: 400; letter-spacing: 0.02em; }
+.kpi-label { font-size: 10px; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; }
+.kpi-value { font-family: var(--font-jetbrains-mono); font-size: 32px; font-weight: 300; font-variant-numeric: tabular-nums; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 220ms ease-out; }
