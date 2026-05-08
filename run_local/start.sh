@@ -2,25 +2,28 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "Starting dqt local stack..."
 
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" up -d
 
 echo -n "Waiting for Postgres..."
+n=0
 until docker compose -f "${SCRIPT_DIR}/docker-compose.yml" exec -T postgres \
   pg_isready -U dqt -d dqt > /dev/null 2>&1; do
   echo -n "."
   sleep 1
+  (( ++n >= 60 )) && { echo " timed out waiting for Postgres"; exit 1; }
 done
 echo " ready."
 
 echo -n "Waiting for Redis..."
+n=0
 until docker compose -f "${SCRIPT_DIR}/docker-compose.yml" exec -T redis \
   redis-cli ping 2>/dev/null | grep -q PONG; do
   echo -n "."
   sleep 1
+  (( ++n >= 60 )) && { echo " timed out waiting for Redis"; exit 1; }
 done
 echo " ready."
 

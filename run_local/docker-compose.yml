@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: timescale/timescaledb:latest-pg16
     environment:
       POSTGRES_USER: dqt
       POSTGRES_PASSWORD: dqtdev

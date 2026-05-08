@@ -4,7 +4,8 @@ set -euo pipefail
 # Production-like: Gunicorn with uvicorn workers.
 # Uses env vars from the environment (or a .env file loaded by the caller).
 
-cd apps/server
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}/../apps/server"
 exec uv run gunicorn dqt_server.main:app \
   --worker-class uvicorn.workers.UvicornWorker \
   --workers 2 \
