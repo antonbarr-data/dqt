@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Check detector group taxonomy — matches UI tab names",
+  "values": [
+    { "slug": "basic",          "label": "Basic",                   "ui_tab": "Basic"        },
+    { "slug": "schema",         "label": "Schema",                  "ui_tab": "Basic"        },
+    { "slug": "referential",    "label": "Referential",             "ui_tab": "Basic"        },
+    { "slug": "distribution",   "label": "Distribution",            "ui_tab": "Distribution" },
+    { "slug": "outliers_uni",   "label": "Outliers (univariate)",   "ui_tab": "Outliers"     },
+    { "slug": "outliers_multi", "label": "Outliers (multivariate)", "ui_tab": "Outliers"     },
+    { "slug": "timeseries",     "label": "Time series",             "ui_tab": "Time series"  },
+    { "slug": "drift",          "label": "Drift",                   "ui_tab": "Drift"        },
+    { "slug": "info",           "label": "Dependencies",            "ui_tab": "Dependencies" },
+    { "slug": "ensemble",       "label": "Ensemble",                "ui_tab": "Dependencies" }
+  ]
+}
