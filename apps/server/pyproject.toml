@@ -24,6 +24,9 @@ dependencies = [
     "email-validator>=2.1",
 ]
 
+[tool.uv.sources]
+dqt = { workspace = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

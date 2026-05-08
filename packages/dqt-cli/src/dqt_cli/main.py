@@ -1,4 +1,5 @@
 """dqt CLI entry point."""
+
 import typer
 
 app = typer.Typer(name="dqt", help="dqt data quality CLI", no_args_is_help=True)
@@ -11,6 +12,7 @@ app.add_typer(demo_app, name="demo")
 def version() -> None:
     """Print dqt library version."""
     import dqt
+
     typer.echo(dqt.__version__)
 
 

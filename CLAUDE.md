@@ -1,4 +1,4 @@
-NB This file is copied to CLAUDE.md and .cursor/rules/overview.mdc
+NB This file is copied to CLAUDE.md and .ai/rules/overview.mdc
 
 # App overview
 - **Product**: `dqt` — open-source data quality, observability, semantic, and causality library + service. Watches dbt-built warehouses (and any SQL warehouse) for statistical drift, anomalies, silent regressions, and explains *why* metrics moved.
@@ -382,41 +382,41 @@ Ported verbatim from the dqt design handoff. **High fidelity — every value is 
 # Further rules files
 
 Before any task must read the most relevant rules and guidelines:
-- `.cursor/rules/general-rules.mdc` — Core developer preferences and philosophy
-- `.cursor/rules/project-overview.mdc` — Project context and architecture
-- `.cursor/rules/library-vs-server.mdc` — The hard boundary between library and server code
-- `.cursor/rules/algorithms.mdc` — Detector contract, STAT_SCALES, statistical correctness rules
-- `.cursor/rules/adapters.mdc` — Warehouse adapter contract, sampling rules, cost guards, read-only enforcement
-- `.cursor/rules/checks.mdc` — Check YAML format, baselining, SodaCL/dbt compatibility
-- `.cursor/rules/lineage.mdc` — Column-level lineage, sqlglot patterns, dbt manifest ingest
-- `.cursor/rules/semantic.mdc` — Metric definition format, dbt semantic-layer compatibility
-- `.cursor/rules/causality.mdc` — Discovery pipeline, HITL gate, Shapley attribution, do-calculus
-- `.cursor/rules/agent.mdc` — Agent loop, ladder of causation, tool contract, citation requirement, cost guard
-- `.cursor/rules/governance.mdc` — Catalog, policies, audit log, classification
-- `.cursor/rules/hitl.mdc` — Review queue, sampling strategies, label store
-- `.cursor/rules/incidents-oncall.mdc` — Incident lifecycle, schedules, routing, notifiers, postmortems
-- `.cursor/rules/backend-and-python.mdc` — Python/FastAPI patterns, async, Pydantic, SQLAlchemy 2.x async
-- `.cursor/rules/frontend-architecture.mdc` — Next.js App Router, RSC, Tailwind, shadcn/ui, React Query
-- `.cursor/rules/modules-and-folders-structure.mdc` — Project organisation
-- `.cursor/rules/database.mdc` — Schema, migrations (migra/alembic), TimescaleDB, pgvector, RLS
-- `.cursor/rules/config_and_enums.mdc` — Configuration and enum management, code generation
-- `.cursor/rules/data_model_and_repositories.mdc` — Data layer, BaseRepository, library Store interface
-- `.cursor/rules/ui-design-principles.mdc` — UI/UX design standards, density, sharpness
-- `.cursor/rules/ui-tokens.mdc` — Colors, type, spacing, borders, shadows
-- `.cursor/rules/ui-charts.mdc` — Custom SVG charts (StatGauge, Spark, TimeSeries, HistDual, CDFPair, KLMatrix, CausalDAG)
-- `.cursor/rules/ui-forms.mdc` — Form component patterns (react-hook-form + zod)
-- `.cursor/rules/ui-list-pages.mdc` — List and table patterns
-- `.cursor/rules/ui-page-headers.mdc` — Page header patterns
-- `.cursor/rules/ui-view-page.mdc` — Detail page patterns
-- `.cursor/rules/design.mdc` — Design system guidelines
-- `.cursor/rules/testing.mdc` — Testing standards (library / server / e2e split)
-- `.cursor/rules/error-handling.mdc` — Error handling patterns, library exception hierarchy
-- `.cursor/rules/logging.mdc` — Logging standards, structlog, PII redaction
-- `.cursor/rules/local-deployment.mdc` — Local development setup
-- `.cursor/rules/cloud-deployment.mdc` — Cloud deployment procedures
-- `.cursor/rules/github-actions.mdc` — CI/CD pipeline rules
-- `.cursor/rules/i18n.mdc` — Internationalisation guidelines
-- `.cursor/rules/schemas.mdc` — Schema definitions and validation
-- `.cursor/rules/glossary.mdc` — Project terminology (plain-English ↔ stat method mapping; lineage/causal/governance terms)
-- `.cursor/rules/authentication_and_authorization.mdc` — Authorization, authentication, sessions, sysadmin privileges
-- `.cursor/rules/open-source.mdc` — Library publishing rules: no server imports, semver discipline, deprecation policy, public API stability
+- `.ai/rules/general-rules.mdc` — Core developer preferences and philosophy
+- `.ai/rules/project-overview.mdc` — Project context and architecture
+- `.ai/rules/library-vs-server.mdc` — The hard boundary between library and server code
+- `.ai/rules/algorithms.mdc` — Detector contract, STAT_SCALES, statistical correctness rules
+- `.ai/rules/adapters.mdc` — Warehouse adapter contract, sampling rules, cost guards, read-only enforcement
+- `.ai/rules/checks.mdc` — Check YAML format, baselining, SodaCL/dbt compatibility
+- `.ai/rules/lineage.mdc` — Column-level lineage, sqlglot patterns, dbt manifest ingest
+- `.ai/rules/semantic.mdc` — Metric definition format, dbt semantic-layer compatibility
+- `.ai/rules/causality.mdc` — Discovery pipeline, HITL gate, Shapley attribution, do-calculus
+- `.ai/rules/agent.mdc` — Agent loop, ladder of causation, tool contract, citation requirement, cost guard
+- `.ai/rules/governance.mdc` — Catalog, policies, audit log, classification
+- `.ai/rules/hitl.mdc` — Review queue, sampling strategies, label store
+- `.ai/rules/incidents-oncall.mdc` — Incident lifecycle, schedules, routing, notifiers, postmortems
+- `.ai/rules/backend-and-python.mdc` — Python/FastAPI patterns, async, Pydantic, SQLAlchemy 2.x async
+- `.ai/rules/frontend-architecture.mdc` — Next.js App Router, RSC, Tailwind, shadcn/ui, React Query
+- `.ai/rules/modules-and-folders-structure.mdc` — Project organisation
+- `.ai/rules/database.mdc` — Schema, migrations (migra/alembic), TimescaleDB, pgvector, RLS
+- `.ai/rules/config_and_enums.mdc` — Configuration and enum management, code generation
+- `.ai/rules/data_model_and_repositories.mdc` — Data layer, BaseRepository, library Store interface
+- `.ai/rules/ui-design-principles.mdc` — UI/UX design standards, density, sharpness
+- `.ai/rules/ui-tokens.mdc` — Colors, type, spacing, borders, shadows
+- `.ai/rules/ui-charts.mdc` — Custom SVG charts (StatGauge, Spark, TimeSeries, HistDual, CDFPair, KLMatrix, CausalDAG)
+- `.ai/rules/ui-forms.mdc` — Form component patterns (react-hook-form + zod)
+- `.ai/rules/ui-list-pages.mdc` — List and table patterns
+- `.ai/rules/ui-page-headers.mdc` — Page header patterns
+- `.ai/rules/ui-view-page.mdc` — Detail page patterns
+- `.ai/rules/design.mdc` — Design system guidelines
+- `.ai/rules/testing.mdc` — Testing standards (library / server / e2e split)
+- `.ai/rules/error-handling.mdc` — Error handling patterns, library exception hierarchy
+- `.ai/rules/logging.mdc` — Logging standards, structlog, PII redaction
+- `.ai/rules/local-deployment.mdc` — Local development setup
+- `.ai/rules/cloud-deployment.mdc` — Cloud deployment procedures
+- `.ai/rules/github-actions.mdc` — CI/CD pipeline rules
+- `.ai/rules/i18n.mdc` — Internationalisation guidelines
+- `.ai/rules/schemas.mdc` — Schema definitions and validation
+- `.ai/rules/glossary.mdc` — Project terminology (plain-English ↔ stat method mapping; lineage/causal/governance terms)
+- `.ai/rules/authentication_and_authorization.mdc` — Authorization, authentication, sessions, sysadmin privileges
+- `.ai/rules/open-source.mdc` — Library publishing rules: no server imports, semver discipline, deprecation policy, public API stability

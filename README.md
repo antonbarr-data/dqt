@@ -81,15 +81,15 @@ examples/             # runnable library examples
 
 ## Contributing
 
-Read [`.cursor/rules/`](.cursor/rules/) before opening a PR — especially:
-- [`general-rules.mdc`](.cursor/rules/general-rules.mdc)
-- [`library-vs-server.mdc`](.cursor/rules/library-vs-server.mdc) — the hardest rule
-- [`algorithms.mdc`](.cursor/rules/algorithms.mdc) — detector contract
-- [`open-source.mdc`](.cursor/rules/open-source.mdc) — public API + semver discipline
+Read [`.ai/rules/`](.ai/rules/) before opening a PR — especially:
+- [`general-rules.mdc`](.ai/rules/general-rules.mdc)
+- [`library-vs-server.mdc`](.ai/rules/library-vs-server.mdc) — the hardest rule
+- [`algorithms.mdc`](.ai/rules/algorithms.mdc) — detector contract
+- [`open-source.mdc`](.ai/rules/open-source.mdc) — public API + semver discipline
 
 CI gates: `make test-lib` (<60s), lint (ruff + mypy strict on the library), typecheck.
 
-New algorithm? See [`algorithms.mdc`](.cursor/rules/algorithms.mdc) for the five required tests.
+New algorithm? See [`algorithms.mdc`](.ai/rules/algorithms.mdc) for the five required tests.
 
 ## License
 

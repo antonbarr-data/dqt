@@ -13,14 +13,12 @@ Usage:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
 
-import dqt
 from dqt.adapters import postgres
 from dqt.algorithms import (
-    KS2Sample,        # distribution shape change
-    Wasserstein1,     # level shift
-    PSI,              # stability
+    PSI,  # stability
+    KS2Sample,  # distribution shape change
+    Wasserstein1,  # level shift
 )
 from dqt.checks import Baseline, Check, RollingWindow
 from dqt.runner import Runner
@@ -52,12 +50,30 @@ def main() -> None:
     baseline = Baseline(kind="rolling", window=RollingWindow(days=14))
 
     checks = [
-        Check(id=f"orders.{column}.shape_change", source=src.id, dataset="public.fct_orders",
-              column=column, detector=KS2Sample.slug, baseline=baseline),
-        Check(id=f"orders.{column}.level_shift",  source=src.id, dataset="public.fct_orders",
-              column=column, detector=Wasserstein1.slug, baseline=baseline),
-        Check(id=f"orders.{column}.stability",    source=src.id, dataset="public.fct_orders",
-              column=column, detector=PSI.slug, baseline=baseline),
+        Check(
+            id=f"orders.{column}.shape_change",
+            source=src.id,
+            dataset="public.fct_orders",
+            column=column,
+            detector=KS2Sample.slug,
+            baseline=baseline,
+        ),
+        Check(
+            id=f"orders.{column}.level_shift",
+            source=src.id,
+            dataset="public.fct_orders",
+            column=column,
+            detector=Wasserstein1.slug,
+            baseline=baseline,
+        ),
+        Check(
+            id=f"orders.{column}.stability",
+            source=src.id,
+            dataset="public.fct_orders",
+            column=column,
+            detector=PSI.slug,
+            baseline=baseline,
+        ),
     ]
 
     store = MemoryStore()
@@ -66,12 +82,7 @@ def main() -> None:
     for check in checks:
         result = runner.run(check, source=src)
         r = result.detector_result
-        print(
-            f"{result.check_id:<44} "
-            f"{r.verdict:<5} "
-            f"score={r.score:.4f}  "
-            f"({r.plain_english})"
-        )
+        print(f"{result.check_id:<44} {r.verdict:<5} score={r.score:.4f}  ({r.plain_english})")
 
     # Show what an incident would look like (if any check failed)
     incidents = store.list_incidents()

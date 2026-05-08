@@ -70,8 +70,8 @@ warn_return_any = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 exclude = [
-    "**/generated/",
-    "**/migrations/",
+    ".*/generated/",
+    ".*/migrations/",
     "build/",
     "dist/",
 ]

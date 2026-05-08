@@ -9,6 +9,9 @@ dependencies = [
     "arq>=0.26",
 ]
 
+[tool.uv.sources]
+dqt-server = { workspace = true }
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
