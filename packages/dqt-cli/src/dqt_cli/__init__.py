@@ -1,0 +1,1 @@
+"""dqt command-line interface."""
