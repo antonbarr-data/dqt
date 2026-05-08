@@ -29,7 +29,7 @@ help:
 
 # ─── install ────────────────────────────────────────────────────────
 install:
-	uv sync
+	uv sync --all-packages
 	cd apps/web && pnpm install --frozen-lockfile
 
 # ─── codegen ────────────────────────────────────────────────────────
