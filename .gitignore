@@ -1,0 +1,121 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# uv
+.venv/
+.uv-cache/
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# pytest
+.pytest_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# mypy / ruff
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# --- Node / Next.js ---
+node_modules/
+.next/
+.turbo/
+.swc/
+out/
+dist/
+build/
+.npm/
+.pnpm-store/
+pnpm-debug.log*
+yarn-debug.log*
+npm-debug.log*
+
+# --- Generated artifacts (NEVER commit) ---
+packages/dqt-types/
+shared/generated/
+apps/web/src/generated/
+apps/web/src/lib/stats.generated.ts
+apps/web/src/components/connections/engines.generated.ts
+packages/dqt/src/dqt/generated/
+apps/server/openapi.json
+
+# --- Env / secrets ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.crt
+service-account*.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+.history/
+
+# --- Local dev ---
+tmp/
+*.log
+logs/
+.cache/
+
+# --- Docker / DB volumes ---
+run_local/data/
+run_local/postgres-data/
+run_local/redis-data/
+
+# --- Test artifacts ---
+playwright-report/
+test-results/
+e2e-screenshots/
+*.pyc
+.benchmarks/
+
+# --- Built docs ---
+docs/_build/
+site/
+
+# --- Archives (created by build scripts) ---
+*.zip
+*.tar.gz
+!reference_data/**/*.zip

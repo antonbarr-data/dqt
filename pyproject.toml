@@ -1,0 +1,143 @@
+# Root pyproject — uv workspace declaration.
+# Each package has its own pyproject in packages/<name>/ and apps/<name>/.
+
+[project]
+name = "dqt-workspace"
+version = "0.0.0"          # not published — workspace meta
+requires-python = ">=3.12"
+description = "Workspace root for dqt"
+
+[tool.uv.workspace]
+members = [
+    "packages/dqt",
+    "packages/dqt-cli",
+    "apps/server",
+    "apps/worker",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-randomly>=3.15",
+    "hypothesis>=6.100",
+    "testcontainers>=4.5",
+    "vcrpy>=6.0",
+    "freezegun>=1.5",
+    "httpx>=0.27",
+]
+
+# ─── ruff ───────────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [
+    "**/generated/**",
+    "**/migrations/**",
+    "**/.venv/**",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",  # ruff
+    "ASYNC",# async patterns
+    "PTH",  # use pathlib
+    "TCH",  # type-checking imports
+]
+ignore = [
+    "E501",  # line length handled by formatter
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ─── mypy ───────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+exclude = [
+    "**/generated/",
+    "**/migrations/",
+    "build/",
+    "dist/",
+]
+
+# Library is strict
+[[tool.mypy.overrides]]
+module = "dqt.*"
+strict = true
+disallow_any_explicit = false
+disallow_untyped_decorators = false
+
+# Server is default strict
+[[tool.mypy.overrides]]
+module = "dqt_server.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+# Optional deps may not have stubs
+[[tool.mypy.overrides]]
+module = [
+    "tigramite.*",
+    "dowhy.*",
+    "stumpy.*",
+    "causallearn.*",
+    "pyod.*",
+]
+ignore_missing_imports = true
+
+# ─── pytest ─────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = [
+    "packages/dqt/tests",
+    "packages/dqt-cli/tests",
+    "apps/server/tests",
+    "apps/worker/tests",
+]
+markers = [
+    "unit: fast, no external services",
+    "integration: real Postgres/Redis via testcontainers",
+    "adapter: real warehouse engine via testcontainers or vcrpy",
+    "slow: excluded from default; long-running",
+]
+addopts = [
+    "-m", "not slow",
+    "-ra",
+    "--strict-markers",
+    "--tb=short",
+]
+asyncio_mode = "auto"
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:pkg_resources",
+]
+
+# ─── coverage ───────────────────────────────────────────────────────
+[tool.coverage.run]
+branch = true
+source = ["packages/dqt/src/dqt", "apps/server/src/dqt_server"]
+omit = ["**/generated/**", "**/migrations/**"]
+
+[tool.coverage.report]
+exclude_also = [
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "if __name__ == .__main__.:",
+]
+fail_under = 80
