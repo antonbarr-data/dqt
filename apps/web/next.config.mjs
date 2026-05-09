@@ -6,7 +6,7 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const nextConfig = {
   // standalone bundles the minimal server for Railway/Docker deployments.
   // On Windows local dev, skip it (symlinks require elevated privileges).
-  output: process.env.CI ? "standalone" : undefined,
+  output: "standalone",
   experimental: {
     typedRoutes: true,
   },

@@ -1,7 +1,3 @@
-# nixpacks build config for dqt-web (Next.js 14).
-# Uses npm because pnpm-lock.yaml lives at the monorepo root;
-# Railway deploys this service from apps/web/ which doesn't have a lock file.
-
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
@@ -12,5 +8,4 @@ cmds = ["npm install --legacy-peer-deps"]
 cmds = ["npm run build"]
 
 [start]
-# CI=true triggers output:"standalone" in next.config.mjs; standalone server reads PORT env var
-cmd = "PORT=$PORT node .next/standalone/server.js"
+cmd = "HOSTNAME=0.0.0.0 node .next/standalone/server.js"
