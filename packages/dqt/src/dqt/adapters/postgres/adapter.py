@@ -23,7 +23,11 @@ _log = get_logger(__name__)
 class PostgresAdapter:
     def __init__(self, conn_str: str) -> None:
         self._conn_str = conn_str
-        self._engine = sa.create_engine(conn_str, pool_pre_ping=True)
+        self._engine = sa.create_engine(
+            conn_str,
+            pool_pre_ping=True,
+            execution_options={"isolation_level": "READ COMMITTED"},
+        )
 
     def health_check(self) -> HealthCheckResult:
         steps: list[HealthCheckStep] = []
@@ -136,13 +140,15 @@ class PostgresAdapter:
 
     def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
         # Use ORDER BY random() to get a genuine random sample without TABLESAMPLE bias on small tables.
-        query = sa.text(f'SELECT * FROM "{schema}"."{table}" ORDER BY random() LIMIT :n')  # noqa: S608
+        # schema/table are double-quoted identifiers, not user values in SQL context.
+        query = sa.text(f'SELECT * FROM "{schema}"."{table}" ORDER BY random() LIMIT :n')
         with self._engine.connect() as conn:
             return pd.read_sql(query, conn, params={"n": n})
 
     def aggregate(self, schema: str, table: str, exprs: list[AggExpr]) -> dict[str, Any]:
         cols = ", ".join(f"{e.sql} AS {e.name}" for e in exprs)
-        query = sa.text(f'SELECT {cols} FROM "{schema}"."{table}"')  # noqa: S608
+        # schema/table are double-quoted identifiers; cols are built from AggExpr.sql (caller-controlled).
+        query = sa.text(f'SELECT {cols} FROM "{schema}"."{table}"')
         with self._engine.connect() as conn:
             row = conn.execute(query).fetchone()
         return dict(zip([e.name for e in exprs], row))
