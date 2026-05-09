@@ -32,7 +32,7 @@ def test_value_in_range_fail(range_det):
 def test_value_in_range_sql_uses_bounds(range_det):
     exprs = range_det.get_aggregations("price")
     sql_text = " ".join(e.sql for e in exprs)
-    assert "0.0" in sql_text or "100.0" in sql_text
+    assert "0.0" in sql_text and "100.0" in sql_text
 
 
 @pytest.fixture()

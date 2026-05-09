@@ -5,21 +5,9 @@ import pandas as pd
 from dqt.adapters._protocol import AggExpr
 from dqt.algorithms._base import BaseAggregateDetector, DetectorResult, DetectorState
 from dqt.algorithms._registry import registry
+from dqt.algorithms.basic._helpers import fraction_result
 
 _ALLOWED_OPS = {">", ">=", "<", "<=", "=", "!="}
-
-
-def _fraction_result(df: pd.DataFrame, slug: str, label: str) -> DetectorResult:
-    from dqt.algorithms._base import compute_verdict
-    row = df.iloc[0]
-    total = int(row["total_count"])
-    frac = int(row["violation_count"]) / total if total > 0 else 0.0
-    return DetectorResult(
-        score=frac,
-        verdict=compute_verdict(frac, slug),
-        plain_english=f"{frac:.2%} of rows violate {label}",
-        details={"violation_fraction": frac, "violation_count": int(row["violation_count"]), "total": total},
-    )
 
 
 @registry.register
@@ -50,7 +38,7 @@ class ColumnPairComparisonDetector(BaseAggregateDetector):
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         label = f"{self._col_a} {self._op} {self._col_b}"
-        return _fraction_result(current, "column_pair_violation", label)
+        return fraction_result(current, "column_pair_violation", label)
 
 
 @registry.register

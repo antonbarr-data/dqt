@@ -21,9 +21,10 @@ class NumericMeanDetector(BaseAggregateDetector):
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         row = reference.iloc[0]
+        sd = float(row["stddev"] or 0)
         return {
             "ref_mean": float(row["mean"]),
-            "ref_stddev": float(row["stddev"]) if float(row["stddev"] or 0) > 0 else 1.0,
+            "ref_stddev": sd if sd > 0 else 1.0,
         }
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
