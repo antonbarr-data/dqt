@@ -1,0 +1,60 @@
+---
+description: Internationalisation guidelines — next-intl, translation namespaces, locale-aware components, backend i18n.
+alwaysApply: false
+---
+
+# Internationalisation (i18n)
+
+## Rules
+- ALL user-facing strings use i18n. No hardcoded English strings in JSX or TS.
+- ALL user-facing numbers, dates, and durations use locale-aware components.
+- Write English first. AI translates the rest via `pnpm run i18n:translate`.
+
+## Frontend — next-intl
+Translation files at `apps/web/messages/<lang>/<module>.json`.
+
+```typescript
+const t = useTranslations('incidents');
+t('filters.status.open')   // → "Open"
+```
+
+## Namespaces
+| Namespace | Route group |
+|---|---|
+| `common` | Shared strings (actions, generic labels, errors) |
+| `overview` | `/overview` |
+| `sources` | `/sources` |
+| `datasets` | `/datasets` |
+| `incidents` | `/incidents` |
+| `metrics` | `/metrics` |
+| `causality` | `/causality` |
+| `tests` | `/tests` |
+| `connections` | Connection wizard |
+| `settings` | `/settings` |
+
+## Locale-aware components (`apps/web/src/components/localized/`)
+| Component | Purpose |
+|---|---|
+| `<LocalizedNumber value={n} />` | Locale-aware decimal/grouping |
+| `<LocalizedStatValue metric={slug} value={n} />` | Uses scale's `valueFormat` (p-values → `.toExponential(2)`) |
+| `<LocalizedDate value={date} format="short\|medium\|long" />` | Date only |
+| `<LocalizedDateTime value={ts} format="short\|medium\|long" />` | Date + time, 12h/24h per locale |
+| `<LocalizedDuration ms={n} />` | Relative durations ("2m ago", "in 14d") |
+
+**Never use `new Date().toLocaleString()` or `Intl.NumberFormat` directly** — use these components.
+
+## Adding strings
+1. Add to the English JSON file (`messages/en/<module>.json`).
+2. Run `pnpm run i18n:translate` to generate other locales.
+3. Verify the JSON structure before adding keys — don't nest deeper than 3 levels.
+4. Reuse existing strings from `common.json` where applicable.
+
+## Backend i18n
+- `Accept-Language` header honoured for error messages and emails.
+- `EmailTranslationService` for outbound notification emails.
+- User's `preferred_language` stored on the profile (default `en`).
+
+## Agent output
+- Agent always responds in the user's `preferred_language`.
+- Plain-English labels for stat methods are translated.
+- Method names (`KS`, `Wasserstein-1`, `ECOD`) are not translated.

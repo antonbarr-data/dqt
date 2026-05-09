@@ -1,0 +1,49 @@
+---
+description: Column-level lineage, sqlglot parsing patterns, dbt manifest ingest, OpenLineage ingestion.
+alwaysApply: false
+---
+
+# Lineage
+
+## What dqt tracks
+Column-level lineage parsed from warehouse SQL via **sqlglot**. Plus dbt manifest ingestion for projects that have one. Plus optional OpenLineage event ingestion.
+
+## Storage
+Edge list in `lineage_edges`:
+```sql
+lineage_edges (
+    upstream_dataset,
+    upstream_column,
+    downstream_dataset,
+    downstream_column,
+    transform_kind,    -- 'direct' | 'aggregation' | 'join' | 'expression'
+    confidence         -- 0.0–1.0
+)
+```
+DAG views materialised through Postgres recursive CTEs.
+
+## Coverage overlay
+Each lineage node carries `% of columns watched` for the lineage screen's heatmap. Calculated at query time from the checks table.
+
+## Failure blast radius
+`lineage.downstream_impact(incident)` returns affected downstream nodes for the "causal trace" panel on the incident detail screen.
+
+## sqlglot patterns
+- Parse with `sqlglot.parse_one(sql, dialect=engine_dialect)`.
+- Walk the AST to extract column-level dependencies.
+- Handle CTEs, subqueries, and window functions.
+- `confidence` is lower for aggregations (column identity is lost) and higher for direct column references.
+- Never try to parse SQL that the warehouse has already executed — parse the DDL/view definitions and dbt model SQL, not query logs.
+
+## dbt manifest ingest
+`dqt.lineage.dbt` ingests `manifest.json`:
+- `nodes` → datasets
+- `sources` → source datasets
+- `parent_map` → upstream edges
+- Column-level lineage from `depends_on.columns` where available (dbt ≥ 1.6).
+
+## OpenLineage ingest
+`dqt.lineage.openlineage` ingests OpenLineage events via the standard input facet. Stores edges with `confidence=1.0` (runtime-observed, not inferred).
+
+## Models (MVP scope)
+`packages/dqt/src/dqt/lineage/models.py` — `LineageEdge`, `LineageNode`, `LineageGraph`. No sqlglot parsing in MVP — models only, parsing deferred to post-MVP.

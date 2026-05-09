@@ -1,0 +1,44 @@
+---
+description: HITL review queue, sampling strategies, label store, active learning feedback loop.
+alwaysApply: false
+---
+
+# HITL (Human-in-the-Loop) Review
+
+## Queue
+A single inbox of items needing human judgment:
+- Proposed causal edges (from discovery pipeline)
+- Uncertain incident classifications (detector disagrees with prior labels)
+- Ambiguous semantic mappings
+- Suggested checks from the auto-baseliner
+
+## Sampling strategy
+- **Default**: uncertainty sampling — items with the lowest model confidence surface first.
+- **Switchable**: query-by-committee when multiple detectors disagree. The committee votes; the most contested item is shown next.
+
+## Label store
+Every reviewed item produces a labeled training example written to `hitl_labels`:
+```sql
+hitl_labels (
+    id, tenant_id,
+    item_type,     -- 'causal_edge' | 'incident' | 'semantic_mapping' | 'check_suggestion'
+    item_id,
+    reviewer_id,
+    label,         -- task-specific enum
+    confidence,    -- reviewer's stated confidence (1-5)
+    notes,
+    created_at
+)
+```
+
+The auto-baseliner and the causality layer both consume `hitl_labels` — the system gets steadily better at the things this user cares about.
+
+## No silent overrides
+A confirmed-then-later-reverted decision is logged with the reviewer, timestamp, and reason. The revision is itself a label in `hitl_labels` with `item_type = 'revision'`.
+
+## Active learning
+- Items processed → model retrained (or fine-tuned) → uncertainty recalculated → queue reprioritised.
+- Retrain is not in MVP. MVP just accumulates labels and reprioritises by static uncertainty score.
+
+## Diversity
+After 10 consecutive items of the same type, interleave a different type to avoid reviewer fatigue.

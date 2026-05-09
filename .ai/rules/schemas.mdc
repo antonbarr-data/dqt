@@ -1,0 +1,53 @@
+---
+description: JSON Schema files for declarative artifacts — checks, metrics, policies, oncall routes.
+alwaysApply: false
+---
+
+# Schemas
+
+## Location
+`shared/schemas/` — JSON Schema files for all declarative YAML artifacts.
+
+## Schemas
+| File | Validates |
+|---|---|
+| `shared/schemas/check.schema.json` | Check YAML definition |
+| `shared/schemas/metric.schema.json` | Metric definition YAML |
+| `shared/schemas/policy.schema.json` | Governance policy YAML |
+| `shared/schemas/oncall-route.schema.json` | On-call routing rule YAML |
+
+The check schema is also mirrored at `packages/dqt/src/dqt/checks/schema/check.schema.json` for library-only users.
+
+## Validation
+All YAML files are validated against the JSON Schema at load time using `jsonschema`. Invalid files raise `CheckDefinitionError` (or equivalent) immediately, not at run time.
+
+## Schema evolution
+- Additive changes (new optional fields): safe, no migration required.
+- Breaking changes (required fields added, field renamed/removed): require a version bump in the schema's `$schema` URL and a migration guide in `docs/`.
+- Never remove required fields without a deprecation cycle.
+
+## OpenAPI schema
+The FastAPI server's OpenAPI schema at `/openapi.json` is generated from Pydantic models. It is the source of truth for the REST API contract. `packages/dqt-types/` is generated from this schema via `make types` using `openapi-typescript`.
+
+- The OpenAPI schema is regenerated in CI via `python -m apps.server.scripts.dump_openapi`.
+- If the schema changes (new field, new endpoint), `make types` must be re-run and the generated `api.ts` is updated (but not committed — it's git-ignored).
+
+## Check schema structure (key fields)
+```jsonschema
+{
+  "$schema": "...",
+  "type": "object",
+  "required": ["name", "dataset", "detector"],
+  "properties": {
+    "name":       { "type": "string" },
+    "dataset":    { "type": "string" },
+    "column":     { "type": "string" },
+    "detector":   { "type": "string" },       // registered slug
+    "params":     { "type": "object" },
+    "baseline":   { "$ref": "#/$defs/Baseline" },
+    "schedule":   { "type": "string" },       // cron expression
+    "severity":   { "enum": ["warn", "fail"] },
+    "group":      { "type": "string" }
+  }
+}
+```

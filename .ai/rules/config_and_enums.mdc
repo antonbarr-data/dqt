@@ -1,0 +1,43 @@
+---
+description: Configuration and enum management, single source of truth in JSON, code generation workflow.
+alwaysApply: false
+---
+
+# Config and Enums
+
+## Single source of truth
+All enums and constants live in JSON files at `shared/config/*.config.json` and are auto-generated for frontend (TypeScript) and backend (Python).
+
+**Exceptions** (Python is authoritative, not JSON):
+- `STAT_SCALES` → `packages/dqt/src/dqt/algorithms/_scales.py` — generated to TS via `make stats-scales`. Python is authoritative because the library is the source of statistical truth.
+- Engine catalog → `packages/dqt/src/dqt/adapters/<engine>/config.py` — generated to `apps/web/src/components/connections/engines.ts` via `make engines`. Python is authoritative because the library is what actually connects.
+
+## Config files
+| File | Contents |
+|---|---|
+| `shared/config/severity.config.json` | `fail`, `warn` severity enum |
+| `shared/config/check_kinds.config.json` | Check kind taxonomy (basic, distribution, drift, …) |
+| `shared/config/incident_status.config.json` | Lifecycle states |
+| `shared/config/roles.config.json` | User roles |
+| `shared/config/verdicts.config.json` | `pass`, `warn`, `fail` |
+
+## Code generation
+Generated files go to `shared/generated/` — git-ignored. Never edit or commit generated files.
+
+```bash
+make stats-scales   # _scales.py → shared/generated/stat-scales.ts
+make engines        # adapter configs → shared/generated/engines.ts
+make types          # server openapi.json → packages/dqt-types/src/api.ts
+make enums          # shared/config/*.json → shared/generated/*.ts + *.py
+```
+
+## Usage rules
+- **Never hardcode enum values** in application code. Import from `dqt_types` (TS) or the generated Python module.
+- **Value not label** in DB. Always store the canonical slug (e.g. `ks`, not `Kolmogorov–Smirnov`). UI looks up the label from the generated dictionary.
+- Database `CHECK` constraints reference the JSON file in a comment so reviewers know where the values come from.
+
+## Adding a new enum value
+1. Add to the relevant `shared/config/*.config.json`.
+2. Run `make enums` to regenerate.
+3. If DB has a `CHECK` constraint, add a migration to update it.
+4. Commit the JSON change and the migration. Never commit generated files.

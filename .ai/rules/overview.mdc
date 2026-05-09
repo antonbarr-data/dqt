@@ -1,0 +1,18 @@
+---
+description: Full project overview — copy of CLAUDE.md. Read project-overview.mdc for the condensed version.
+alwaysApply: false
+---
+
+# dqt — Full Overview
+
+See `CLAUDE.md` at the repo root for the authoritative full overview. This file is kept in sync with it.
+
+For AI assistance, the most relevant targeted rules files are:
+- `general-rules.mdc` — cross-cutting developer preferences
+- `project-overview.mdc` — condensed architecture summary
+- `library-vs-server.mdc` — the single most important boundary rule
+- `algorithms.mdc` — detector contract and statistical correctness
+- `database.mdc` — schema, migrations, TimescaleDB
+- `backend-and-python.mdc` — FastAPI, SQLAlchemy, Pydantic patterns
+- `frontend-architecture.mdc` — Next.js App Router, shadcn, React Query
+- `testing.mdc` — test standards and isolation rules

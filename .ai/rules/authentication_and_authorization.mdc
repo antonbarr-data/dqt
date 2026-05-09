@@ -1,0 +1,53 @@
+---
+description: JWT auth, roles/permissions, sysadmin emulation, middleware, multi-tenant scoping.
+alwaysApply: false
+---
+
+# Authentication and Authorization
+
+## Library
+No auth. Pure functions. Caller is responsible for credentials.
+
+## Server — JWT
+Via `fastapi-users` (or equivalent). User identity in `sub` claim, tenant in `tenant` claim, role in `role` claim.
+
+Auth middleware: `apps/server/src/dqt_server/middleware/auth.py`
+- Decodes JWT on every request.
+- Populates `request.state.user_id`, `request.state.tenant_id`, `request.state.role`.
+
+## Roles
+| Role | Description |
+|---|---|
+| `viewer` | Read-only access to all resources |
+| `editor` | Create/update checks, acknowledge incidents |
+| `admin` | Full access, manage users, configure integrations |
+| `oncall` | Can manage incidents and tasks |
+| `sysadmin` | Cross-tenant access, act-as emulation |
+
+Permissions defined in `apps/server/src/dqt_server/auth/permissions.py`. Map role → allowed (resource, action) pairs.
+
+## Sysadmin emulation
+Sysadmins can act-as another user (`X-Act-As: <user_id>` header). Logged in audit log with both identities (`actor_id` = sysadmin, `impersonating_id` = target user).
+
+## Routes
+```
+POST /auth/register    # new user + tenant
+POST /auth/login       # returns JWT
+GET  /auth/me          # current user profile
+POST /auth/logout      # invalidate session token
+```
+
+## Session tokens
+`user_sessions (id, user_id, token_hash, expires_at)` — token stored as bcrypt hash, never plaintext.
+
+## Testing auth
+Dependency-override `get_current_user` with a fixture user. **Never patch middleware.** Never hardcode a test JWT secret.
+```python
+app.dependency_overrides[get_current_user] = lambda: fixture_user
+```
+
+## Multi-tenant scoping
+All queries pass through `TenantScopedRepository` which injects `tenant_id` automatically. RLS in Postgres as defense-in-depth. See `database.mdc`.
+
+## Password policy
+bcrypt, min 8 chars. No other policy enforced in MVP.

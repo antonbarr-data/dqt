@@ -1,0 +1,50 @@
+---
+description: Causal discovery pipeline, HITL gate, Shapley attribution, do-calculus, E-value sensitivity. Requires dqt[causal].
+alwaysApply: false
+---
+
+# Causality Layer
+
+## Goal
+An automatically-discovered directed graph of metric→metric influence, with edge weights, lags, and uncertainty.
+
+## Discovery pipeline
+1. PCMCI+ on the metric panel (via tigramite)
+2. Prune by stability selection across bootstrap resamples
+3. Annotate edges with Transfer Entropy magnitudes and Granger F-statistics
+4. Present as a proposed DAG for HITL review
+
+## HITL gate (mandatory)
+The discovered DAG is **proposed**, not committed. Owners review / edit / confirm in the Causality screen. Only confirmed edges enter the production DAG used for attribution. The HITL queue prioritises edges with the lowest stability score (uncertainty sampling).
+
+**A confirmed-then-later-reverted decision is logged** with the reviewer, timestamp, and reason. No silent overrides.
+
+## Refresh cadence
+Weekly by default, on-demand from the Causality screen.
+
+## Attribution at incident time
+Shapley value decomposition over the confirmed DAG explains a metric's current move as a fair-share split across upstream parents. This is what the incident detail's "Causal trace" timeline renders.
+
+## E-value sensitivity
+Every reported edge carries an E-value (sensitivity to unobserved confounders). UI shows a "fragile" badge on edges with E-value < 1.5.
+
+## Do-calculus (hypotheticals)
+Pearl-style `do(X = x)` for counterfactual questions ("what if conversion held flat?"). Used by the AI agent when the user asks counterfactual questions. Implemented via DoWhy.
+
+## Honest causal claims
+- Never claim a causal link without a confirmed DAG edge.
+- Always show E-value alongside causal claims.
+- Agent output labels the causal reasoning level (association / intervention / counterfactual) per the ladder of causation.
+
+## Storage
+```sql
+causal_edges (
+    metric_from, metric_to,
+    lag_periods, te_magnitude, granger_f, stability_score,
+    e_value, status,   -- 'proposed' | 'confirmed' | 'rejected'
+    confirmed_by, confirmed_at
+)
+```
+
+## Required extra
+`dqt[causal]` = tigramite, dowhy, causallearn. Without it, the causality module imports but raises `ImportError` on use.

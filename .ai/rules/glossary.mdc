@@ -1,0 +1,73 @@
+---
+description: Project terminology — plain-English to stat method mapping, data model terms, lineage/causal/governance vocabulary.
+alwaysApply: false
+---
+
+# Glossary
+
+## Core data model terms
+| Term | Definition |
+|---|---|
+| **Source** | A warehouse connection (Postgres, BigQuery, etc.). Contains encrypted credentials. A dqt deployment can monitor many sources simultaneously. |
+| **Monitored warehouse** | The user's actual data warehouse (a Source). dqt never writes to it. |
+| **dqt metadata DB** | dqt's own control-plane Postgres. Stores configs, runs, incidents. Separate from monitored warehouses. |
+| **Dataset** | A table or view within a Source. Has columns, row count, last sync time. |
+| **Column** | A column within a Dataset. Has type, PII flag, classification, description, owner. |
+| **Check** | A declarative binding of a Detector to a target (column/table/metric) with params and a baseline. |
+| **Run / RunResult** | One execution of a Check. Produces a verdict (pass/warn/fail), a score, and plain_english. |
+| **Incident** | Opened when a Run's verdict is warn or fail. Has a lifecycle (open→investigating→resolved→closed). |
+| **Baseline** | The reference distribution or window a Detector fits against. Auto-fitted on first run. |
+
+## Algorithm terms
+| Plain English | Stat method | Slug |
+|---|---|---|
+| Distribution shape test | Shapiro-Wilk | `shapiro_wilk` |
+| Normality test | Anderson-Darling | `anderson_darling` |
+| Multimodality test | Hartigan's dip test | `hartigan_dip` |
+| Drift: numeric column | Wasserstein-1 (earth-mover distance) | `wasserstein1` |
+| Drift: numeric column | 2-sample KS test | `ks_2sample` |
+| Drift: categorical column | Chi-square test | `chi_square` |
+| Population Stability Index | PSI | `psi` |
+| Outlier: single column | Modified Z-score (MAD-based) | `mad` |
+| Outlier: tabular high-dim | ECOD | `ecod` |
+| Time-series anomaly | STL residual | `stl` |
+| Changepoint detection | BOCPD | `bocpd` |
+| Causal discovery | PCMCI+ | `pcmci_plus` |
+| Causal attribution | Shapley values | (not a detector — post-processing) |
+| Sensitivity analysis | E-value | (annotation on DAG edges) |
+
+## Lineage terms
+| Term | Definition |
+|---|---|
+| **Column-level lineage** | Which upstream columns a downstream column was derived from. |
+| **Blast radius** | The set of downstream columns/datasets affected if a given column has anomalies. |
+| **Transform kind** | How an upstream column maps to a downstream one: `direct`, `aggregation`, `join`, `expression`. |
+| **Confidence** | 0–1 score on a lineage edge. Lower for aggregations (identity lost), higher for direct column references. |
+
+## Causality terms
+| Term | Definition |
+|---|---|
+| **Driver-tree DAG** | The automatically-discovered directed graph of metric→metric influence. |
+| **Proposed edge** | A causal edge suggested by the discovery pipeline but not yet human-confirmed. |
+| **Confirmed edge** | A causal edge approved by a reviewer. Only confirmed edges are used for attribution. |
+| **E-value** | Sensitivity of a causal edge to unobserved confounders. E-value < 1.5 → "fragile" badge. |
+| **Shapley attribution** | Fair-share split of a metric's movement across upstream causal parents. |
+| **Pearl's ladder** | Three levels of causal reasoning: association (observe), intervention (do), counterfactual (imagine). |
+| **do-calculus** | Pearl's framework for reasoning about interventions: `do(X = x)` — what would happen if we forced X. |
+
+## Governance terms
+| Term | Definition |
+|---|---|
+| **Classification** | Data sensitivity level: `public`, `internal`, `confidential`, `restricted`. |
+| **PII** | Personally Identifiable Information flag on a column. Redacted from logs and blocked from agent context. |
+| **Freshness SLA** | Maximum allowed staleness for a dataset (e.g. "1h"). Violation opens an incident. |
+| **Policy** | A declarative rule enforced by `PolicyEngine` at runtime. |
+| **Audit log** | Append-only record of every actor+action+target in the system. |
+
+## HITL terms
+| Term | Definition |
+|---|---|
+| **HITL** | Human-in-the-Loop — human review of uncertain decisions before they enter the production system. |
+| **Uncertainty sampling** | Prioritise items the model is least confident about. |
+| **Query-by-committee** | Prioritise items where multiple detectors/models disagree most. |
+| **hitl_labels** | The label store — every reviewed item becomes a training example here. |

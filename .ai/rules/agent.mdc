@@ -1,0 +1,68 @@
+---
+description: AI agent loop, Pearl's ladder of causation, tool contract, citation requirement, cost guard.
+alwaysApply: false
+---
+
+# AI Agent
+
+## Provider
+Anthropic Claude. Library exposes a generic `LLMProvider` protocol; Claude is the reference impl. Server defaults to Anthropic. Model configured in `agent.config.model` — keep updated to the latest available.
+
+## Trigger conditions
+1. New incident opened (auto-explain)
+2. User clicks "explain this" on an incident
+3. Scheduled metric review (daily for warn metrics, hourly for fail)
+
+## Reasoning loop — Pearl's ladder of causation
+Agent operates on three explicit levels. Each level is a separate tool call so reasoning is auditable:
+
+| Level | Ladder rung | Agent action |
+|---|---|---|
+| 1 | Association | Describe what changed (detector evidence, score, trend) |
+| 2 | Intervention | Query the causal DAG for likely drivers via `get_dag_attribution` + `do_calculus` |
+| 3 | Counterfactual | Answer "would this have happened anyway?" using DoWhy refuters |
+
+## Tools available to the agent
+Defined in `packages/dqt/src/dqt/agent/tools.py`:
+```python
+query_warehouse(sql: str)          # read-only, sandboxed, cost-capped
+run_detector(slug: str, params: dict)
+walk_lineage(node: str, direction: Literal["upstream", "downstream"])
+get_dag_attribution(metric: str, t: datetime)
+do_calculus(metric: str, intervention: dict)
+search_incidents(query: str)
+get_metric_definition(id: str)
+```
+
+## Citation requirement
+**Every agent claim must cite evidence.** No unsupported assertions. Output format:
+```json
+{
+  "plain_english": "...",
+  "evidence": [
+    {"kind": "detector", "description": "...", "value": "..."},
+    {"kind": "dag_edge", "description": "...", "value": "..."},
+    {"kind": "lineage_path", "description": "...", "value": "..."}
+  ],
+  "confidence": 0.82,
+  "follow_up_questions": ["..."]
+}
+```
+
+## No hallucinated SQL
+Warehouse queries the agent generates are validated against the lineage graph before execution and capped at the source's cost limit. If a query touches a column not in lineage, it is rejected.
+
+## Governance guard
+- PII columns must not enter the agent's context (enforced by `PolicyEngine`).
+- `classification = restricted` datasets are off-limits to the agent unless the user has explicit permission.
+
+## Cost control
+- Per-tenant token budget, configurable.
+- Agent caches reasoning by `(incident_id, evidence_hash)` to avoid re-running the same chain.
+- Rate limiting on `/agent/explain` via SlowAPI.
+
+## MVP agent scope
+`POST /agent/explain`: calls Claude with incident's structured context — detector slug, score, plain_english verdict, dataset name, column name, check params, and last 5 check run scores for trend context. No DAG traversal, no do-calculus, no lineage walking in MVP.
+
+## Language
+Agent always responds in the user's `preferred_language`. Statistical method names (e.g. `KS`, `Wasserstein-1`) are not translated; plain-English labels are.

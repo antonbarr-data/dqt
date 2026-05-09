@@ -1,0 +1,71 @@
+---
+description: Schema, migrations (migra/alembic), TimescaleDB, pgvector, RLS, port assignments.
+alwaysApply: false
+---
+
+# Database
+
+## Engines
+- **Primary OLTP**: PostgreSQL 16+ with TimescaleDB (time-series tables) and pgvector (semantic embeddings).
+- **Embedded analytics**: DuckDB (in-process, for running detectors on sampled data).
+
+## Schema files
+- Library: `packages/dqt/src/dqt/store/sql/schema_*.sql`
+- Server: `apps/server/src/dqt_server/db/schema_*.sql`
+
+These must match the current live schema. Never edit the DB directly.
+
+## Migrations
+- **Simple additive changes**: use `migra` for diff-driven migrations.
+- **Destructive or order-sensitive**: use an **Alembic** script.
+- `make db-migrate` runs `alembic upgrade head`.
+- Never change the DB schema directly — keep all envs in sync via migra or alembic only.
+
+## Local ports
+| DB | Port | Purpose |
+|---|---|---|
+| main | 5434 | dqt metadata DB (dev) |
+| unit tests | 5435 | + 5438–5440 (4 parallel workers) |
+| integration tests | 5436 | |
+| e2e tests | 5437 | |
+
+## Key tables (dqt metadata DB)
+```sql
+tenants           (id, name, created_at)
+users             (id, tenant_id, email, hashed_password, role, created_at)
+sources           (id, tenant_id, engine, display_name, host, port, dbname,
+                   username, encrypted_password, ssl_mode, extra_config, created_at)
+datasets          (id, source_id, tenant_id, schema_name, table_name,
+                   row_count, last_synced_at, created_at)
+columns           (id, dataset_id, name, data_type, pii, owner,
+                   classification, description, tags, created_at)
+checks            (id, tenant_id, dataset_id, column_id, detector_slug,
+                   params, baseline_config, schedule, created_at)
+check_runs        (id, check_id, started_at, finished_at, verdict,
+                   score, plain_english, details)
+incidents         (id, tenant_id, check_id, check_run_id, opened_at,
+                   resolved_at, status, severity, score, detector_slug)
+incident_comments (id, incident_id, user_id, body, created_at)
+audit_log         (id, tenant_id, actor_id, action, target_type,
+                   target_id, payload, created_at)
+```
+
+## TimescaleDB
+`check_runs` and `metric_runs` are designed to become hypertables. In MVP they use a regular `started_at` index. Migrating to a hypertable later is a single `SELECT create_hypertable(...)` call.
+
+## pgvector
+Used for semantic embeddings on column/metric descriptions. Column `embedding VECTOR(1536)` on `columns` and `metrics`. Enables similarity search in the Cmd-K palette and agent grounding.
+
+## Row-level security
+All queries pass through `TenantScopedRepository` which injects `tenant_id` automatically. RLS policies in Postgres as defense-in-depth:
+```sql
+ALTER TABLE datasets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON datasets
+    USING (tenant_id = current_setting('app.tenant_id')::uuid);
+```
+
+## Credentials
+Warehouse credentials encrypted at rest with `cryptography.fernet`. Key from env var `DQT_CREDS_KEY`. Never store plaintext credentials in any table.
+
+## Connection pool
+10 pool / 40 overflow per server instance. Async via asyncpg.

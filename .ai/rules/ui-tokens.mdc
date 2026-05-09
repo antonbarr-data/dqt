@@ -1,0 +1,82 @@
+---
+description: Design tokens — colors, typography, spacing, borders, shadows. Exact values from the dqt design handoff.
+alwaysApply: false
+---
+
+# UI Tokens
+
+## Themes
+Two themes: dark (default) and light. Toggle persisted in `localStorage`, applied as `data-theme="dark|light"` on `<html>`. CSS variables in `app/globals.css`, extended in `tailwind.config.ts`.
+
+## Color tokens (CSS variables)
+Define in `@layer base { :root { ... } [data-theme="light"] { ... } }`.
+
+### Semantic (same in both themes)
+```css
+--accent:      #9DD0B0;
+--accent-bg:   rgba(157, 208, 176, 0.10);
+--pass:        #7FB394;   /* dark */  #5A8F70;  /* light */
+--warn:        #D9B566;   /* dark */  #B89540;  /* light */
+--fail:        #E07B6E;   /* dark */  #C25D52;  /* light */
+--fail-bg:     rgba(224, 123, 110, 0.07);
+```
+
+### Neutrals (vary by theme)
+```css
+/* dark theme (default) */
+--bg-0: #0D0D0D;    /* page background */
+--bg-1: #141414;    /* card / panel */
+--bg-2: #1A1A1A;    /* hover row */
+--bg-3: #202020;    /* selected / active */
+--line:   #262626;  /* primary border */
+--line-2: #1E1E1E;  /* subtle divider */
+--line-3: #2E2E2E;  /* strong border */
+--fg-0: #F0F0F0;    /* primary text */
+--fg-1: #A0A0A0;    /* secondary text */
+--fg-2: #606060;    /* muted / placeholder */
+--fg-3: #383838;    /* disabled */
+
+/* light theme */
+--bg-0: #FAFAFA;
+--bg-1: #FFFFFF;
+--bg-2: #F5F5F5;
+--bg-3: #EEEEEE;
+--line:   #E4E4E7;
+--line-2: #F0F0F0;
+--line-3: #D4D4D8;
+--fg-0: #09090B;
+--fg-1: #52525B;
+--fg-2: #A1A1AA;
+--fg-3: #D4D4D8;
+```
+
+## Typography
+| Class | Font | Size | Weight | Tracking | Notes |
+|---|---|---|---|---|---|
+| `t-display` | Inter Tight | 32px | 200 | -0.02em | page hero |
+| `t-h1` | Inter Tight | 24px | 300 | -0.01em | |
+| `t-h2` | Inter Tight | 18px | 400 | 0 | |
+| `t-h3` | Inter Tight | 14px | 500 | 0 | |
+| `t-body` | Inter Tight | 13px | 400 | 0 | default prose |
+| `t-small` | Inter Tight | 12px | 400 | 0 | |
+| `t-micro` | Inter Tight | 10px | 400 | 0.02em | |
+| `kpi-label` | Inter Tight | 10px | 400 | 0.16em | uppercase |
+| `kpi-value` | JetBrains Mono | 32px | 300 | 0 | tabular-nums |
+
+## Spacing
+Tailwind default 4px grid. No custom spacing values.
+
+## Borders
+Always `1px solid var(--line)`. No thicker borders anywhere.
+
+## Shadows
+Only status-dot halo:
+```css
+box-shadow: 0 0 0 2px rgba(157, 208, 176, 0.20);  /* accent halo */
+box-shadow: 0 0 0 2px rgba(127, 179, 148, 0.20);  /* pass halo */
+box-shadow: 0 0 0 2px rgba(224, 123, 110, 0.20);  /* fail halo */
+```
+No drop shadows. No `shadow-*` Tailwind classes.
+
+## Border radius
+Zero everywhere. `rounded-none` on all shadcn overrides.

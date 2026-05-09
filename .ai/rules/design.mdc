@@ -1,0 +1,58 @@
+---
+description: Design system overview, brand identity, UI philosophy, component inventory.
+alwaysApply: false
+---
+
+# Design System
+
+## Brand
+- Product name: `dqt` — always lowercase.
+- Wordmark: JetBrains Mono, weight 300, `-0.05em` tracking.
+- Dark theme is the default and primary design target. Light is supported.
+
+## UI philosophy
+- **Dense power-user UI.** No decorative whitespace. Information density is a feature.
+- **Zero border-radius.** Sharp corners everywhere. No `rounded-*` classes. No `border-radius` in CSS.
+- **1px borders.** Always 1px, never thicker. Color from `line` token.
+- **No drop shadows.** Only the status-dot halo (`box-shadow: 0 0 0 2px rgba(...)`).
+- **Monospace for data.** JetBrains Mono for all numeric values, statistical scores, IDs, code.
+
+## Color semantic tokens
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `accent` | `#9DD0B0` | same | Primary action, active states |
+| `pass` | `#7FB394` | `#5A8F70` | Passing verdict |
+| `warn` | `#D9B566` | `#B89540` | Warning verdict |
+| `fail` | `#E07B6E` | `#C25D52` | Failing verdict |
+| `fail-bg` | `rgba(224,123,110,0.07)` | same | Row highlight for failing items |
+
+## Motion
+- 220ms `fadeIn` on screen mount (slide-in from 2px offset).
+- 240ms ease-out on bar widths (StatGauge fill animation).
+- No other animations. No bounce, no spring, no decorative transitions.
+
+## Icons
+lucide-react, stroke-width 1.6. Never filled icons. Size 14–16px for inline, 18px for actions.
+
+## Status dot
+8px circle + 2px halo at 18–22% opacity. Colors from pass/warn/fail tokens.
+
+## AppShell
+212px collapsible sidebar + topbar. Topbar: search trigger (Cmd-K), theme toggle, user menu.
+
+Sidebar groups:
+- **Warehouse**: Sources, Datasets, Lineage
+- **Semantic layer**: Metrics, Causality
+- **Watch**: Incidents, Tests
+- **Govern**: Catalog, Policies, Audit
+- **Team**: On-call, Tasks
+
+Active state: left 2px accent border + `bg-1` tint.
+
+Sidebar footer: current on-call ("Jamie Lin · on-call · ends 18:30").
+
+## Tooltips
+6px gap above target, `bg-1` surface, 1px border from `line` token.
+
+## shadcn/ui overrides
+All `Card` components: `className="rounded-none"`. All `Button` + `Badge` components have `accent`, `pass`, `warn`, `fail` variants registered.

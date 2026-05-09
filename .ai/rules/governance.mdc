@@ -1,0 +1,52 @@
+---
+description: Catalog, policies, audit log, data classification, PII handling, access control.
+alwaysApply: false
+---
+
+# Governance
+
+## Catalog
+Every Source, Dataset, Column, and Metric carries:
+- `owner` (email)
+- `domain` (string tag)
+- `tags[]`
+- `classification` (public / internal / confidential / restricted)
+- `pii` (boolean)
+- `freshness_sla` (duration, e.g. "1h")
+- `description` (markdown)
+
+Queryable via REST and via the Cmd-K palette.
+
+## Policies
+Declarative YAML at `governance/policies/*.yaml`:
+```yaml
+- name: no-pii-in-agent
+  rule: "columns WHERE pii = true MAY NOT enter agent context"
+
+- name: finance-owner-required
+  rule: "metrics WHERE domain = 'finance' MUST have owner"
+
+- name: fct-freshness
+  rule: "datasets WHERE name LIKE 'fct_%' freshness_sla = '1h'"
+```
+
+Enforced at runtime by `dqt.governance.PolicyEngine`. Every detector run, every agent tool call, every API call passes through it. Policy violations raise `GovernancePolicyViolation`.
+
+## Audit log
+Append-only `audit_log` table:
+```sql
+audit_log (id, tenant_id, actor_id, action, target_type, target_id, payload JSONB, created_at, ip, user_agent)
+```
+Records: actor, action, target, before/after state, IP, user-agent. Exposed in UI under Settings → Audit.
+
+**Never swallow policy violations** — they always appear in the audit log and surface an error to the caller.
+
+## PII redaction
+- Log filters redact values from columns marked `pii = true`. Statistical results are safe (aggregates).
+- Agent never receives raw PII values, only aggregate stats.
+- `classification = restricted` datasets require explicit ACL grant before any dqt operation.
+
+## Access control
+- Row-level security in Postgres scoped by `tenant_id`.
+- Optional dataset-level ACLs stored in `dataset_acls`.
+- Roles determine which governance actions users can perform (e.g. only `admin` can change classification).

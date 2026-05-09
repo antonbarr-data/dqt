@@ -1,0 +1,61 @@
+---
+description: List and table page patterns — filter bar, virtualized list, KPI band, row interactions.
+alwaysApply: false
+---
+
+# UI List Pages
+
+## Standard layout
+```
+┌──────────────────────────────────────────────────────┐
+│  Page header (title + actions)                       │
+│  KPI band (optional — open incidents, datasets, …)   │
+│  Filter bar (search, dropdowns, date range)          │
+│  Table / virtualized list                            │
+└──────────────────────────────────────────────────────┘
+```
+
+## KPI band
+Row of 4 headline numbers above the list. Use `kpi-label` + `kpi-value` classes. Example:
+```tsx
+<KpiCard label={t('incidents.kpis.open')} value={openCount} />
+<KpiCard label={t('incidents.kpis.meanDetect')} value={meanDetect} unit="min" />
+```
+
+## Filter bar
+- Search input on the left (Cmd-K alternative for module-scoped search).
+- Dropdowns for categorical filters (severity, status, engine, dataset).
+- Date range picker for time filters.
+- "Clear filters" link appears when any filter is active.
+- Filters sync to URL search params.
+
+## Table
+shadcn/ui `Table` base. Row behaviour:
+- Hover: `bg-2` tint (220ms transition).
+- Click: navigate to detail page. Entire row is a link (`<tr>` wraps an `<a>` or uses `router.push`).
+- No checkboxes in MVP (bulk actions deferred).
+
+### Column patterns
+| Content | Component |
+|---|---|
+| Status | `<StatusDot status={...} />` |
+| Verdict / severity | `<Badge variant="pass|warn|fail">` |
+| Detector score | `<StatChip metric={slug} value={score} />` |
+| Sparkline | `<Spark data={history} />` |
+| Timestamp | `<LocalizedDateTime value={ts} format="short" />` |
+| Engine | `<EngineGlyph engine={engine} size={14} />` |
+
+## Virtualized list
+For large lists (incidents, audit log), use `@tanstack/react-virtual` to virtualise rows. Default page size 50; infinite scroll triggers next page at 80% scroll depth via React Query `useInfiniteQuery`.
+
+## Empty state
+When the list is empty (no data yet), show a centred empty-state panel with:
+1. A simple icon (lucide, stroke 1.6).
+2. A one-line heading.
+3. A one-line sub-text.
+4. A primary action button if applicable ("Add source", "Create check").
+
+Never show a blank table with column headers and no rows.
+
+## Loading state
+Show skeleton rows matching the expected row height while the first page loads. Use `animate-pulse` with `bg-2` color.

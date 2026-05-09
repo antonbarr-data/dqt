@@ -2,6 +2,7 @@ from dqt.algorithms.outliers_uni.mad import DoubleMadOutlierDetector, MADOutlier
 from dqt.algorithms.outliers_uni.zscore import ZScoreDetector
 from dqt.algorithms.outliers_uni.adjusted_boxplot import AdjustedBoxplotDetector
 from dqt.algorithms.outliers_uni.auto_outlier import AutoOutlierDetector
+from dqt.algorithms.outliers_uni.outlier_fraction_range import OutlierFractionRangeDetector  # noqa: F401
 
 __all__ = [
     "MADOutlierDetector",
@@ -9,4 +10,5 @@ __all__ = [
     "ZScoreDetector",
     "AdjustedBoxplotDetector",
     "AutoOutlierDetector",
+    "OutlierFractionRangeDetector",
 ]

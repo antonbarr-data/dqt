@@ -1,0 +1,47 @@
+---
+description: Library publishing rules — public API stability, semver discipline, deprecation policy, no server imports.
+alwaysApply: false
+---
+
+# Open-Source Library Rules
+
+## Boundary
+`packages/dqt/` and `packages/dqt-cli/` are MIT-licensed and published to PyPI. `apps/` is the reference deployment, also MIT, but not published to PyPI. Never add server-only deps or imports to `packages/`.
+
+## Public API (`packages/dqt/__init__.py`)
+Everything exported from `dqt.__init__` is public API. Everything else is internal.
+- Public API changes follow semver: breaking changes → major bump, new features → minor bump, fixes → patch.
+- Never remove or rename a public symbol without a deprecation cycle (minimum one minor version with `DeprecationWarning`).
+- Never add required parameters to existing public functions (keyword-only optional params are fine).
+- Document the public API surface in the package docstring and README. Internal modules have no stability guarantees.
+
+## PyPI publishing
+- Library publishes to PyPI on tags matching `dqt-v*` via GitHub Actions.
+- CLI publishes on tags matching `dqt-cli-v*`.
+- Always bump `pyproject.toml` version before tagging.
+- CHANGELOG.md must be updated with every release.
+
+## Importability contract
+```python
+import dqt                              # always works
+from dqt.algorithms.drift import ks2sample  # always works
+from dqt.adapters.postgres import PostgresAdapter  # works with [postgres] extra
+```
+Must not fail with `ImportError` due to missing optional deps unless the user is using a feature that requires those deps. Guard optional imports at use-site:
+```python
+try:
+    import tigramite
+except ImportError as e:
+    raise ImportError("dqt[causal] required") from e
+```
+
+## Detector registration
+Every new detector must:
+1. Implement the `Detector` protocol (fit + score).
+2. Register its slug in `dqt.algorithms._registry`.
+3. Add a `STAT_SCALE` entry to `dqt.algorithms._scales`.
+4. Add a one-paragraph reference entry in `docs/algorithms/`.
+5. Pass the five required tests (see `algorithms.mdc`).
+
+## No hallucinated compatibility
+Compatibility shims (`dqt.compat.gx`, `.soda`, `.elementary`) must be tested against real GX/Soda/Elementary artifacts. Never claim compatibility you haven't tested.

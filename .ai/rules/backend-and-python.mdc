@@ -1,0 +1,73 @@
+---
+description: Python/FastAPI patterns, async, Pydantic v2, SQLAlchemy 2.x async, API conventions.
+alwaysApply: false
+---
+
+# Backend and Python
+
+## Python version and tools
+- Python 3.12+
+- `uv` for package management (never pip directly in the monorepo)
+- ruff for linting and import ordering
+- mypy strict on the library (`packages/dqt/`)
+- structlog for all logging (see `logging.mdc`)
+
+## FastAPI patterns
+- All routes async. No sync handlers.
+- Routers organised by module under `apps/server/src/dqt_server/api/v1/<module>/routes.py`.
+- All endpoints under `/api/v1` (URL-based versioning).
+- Pydantic v2 request/response models in `<module>/schemas/`.
+- OpenAPI spec at `/openapi.json` — generated from Pydantic. `dqt-types` regenerates TS types from this.
+
+## API response shape
+- Collections: `{"data": [...], "meta": {"total": N, "cursor": "..."}}`
+- Singletons: raw object
+- Errors: `{"error": {"code": "...", "message": "...", "details": {...}, "trace_id": "..."}}`
+
+## Pydantic v2
+- Use `model_validator`, `field_validator` (not v1 validators).
+- `model_config = ConfigDict(from_attributes=True)` for ORM models.
+- Never use `.dict()` — use `.model_dump()`.
+- Never use `.parse_obj()` — use `Model.model_validate()`.
+
+## SQLAlchemy 2.x async
+- Always use async sessions: `async with AsyncSession(engine) as session`.
+- Use `select()`, `insert()`, `update()`, `delete()` statement objects.
+- Never use legacy `Query` API.
+- Session factory injected via FastAPI dependency.
+- Transactions managed explicitly — no autocommit.
+
+## Dependency injection
+```python
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSession(engine) as session:
+        yield session
+
+async def get_current_user(request: Request) -> User:
+    return request.state.user   # set by auth middleware
+```
+
+## WebSocket
+`/api/v1/ws` — live incident feed and check-run progress. Auth via the same JWT (token in query param on connect). Broadcasts:
+- `incident.opened`
+- `incident.resolved`
+- `check_run.completed`
+
+## Rate limiting
+Per-tenant + per-IP via SlowAPI on Redis. Stricter limits on agent endpoints (cost guard).
+
+## Background tasks
+Long-running work goes to arq (Redis-backed). Never use FastAPI `BackgroundTasks` for anything that takes >1s or needs durability. arq tasks live in `apps/server/src/dqt_server/worker_tasks.py`.
+
+## Error hierarchy
+```
+DqtError
+├── AdapterError
+├── DetectorError
+├── CheckDefinitionError
+├── LineageError
+├── CausalityError
+├── GovernancePolicyViolation
+└── AgentError
+```
+One global FastAPI exception handler maps these + Pydantic + SQLAlchemy errors to the error envelope.

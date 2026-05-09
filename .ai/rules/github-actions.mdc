@@ -1,0 +1,51 @@
+---
+description: CI/CD pipeline rules — workflow structure, gates, library publishing, deployment triggers.
+alwaysApply: false
+---
+
+# GitHub Actions
+
+## Workflows
+
+### `ci.yml` — runs on every push and PR
+Steps in order:
+1. `install` — `uv sync --all-extras && pnpm install`
+2. `lint` — ruff (Python), mypy strict on `packages/dqt/`, eslint + tsc (frontend)
+3. `test-lib` — `make test-lib` (must pass in <60s)
+4. `test-server-unit` — server unit tests
+5. `test-server-int` — server integration tests (testcontainers Postgres)
+6. `test-web` — Vitest frontend tests
+
+All steps must pass before merge to `main`.
+
+### `deploy.yml` — runs on push to `main`
+Steps in order:
+1. Run `ci.yml` (reuse).
+2. Build Docker images (server + worker + frontend).
+3. Run DB migrations: `alembic upgrade head` against production DB.
+4. Deploy to Cloud Run (server, then worker, then frontend). Rollback if any step fails.
+
+### `publish.yml` — runs on tags `dqt-v*`
+1. Build and publish `packages/dqt` to PyPI.
+2. Build and publish `packages/dqt-cli` to PyPI.
+
+## Branch protection
+- `main` requires CI pass and 1 reviewer approval.
+- Force push to `main` is blocked.
+- Only squash merge allowed (keeps history clean).
+
+## Secrets in CI
+All secrets from GitHub Actions secrets, not hardcoded:
+- `ANTHROPIC_API_KEY`
+- `PYPI_TOKEN`
+- `GCP_SA_KEY` (service account for deployment)
+- `DATABASE_URL` (integration test DB)
+
+## Generated code in CI
+`make types` and `make enums` run in CI to verify generated files match source. If they differ, CI fails with a diff. Generated files are never committed — if they drift, the PR author must re-run the make target.
+
+## Cache
+Cache `uv` pip cache and `pnpm` store between runs. Cache key: hash of `uv.lock` + `pnpm-lock.yaml`.
+
+## Timeout
+CI workflow: 15 min max. Integration tests: 10 min max. If tests regularly hit this, investigate — don't raise the limit without understanding why.

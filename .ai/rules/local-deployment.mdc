@@ -1,0 +1,81 @@
+---
+description: Local development setup — Docker stack, ports, start scripts, hot reload, demo seed.
+alwaysApply: false
+---
+
+# Local Deployment
+
+## Architecture
+Server, worker, and frontend run natively (not in Docker). Postgres, Redis, MailHog in Docker.
+
+## Ports
+| Service | Port |
+|---|---|
+| Server (FastAPI) | 8000 |
+| Frontend (Next.js) | 3000 |
+| Postgres (main) | 5434 |
+| Postgres (unit test) | 5435 + 5438–5440 |
+| Postgres (integration test) | 5436 |
+| Postgres (e2e test) | 5437 |
+| Redis | 6379 |
+| MailHog (email catch-all) | 8025 |
+| Adminer (DB browser) | 8081 |
+
+## Config
+- `local.env` — git-tracked, non-secrets (service URLs, feature flags, dev settings).
+- `.env` — git-ignored, secrets only (`DQT_CREDS_KEY`, `ANTHROPIC_API_KEY`, DB passwords).
+
+## First-time setup
+```bash
+make install               # uv sync + pnpm install
+./run_local/start.sh       # Docker stack up + migrations + demo seed
+make dev-server            # FastAPI on :8000 (hot reload via uvicorn --reload)
+make dev-web               # Next.js on :3000 (hot reload)
+```
+
+## Daily dev
+```bash
+make dev-server            # FastAPI on :8000
+make dev-web               # Next.js on :3000
+# Worker (if needed):
+make dev-worker            # arq worker
+```
+
+Hot reload: frontend and backend reload automatically — don't restart them.
+
+## Server modes
+- `uvicorn dqt_server.main:app --reload` — dev (hot reload, debug logging)
+- `./run_local/start-server-prod.sh` — Gunicorn + uvicorn workers (production-like)
+
+## Demo seed data
+```bash
+dqt demo seed
+```
+Populates the local Postgres with:
+- 1 tenant + 1 admin user (`admin@dqt.local` / `password`)
+- 1 Postgres source (pointing at synthetic `analytics` schema in same DB)
+- 3 datasets: `fct_orders`, `fct_sessions`, `dim_customers`
+- ~20 checks (mix of rule-based and statistical)
+- Pre-run check history with injected anomalies
+- 3 open incidents (so Overview and Incidents aren't empty on first load)
+
+## Docker stack (`run_local/docker-compose.yml`)
+| Service | Image | Port |
+|---|---|---|
+| postgres | `postgres:16` | 5434 |
+| redis | `redis:7-alpine` | 6379 |
+| mailhog | `mailhog/mailhog` | 8025 |
+| adminer | `adminer` | 8081 |
+
+## Migrations
+```bash
+make db-migrate            # alembic upgrade head
+make db-rollback           # alembic downgrade -1
+```
+
+## Validate the stack
+```bash
+make test-lib              # library tests (<60s)
+make lint                  # ruff + mypy + eslint + tsc
+open http://localhost:3000  # UI should show demo data
+```

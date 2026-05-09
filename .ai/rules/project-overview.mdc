@@ -1,0 +1,47 @@
+---
+description: Project context, positioning, and high-level architecture. Read this first for any new task.
+alwaysApply: true
+---
+
+# Project Overview
+
+## What is dqt
+Open-source data quality, observability, semantic, and causality library + service. Watches dbt-built warehouses (and any SQL warehouse) for statistical drift, anomalies, silent regressions, and explains *why* metrics moved.
+
+**Positioning**: pip-installable Python library at the core (MIT). `apps/server` (FastAPI) exposes it as a multi-tenant service. `apps/web` (Next.js) is the power-user UI. Library is usable standalone in notebooks, CI pipelines, and Airflow/Dagster/Prefect tasks without the server.
+
+**Scope vs. peers**: superset of Great Expectations (declarative checks), Soda (SodaCL rules), and Elementary (dbt artifact ingestion). dqt additionally ships a full statistical/ML detector library, a semantic layer, column-level lineage, causal-discovery DAGs, an HITL review loop, an AI agent for incident explanation, and an on-call/incident manager.
+
+## Key data model
+`Source` (warehouse connection) → `Dataset` (table/view) → `Column` → `Check` (statistical or rule) → `Run` (one execution) → `Incident` (when a Run breaches threshold).
+
+On top: `Metric` (semantic-layer definition) → `MetricDriverEdge` (causal edge in the driver-tree DAG) → `MetricRun` (snapshot of metric value over time).
+
+## Tech stack
+- **Python**: 3.12+, FastAPI, SQLAlchemy 2.x async, Alembic, Pydantic v2, arq, ibis-framework, sqlglot, DuckDB
+- **Databases**: Postgres + TimescaleDB (results store), pgvector (semantic embeddings), Redis (cache + arq broker)
+- **Frontend**: Next.js 14 App Router, Tailwind, shadcn/ui, lucide-react, zustand, React Query
+- **AI**: Anthropic Claude SDK
+
+## Monorepo layout
+```
+packages/dqt/       # pip-publishable library (MIT) — no FastAPI, no auth, no web
+packages/dqt-cli/   # dqt command-line tool
+packages/dqt-types/ # generated TS types (git-ignored, from `make types`)
+apps/server/        # FastAPI multi-tenant service
+apps/worker/        # arq worker for scheduled runs + agent loop
+apps/web/           # Next.js 14 frontend
+shared/config/      # JSON enums + constants (single source of truth)
+shared/schemas/     # JSON Schema files for declarative artifacts
+shared/generated/   # generated TS + Python (git-ignored)
+docs/               # documentation (algorithms/, architecture/, governance/)
+examples/           # runnable library examples
+run_local/          # Docker compose stack + start scripts
+```
+
+## Two database concepts (critical separation)
+1. **dqt metadata DB** — dqt's own control-plane Postgres. Stores tenants, users, source configs, datasets, checks, runs, incidents. dqt owns this entirely.
+2. **Monitored warehouses** — the user's actual data warehouses that dqt connects to read-only at runtime. Each is a `Source` record. dqt never writes to monitored warehouses.
+
+## Brand
+`dqt` wordmark — lowercase, JetBrains Mono weight 300, `-0.05em` tracking. Zero border-radius everywhere. Sharp corners. Dense power-user UI. Dark default, light supported.

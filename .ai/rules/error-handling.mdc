@@ -1,0 +1,63 @@
+---
+description: Error handling patterns, library exception hierarchy, FastAPI error envelope, frontend error handling.
+alwaysApply: false
+---
+
+# Error Handling
+
+## Backend error envelope
+```json
+{
+  "error": {
+    "code": "DETECTOR_NOT_FOUND",
+    "message": "No detector registered with slug 'xyz'",
+    "details": {"slug": "xyz"},
+    "trace_id": "00-4bf92f3577b34da6-00f067aa0ba902b7-01"
+  }
+}
+```
+
+## Library error hierarchy
+```
+DqtError (base)
+├── AdapterError           # warehouse connection/query failures
+├── DetectorError          # detector fit/score failures
+├── CheckDefinitionError   # invalid check YAML
+├── LineageError           # lineage parsing/query failures
+├── CausalityError         # causal discovery/attribution failures
+├── GovernancePolicyViolation  # policy enforcement
+└── AgentError             # LLM provider / tool call failures
+```
+
+All errors carry `code: str` and `details: dict`. Code is a `SCREAMING_SNAKE_CASE` constant.
+
+## FastAPI global handler
+One global exception handler in `apps/server/src/dqt_server/main.py` maps:
+- `DqtError` subclasses → appropriate HTTP status + error envelope
+- `pydantic.ValidationError` → 422 + field-level error details
+- `sqlalchemy` errors → 500 (log internally, return generic message)
+- `HTTPException` → pass through
+
+```python
+@app.exception_handler(DqtError)
+async def dqt_error_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.http_status,
+        content={"error": {"code": exc.code, "message": str(exc), "trace_id": get_trace_id()}}
+    )
+```
+
+## Never swallow exceptions
+Always let the exception propagate to the global handler. User must always know when there's been a technical error. No `except Exception: pass`.
+
+## Frontend error handling
+`handleApiError(error, form)` in `apps/web/src/lib/error-handling.ts`:
+- Reads `error.code` and `error.details` from the envelope.
+- Toast via `sonner` for non-form errors.
+- Field errors mapped to `react-hook-form` automatically when `error.details` has field-keyed messages.
+
+## Trace ID
+W3C traceparent format. Injected by middleware into every request context. Appears in every log line and every error response. Used for correlating frontend errors with backend logs.
+
+## Logging on error
+Every error logged with `trace_id`, `tenant_id`, `user_id`, and request path before returning the response. See `logging.mdc`.

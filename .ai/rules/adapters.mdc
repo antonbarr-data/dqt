@@ -1,0 +1,65 @@
+---
+description: Warehouse adapter contract, sampling rules, cost guards, read-only enforcement, health check protocol.
+alwaysApply: false
+---
+
+# Warehouse Adapters
+
+## Supported engines
+PostgreSQL, MySQL, ClickHouse, BigQuery, Snowflake, Redshift, Databricks SQL, DuckDB, Trino/Presto.
+
+## WarehouseAdapter protocol (`packages/dqt/src/dqt/adapters/_protocol.py`)
+```python
+class WarehouseAdapter(Protocol):
+    def health_check(self) -> HealthCheckResult: ...
+    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame: ...
+    def aggregate(self, schema: str, table: str, exprs: list[AggExpr]) -> dict: ...
+    def describe_columns(self, schema: str, table: str) -> list[ColumnMeta]: ...
+    def list_schemas(self) -> list[str]: ...
+    def list_tables(self, schema: str) -> list[str]: ...
+    def cost_estimate(self, schema: str, table: str, exprs: list[AggExpr]) -> CostEstimate: ...
+    def cancel(self, query_id: str) -> None: ...
+```
+
+Every adapter wraps an ibis-framework backend. This keeps detector code uniform across all engine types.
+
+## Health check protocol (6 steps)
+Matches the wizard's Test & Verify screen. Each step returns `{name, status, latency_ms, detail}`.
+1. TCP reach
+2. Auth
+3. info_schema read
+4. Sample SELECT
+5. Latency probe
+6. Clock skew
+
+## Sampling rules
+- Default sample: reservoir-sample of 100,000 rows or `LIMIT 100000 TABLESAMPLE` where supported.
+- Never read full tables for stats.
+- Bigger samples are configurable per check via `sample_n` param.
+- Detector contracts guarantee correctness on 100k-row samples.
+
+## Cost guard (BigQuery and Snowflake)
+Before executing any query, call `dryRun` (BigQuery) or `EXPLAIN` (Snowflake) to estimate bytes scanned. Refuse to run if estimated bytes exceed `source.max_bytes_per_query` (default 50 GB). Log the refused query with the cost estimate.
+
+## Read-only enforcement
+Every adapter wraps queries in a read-only transaction or connects with a read-only role. **Never write to a monitored warehouse.** This is non-negotiable.
+
+## Engine-specific config
+`packages/dqt/src/dqt/adapters/<engine>/config.py` defines the exact fields shown in the connection wizard. **Field set must match `apps/web/src/components/connections/engines.ts` 1:1** — that file is generated from the Python config via `make engines`.
+
+## Why ibis
+Portable expressions across engines, lazy execution, push-down to the warehouse for big aggregates, fall back to DuckDB for stat work on samples.
+
+## DuckDB as stat engine
+When dqt samples rows from a warehouse it loads them into DuckDB and runs all detectors there. Keeps all detector code uniform — detectors never see engine-specific SQL.
+
+## Adapter tests
+`packages/dqt/tests/adapters/` — run against real engines via testcontainers (Postgres, MySQL, ClickHouse) or recorded fixtures with vcrpy (BigQuery, Snowflake).
+
+## File location
+`packages/dqt/src/dqt/adapters/<engine>/`
+```
+config.py     # connection fields (must match frontend engines.ts)
+adapter.py    # WarehouseAdapter implementation
+__init__.py
+```

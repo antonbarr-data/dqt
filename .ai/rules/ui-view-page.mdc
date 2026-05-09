@@ -1,0 +1,56 @@
+---
+description: Detail/view page patterns — two-column layouts, tabs, evidence panels, activity feeds.
+alwaysApply: false
+---
+
+# UI View (Detail) Pages
+
+## Standard detail page layout
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Page header + status line                                   │
+│  Tab bar (optional — Overview / Tests / Lineage / Samples)  │
+├──────────────────────────────────┬──────────────────────────┤
+│  Main content (1fr)              │  Right rail (380–460px)  │
+└──────────────────────────────────┴──────────────────────────┘
+```
+
+Not every page uses a right rail — incidents and datasets do, sources do not.
+
+## Dataset detail (`/datasets/[id]`)
+- **Left column**: column list (name, type, PII flag, classification).
+- **Right panel**: for the selected column — `HistDual` + `CDFPair` + `StatGauge` bank showing every check's score.
+- Selected column persisted in URL (`?col=order_total`).
+- Tabs: Overview / Tests / Lineage / Samples.
+
+## Incident detail (`/incidents/[id]`)
+Top-to-bottom sections:
+1. **Headline KPI band** — score, severity, time to detect, check name.
+2. **Statistical evidence** — `StatGauge` + `TimeSeries` + `HistDual` for the triggering detector.
+3. **Segment decomposition** — which dimension slices drove the anomaly.
+4. **Causal trace** — Shapley attribution timeline (post-MVP).
+
+Right rail:
+- Rule definition (detector slug, params, baseline config).
+- Activity log (status transitions, comments, reviewer actions).
+- Agent explanation panel (plain English + cited evidence with links to evidence sections).
+- Related past incidents (same check, similar score range).
+
+## Metrics detail (`/metrics/[id]`)
+1fr / 460px split:
+- Left: metrics table.
+- Right: selected metric — YAML source, 30-day health sparkline, "Watching" panel with the four auto-checks (shape change / level shift / spike / trend break).
+
+## Causality screen (`/causality`)
+1fr / 380px split:
+- Left: `CausalDAG` SVG + `KLMatrix` heatmap.
+- Right: attribution rail — Shapley breakdown + agent's plain-English causal summary.
+
+## Tabs
+Use shadcn `Tabs`. Tab bar is sticky at the top of the content area. Selected tab in URL param (`?tab=tests`).
+
+## Evidence linking
+Agent citations and statistical evidence are cross-linked. Clicking a citation in the agent panel scrolls to the relevant evidence section. Sections have `id` anchors.
+
+## Activity log
+Reverse-chronological list of events: status transitions, comments, reviewer actions. Each entry: avatar, actor name, action string, timestamp (`<LocalizedDateTime format="relative" />`).

@@ -30,6 +30,7 @@ forecast = ["prophet>=1.1", "stumpy>=1.4"]
 deep     = ["torch>=2.3", "pyod[deep]>=1.1"]
 explain  = ["shap>=0.45", "pgmpy>=0.1"]
 files    = ["openpyxl>=3.0", "pyarrow>=14.0"]
+reports  = ["matplotlib>=3.8"]
 
 [build-system]
 requires = ["hatchling"]

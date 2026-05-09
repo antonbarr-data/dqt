@@ -97,6 +97,13 @@ Thumbs.db
 tmp/
 *.log
 logs/
+
+# --- Generated demo reports ---
+examples/*/reports/
+apps/web/tsconfig.tsbuildinfo
+
+# --- Unrelated legacy code ---
+dql/
 .cache/
 
 # --- Docker / DB volumes ---

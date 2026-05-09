@@ -1,0 +1,86 @@
+---
+description: Testing standards — library / server / frontend split, isolation, markers, test data, commands.
+alwaysApply: false
+---
+
+# Testing
+
+## Tools
+- pytest — Python unit + integration tests
+- Vitest — frontend unit tests
+- Playwright — E2E tests (post-MVP)
+
+## Database isolation
+| Test type | Postgres port | Workers |
+|---|---|---|
+| Library unit | none (MemoryStore) | — |
+| Server unit | none (mock library) | — |
+| Server integration | 5436 | 1 |
+| E2E | 5437 | 1 |
+| Library unit (parallel) | 5435 + 5438–5440 | 4 |
+
+## Library tests (`packages/dqt/tests/`)
+- Must run without Postgres, Redis, or network.
+- Use `MemoryStore` and offline fixture data.
+- Must complete in <60s.
+
+**Per-detector requirements** (5 tests each):
+1. Known-answer test against a textbook example.
+2. Behaviour tests on synthetic distributions (drift / no-drift, anomaly / no-anomaly).
+3. `hypothesis` property test for numerical stability (no NaN/Inf, bounded scores).
+4. Golden-file test for `STAT_SCALE` verdict (pass/warn/fail boundary).
+5. Time-series detectors: seasonality and trend robustness test.
+
+## Adapter tests (`packages/dqt/tests/adapters/`)
+- Real engines via testcontainers (Postgres, MySQL, ClickHouse).
+- Recorded fixtures via vcrpy (BigQuery, Snowflake — no credentials in CI).
+- Marker: `@pytest.mark.adapter`.
+
+## Server tests (`apps/server/tests/`)
+- **Unit**: mock the library. Test route logic, auth, error handling, tenant scoping.
+- **Integration**: real library + testcontainers Postgres (port 5436). Test actual DB behaviour.
+- Marker: `@pytest.mark.unit` / `@pytest.mark.integration`.
+
+## Auth in server tests
+Dependency-override `get_current_user` with a fixture user. **Never patch middleware.**
+```python
+app.dependency_overrides[get_current_user] = lambda: fixture_admin_user
+```
+
+## Frontend tests (`apps/web/`)
+Vitest for component unit tests. Test rendering, user interactions, error states. No Playwright in MVP.
+
+## Pytest markers
+```python
+@pytest.mark.unit        # no external deps
+@pytest.mark.integration # needs real DB
+@pytest.mark.adapter     # needs real warehouse or vcrpy fixture
+@pytest.mark.slow        # takes >5s
+```
+
+## Test data
+```
+tests/data/
+├── warehouses/          # SQLite/DuckDB fixtures simulating warehouse schemas
+├── dbt_artifacts/       # sample manifest.json, catalog.json
+└── golden_outputs/      # expected DetectorResult JSON for golden-file tests
+```
+
+## Commands
+```bash
+make test-lib              # library unit tests (<60s)
+make test-server-unit      # server unit tests
+make test-server-int       # server integration tests (starts testcontainer)
+make test-adapter          # adapter tests
+make test-web              # frontend Vitest tests
+make test-all              # everything
+
+# Fast iteration flags
+./tests/run_unit_tests.sh --skip-db-reset --skip-schema-gen
+```
+
+## Best practices
+- Test the real library in integration tests — don't mock detectors.
+- Pytest style (functions + fixtures), not unittest class style.
+- Use `pytest.approx` for float comparisons.
+- Test names: `test_<method>_<scenario>` (e.g. `test_wasserstein1_detects_distribution_shift`).

@@ -1,0 +1,68 @@
+---
+description: Cloud deployment procedures — Google Cloud Run reference deployment, secrets, CI/CD, edge routing.
+alwaysApply: false
+---
+
+# Cloud Deployment
+
+## Reference platform
+Google Cloud Run (but containerised — runs on any container platform: ECS, Fly, Kubernetes).
+
+## Services
+| Service | Platform | Spec | Port |
+|---|---|---|---|
+| Backend (server) | Cloud Run | 4Gi / 2CPU | 8080 |
+| Worker | Cloud Run (different entrypoint) | 2Gi / 1CPU | — |
+| Frontend | Cloud Run (or static CDN target) | Next.js standalone | 8080 |
+| Database | Cloud SQL Postgres 16 | TimescaleDB + pgvector | — |
+| Cache/Queue | Memorystore Redis | — | 6379 |
+
+Worker entrypoint: `arq dqt_server.worker.WorkerSettings`.
+
+## Database
+Cloud SQL Postgres 16 with TimescaleDB and pgvector extensions enabled. Pool: 10 / 40 overflow. Private access via VPC connector.
+
+## Secrets
+Secret Manager prefix `dqt-*`:
+- `dqt-database-url`
+- `dqt-jwt-signing-key`
+- `dqt-anthropic-api-key`
+- `dqt-creds-key` (for warehouse credential encryption)
+- `dqt-warehouse-credentials-{source_id}` (per source, generated at creation time)
+
+## Edge routing
+Load balancer routes:
+- `/api/*` → server service
+- `/ws/*` → server service (WebSocket)
+- Everything else → frontend service
+
+Static assets served via CDN.
+
+## Setup and deployment
+```bash
+./setup/cloud/google-cloud-setup.sh    # first time only
+./deployment/cloud/deploy.sh           # manual rollout
+```
+
+## CI/CD (GitHub Actions)
+On every push to `main`:
+1. Install (uv sync + pnpm install)
+2. Lint (ruff + mypy + eslint + tsc)
+3. Unit + integration tests
+4. Build Docker images
+5. Run DB migrations (`alembic upgrade head`)
+6. Deploy server + worker + frontend
+
+On tags matching `dqt-v*`:
+- Publish `packages/dqt` to PyPI
+- Publish `packages/dqt-cli` to PyPI
+
+## Library publishing
+```bash
+git tag dqt-v0.1.0
+git push origin dqt-v0.1.0
+# CI publishes to PyPI automatically
+```
+
+## Environment variables in production
+Set via Cloud Run environment or Secret Manager mounts. Never bake secrets into the image. Use `local.env` template as reference for required vars.

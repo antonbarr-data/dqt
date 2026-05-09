@@ -1,0 +1,86 @@
+---
+description: Custom SVG chart components — StatGauge, StatChip, Spark, TimeSeries, HistDual, CDFPair, KLMatrix, CausalDAG, EngineGlyph.
+alwaysApply: false
+---
+
+# UI Charts and Visualisation Components
+
+All custom chart components live in `apps/web/src/components/charts/`. All are client components.
+
+## StatGauge
+The most-reused component. Horizontal bar with green/amber/red zones and threshold tick marks.
+
+```tsx
+<StatGauge metric="wasserstein1" value={0.047} label="Wasserstein-1" />
+```
+
+- Reads `STAT_SCALES` from `lib/stats.ts` (generated from `_scales.py`). **Never hardcode thresholds inside the component.**
+- Shows `pass`/`warn`/`fail` color based on verdict from the scale.
+- Shows `plain_english_label` below the bar.
+- Threshold tick positions are derived from `warn_threshold` and `fail_threshold`.
+- `direction` ("lower_is_better" vs "higher_is_better") determines which end is red.
+
+## StatChip
+Inline compact gauge for table cells. Same scale logic as `StatGauge` but minimal — just a colored badge with the value.
+
+```tsx
+<StatChip metric="ks_2sample" value={0.12} />
+```
+
+## InfoTip
+`(i)` icon + tooltip. Exposes the underlying stat method description from `STAT_SCALES.hint`.
+```tsx
+<InfoTip metric="wasserstein1" />
+```
+
+## Spark
+Tiny inline SVG line chart (~60×20px) for sparklines in tables.
+```tsx
+<Spark data={scores} w={60} h={20} color="var(--accent)" />
+```
+
+## TimeSeries
+Larger time series with confidence band, anomaly markers, changepoint verticals.
+```tsx
+<TimeSeries data={runs} band={ciData} anomalies={anomalyIndices} changepoints={cpDates} />
+```
+
+## HistDual
+Overlapping histograms — current (orange/accent) over baseline (gray). Shows distribution shift visually.
+```tsx
+<HistDual a={currentBins} b={baselineBins} />
+```
+
+## CDFPair
+Overlapping CDFs with KS supremum point marked. Used on the datasets detail screen alongside `HistDual`.
+```tsx
+<CDFPair a={currentCDF} b={baselineCDF} />
+```
+
+## KLMatrix
+Symmetric heatmap of pairwise KL divergence across metrics. Diagonal masked.
+```tsx
+<KLMatrix metrics={metricNames} matrix={klValues} />
+```
+
+## CausalDAG
+SVG DAG, bezier edges, weight + lag labels.
+- Hover highlights upstream/downstream nodes.
+- Click-to-select fires `onSelect(nodeId)`.
+- Edge color encodes edge weight (green = strong, gray = weak).
+- "Fragile" badge on edges with E-value < 1.5.
+
+```tsx
+<CausalDAG nodes={nodes} edges={edges} target="gmv_usd" onSelect={setSelected} />
+```
+
+## EngineGlyph
+Per-engine SVG icon. One glyph per engine: Postgres, MySQL, BigQuery, ClickHouse, Snowflake, Redshift, Databricks, DuckDB, Trino.
+```tsx
+<EngineGlyph engine="postgres" size={24} />
+```
+
+## Chart principles
+- All charts use SVG or canvas. No third-party chart library (recharts, etc.) — bespoke for the design system.
+- Colors from CSS variables, not hardcoded hex.
+- All charts are accessible: `aria-label` on the `<svg>`, a screen-reader-only `<caption>` with the key insight.

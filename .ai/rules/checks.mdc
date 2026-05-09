@@ -1,0 +1,67 @@
+---
+description: Check YAML format, auto-baselining, SodaCL/dbt compatibility, check schema source of truth.
+alwaysApply: false
+---
+
+# Checks
+
+## What is a Check
+A `Check` is a YAML or Python definition that binds a detector to a target (column / table / metric) with parameters and a baseline reference. Checks are the declarative test layer on top of detectors.
+
+## Schema
+`packages/dqt/src/dqt/checks/schema/check.schema.json` is the authoritative JSON Schema. All YAML check files are validated against it. Never add check fields that aren't in this schema.
+
+## Format
+Strict superset of SodaCL with native dbt-style tests included:
+```yaml
+checks:
+  - name: order_total_drift
+    dataset: public.fct_orders
+    column: order_total
+    detector: wasserstein1
+    params:
+      threshold: 0.1
+    baseline:
+      window_days: 14
+    schedule: "0 * * * *"    # hourly
+    severity: warn
+```
+
+## Auto-baselining
+When a Check is created, dqt fits the reference window automatically (default last 14 days). Re-fits on schedule or manual trigger ("Re-fit baselines" in the UI). `baseline.window_days` is the rolling reference window.
+
+## Plain-English authoring
+The UI's natural-language input compiles to YAML via the agent. **The YAML is always the source of truth** — the natural-language input is never executed directly.
+
+## SodaCL compatibility
+`dqt.compat.soda` parses SodaCL YAML into native dqt checks. Supported SodaCL checks map to the nearest dqt detector. Unsupported SodaCL checks raise a `CheckDefinitionError` with an explanation.
+
+## dbt-style tests
+dbt `not_null`, `unique`, `accepted_values`, `relationships` map directly to dqt basic checks via the check YAML format.
+
+## Test taxonomy (matches UI tabs)
+| UI tab | `group` field | Example detectors |
+|---|---|---|
+| Basic | `basic`, `schema`, `referential` | not_null, unique, row_count_between |
+| Distribution | `distribution` | ks1sample, shapiro_wilk, hartigan_dip |
+| Outliers | `outliers_uni`, `outliers_multi` | mad, ecod, isolation_forest |
+| Time series | `timeseries` | stl, cusum, holt_winters |
+| Drift | `drift` | ks2sample, wasserstein1, psi |
+| Dependencies | `info`, `ensemble` | cramers_v, mutual_information |
+| Auto-baselined | any with baseline config | (any detector above) |
+
+## Check lifecycle
+1. Check defined (YAML or via UI).
+2. Baseline fitted automatically on first run (`dqt.runner.Runner.fit(check, source)`).
+3. Check runs on schedule or on-demand.
+4. `RunResult` saved to store.
+5. If verdict is `warn` or `fail`, an `Incident` is opened.
+6. When check passes for `auto_resolve_after` consecutive runs (default 3), incident auto-resolves.
+
+## Runner contract
+`packages/dqt/src/dqt/runner/runner.py`:
+```python
+class Runner:
+    def fit(self, check: Check, source: WarehouseAdapter) -> None: ...
+    def run(self, check: Check, source: WarehouseAdapter) -> RunResult: ...
+```

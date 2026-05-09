@@ -46,5 +46,17 @@ STAT_SCALES: dict[str, StatScale] = {
         StatScale("adjusted_boxplot_fraction",   0.20, 0.01,  0.05,  "lower_is_better",  "Outlier fraction (adj. boxplot)",  "Fraction outside medcouple-adjusted Tukey fences; Hubert & Vandervieren 2008"),
         StatScale("isolation_forest_fraction",  0.20,  0.05,  0.10,  "lower_is_better",  "Outlier fraction (IF)",      "Fraction of rows classified as anomalies by Isolation Forest"),
         StatScale("stl_residual_zscore",       10.0,   3.0,   5.0,   "lower_is_better",  "STL residual Z-score",       "Max absolute Z-score of STL residuals over the current window"),
+        StatScale("freshness_seconds_behind", 86400*7, 3600, 86400, "lower_is_better",
+                  "Data freshness", "Seconds since the most recent row timestamp"),
+        StatScale("null_fraction", 1.0, 0.01, 0.05, "lower_is_better",
+                  "Null fraction", "Fraction of rows where the column is NULL"),
+        StatScale("string_case_violation", 1.0, 0.001, 0.01, "lower_is_better",
+                  "String case violation", "Fraction of rows with wrong case"),
+        StatScale("sql_assertion_violation", 1.0, 0.001, 0.01, "lower_is_better",
+                  "SQL assertion violation", "Fraction of rows failing the custom SQL condition"),
+        StatScale("date_part_missing_fraction", 1.0, 0.01, 0.05, "lower_is_better",
+                  "Date-part completeness", "Fraction of expected date buckets with no data"),
+        StatScale("outlier_fraction_drift", 1.0, 0.001, 0.01, "lower_is_better",
+                  "Outlier fraction drift", "Deviation of current outlier fraction from historical baseline range"),
     ]
 }

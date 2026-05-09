@@ -1,0 +1,47 @@
+---
+description: Page header patterns — title, breadcrumbs, primary actions, back navigation.
+alwaysApply: false
+---
+
+# UI Page Headers
+
+## Standard page header
+Every page has a consistent header:
+```
+┌──────────────────────────────────────────────────────┐
+│  [← Back]  Breadcrumb / Title         [Actions]     │
+│  (optional sub-text / status line)                   │
+└──────────────────────────────────────────────────────┘
+```
+
+## Title
+- `t-h1` class (Inter Tight, 24px, weight 300, -0.01em tracking).
+- Plain English, sentence case, no punctuation.
+- For dataset/incident/metric detail pages, title is the resource name.
+
+## Breadcrumbs
+Shown on detail pages: `Sources / my-warehouse` or `Incidents / INC-1042`.
+- Separator: `/` in `fg-2` color.
+- Current page is non-clickable.
+- Parent segments are links.
+
+## Actions
+Right-aligned. Maximum 2 visible primary actions. Overflow into a `...` menu (shadcn DropdownMenu).
+
+Button sizing: `size="sm"` for header actions. Use `variant="outline"` for secondary, `variant="accent"` for primary.
+
+## Back navigation
+`← Back` link on detail pages. Uses `router.back()` if navigated from the list, or explicit list URL as fallback.
+
+## Status line (detail pages)
+Below the title: compact status indicators — severity badge, lifecycle status, last updated time, owner.
+```
+● fail  ·  investigating  ·  opened 2h ago  ·  Jamie Lin
+```
+
+## AppShell topbar
+- Left: sidebar toggle (≡), app logo.
+- Centre: Cmd-K search trigger.
+- Right: theme toggle, notification bell (incident count badge), user avatar menu.
+
+Not part of page-level headers — managed by `AppShell` and consistent across all pages.

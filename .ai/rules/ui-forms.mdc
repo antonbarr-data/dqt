@@ -1,0 +1,63 @@
+---
+description: Form component patterns using react-hook-form + zod, shadcn/ui Form primitives, field error mapping.
+alwaysApply: false
+---
+
+# UI Forms
+
+## Stack
+`react-hook-form` + `zod` for all forms. shadcn/ui `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage` primitives.
+
+## Pattern
+```tsx
+const schema = z.object({
+  host: z.string().min(1),
+  port: z.coerce.number().int().min(1).max(65535),
+  database: z.string().min(1),
+})
+
+const form = useForm<z.infer<typeof schema>>({
+  resolver: zodResolver(schema),
+  defaultValues: { port: 5432 },
+})
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)}>
+    <FormField
+      control={form.control}
+      name="host"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{t('sources.form.host')}</FormLabel>
+          <FormControl>
+            <Input {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  </form>
+</Form>
+```
+
+## API error mapping
+`handleApiError(error, form)` from `lib/error-handling.ts` maps field-keyed API errors to react-hook-form:
+```typescript
+// If error.details = { "host": "unreachable", "port": "refused" }
+// → form.setError("host", { message: "unreachable" })
+// → form.setError("port", { message: "refused" })
+```
+
+Non-field errors → sonner toast.
+
+## Wizard forms
+Connection wizard uses URL search params for resumability. Each step validates independently before enabling the "Next" button. Forward navigation disabled until current step's zod schema passes.
+
+## Input components
+All from shadcn/ui: `Input`, `Select`, `Checkbox`, `Switch`, `Textarea`. Never build custom input primitives.
+
+## Labels
+All labels via `t('module.form.fieldName')` — never hardcode label strings. See `i18n.mdc`.
+
+## Disabled states
+Disable the submit button while `form.formState.isSubmitting`. Show a spinner inside the button, not next to it.

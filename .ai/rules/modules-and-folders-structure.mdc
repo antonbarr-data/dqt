@@ -1,0 +1,88 @@
+---
+description: Project folder layout, module organisation patterns for library, server, and frontend.
+alwaysApply: false
+---
+
+# Modules and Folder Structure
+
+## Library module pattern
+`packages/dqt/src/dqt/<module>/`
+```
+__init__.py       # public API exports only
+models.py         # Pydantic domain models
+<service>.py      # implementation files
+tests/            # pytest tests (co-located with source, not top-level — library is published)
+```
+
+## Server module pattern
+`apps/server/src/dqt_server/<module>/`
+```
+api/              # FastAPI routers (routes.py per sub-resource)
+services/         # business logic on top of the library
+repositories/     # data access (extend BaseRepository)
+schemas/          # request/response Pydantic models
+tests/            # pytest tests
+```
+
+## Frontend module pattern
+`apps/web/src/modules/<module_name>/`
+```
+components/       # module-specific React components
+hooks/            # custom hooks
+services/         # API service layer (calls generated OpenAPI client)
+__tests__/        # Vitest tests
+```
+
+## Library main modules
+| Module | Purpose |
+|---|---|
+| `dqt.adapters` | Warehouse connectors (postgres, mysql, clickhouse, bigquery, snowflake, redshift, databricks, duckdb, trino) |
+| `dqt.algorithms` | All detectors (distribution, outliers_uni, outliers_multi, timeseries, drift, causal, info, pattern, dimred, ensemble, calibration, hitl) |
+| `dqt.checks` | Declarative check definitions, YAML loader, runner |
+| `dqt.lineage` | sqlglot-based column lineage, dbt manifest ingest, OpenLineage ingest |
+| `dqt.semantic` | Metric/dimension definitions, descriptions, embeddings |
+| `dqt.causality` | Discovery (PCMCI+, PC, etc.), DAG store, attribution (Shapley), do-calculus |
+| `dqt.governance` | Catalog, policies, audit log, classification |
+| `dqt.hitl` | Review queue, label store, active-learning samplers |
+| `dqt.agent` | LLMProvider protocol, Anthropic impl, tools, reasoning loops |
+| `dqt.runner` | Check execution engine, scheduling primitives |
+| `dqt.store` | ResultsStore interface (Memory, Postgres) |
+| `dqt.compat` | GX, Soda, Elementary compatibility shims |
+
+## Server main modules
+| Module | Purpose |
+|---|---|
+| `dqt_server.auth` | JWT, users, roles, permissions |
+| `dqt_server.tenants` | Workspace management |
+| `dqt_server.sources` | Connection CRUD + wizard backend |
+| `dqt_server.datasets` | Dataset metadata, samples |
+| `dqt_server.checks` | Check CRUD, on-demand runs |
+| `dqt_server.incidents` | Incident lifecycle, comments, postmortems |
+| `dqt_server.metrics` | Semantic layer CRUD |
+| `dqt_server.causality` | DAG management, HITL review endpoints |
+| `dqt_server.lineage` | Lineage queries |
+| `dqt_server.governance` | Catalog, policies, audit |
+| `dqt_server.oncall` | Schedules, escalations, notifications |
+| `dqt_server.tasks` | Task management |
+| `dqt_server.agent` | Agent invocation endpoints (sync + streaming) |
+| `dqt_server.notifications` | Slack/Teams/email/PagerDuty/Opsgenie/webhook notifiers |
+| `dqt_server.workers` | arq tasks (scheduled check runs, agent loop, baseliner) |
+
+## Shared / cross-cutting
+```
+shared/config/        # JSON enums + constants — authoritative source
+shared/schemas/       # JSON Schema files (checks, metrics, policies, oncall routes)
+shared/generated/     # generated TS + Python (git-ignored, never edit)
+docs/algorithms/      # one-paragraph entry per detector with canonical reference
+docs/architecture/    # substantial architecture docs only
+tmp/                  # temporary scripts — delete when done
+reference_data/       # seed data (synthetic warehouse, demo dbt project)
+setup/                # scripts for new environment creation
+```
+
+## Naming conventions
+- Python packages: `snake_case`
+- Python files: `snake_case.py`
+- TypeScript/React: `PascalCase` for components, `camelCase` for utilities
+- Rules files: `kebab-case.mdc`
+- Config files: `kebab-case.config.json`

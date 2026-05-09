@@ -1,0 +1,65 @@
+---
+description: Data layer patterns — BaseRepository, TenantScopedRepository, library ResultsStore interface.
+alwaysApply: false
+---
+
+# Data Model and Repositories
+
+## Library ResultsStore (`packages/dqt/src/dqt/store/_protocol.py`)
+```python
+class ResultsStore(Protocol):
+    def save_run(self, run: RunResult) -> None: ...
+    def list_runs(self, check_id: str, limit: int = 100) -> list[RunResult]: ...
+    def save_incident(self, incident: Incident) -> None: ...
+    def list_incidents(self, filters: IncidentFilters) -> list[Incident]: ...
+```
+
+Implementations:
+- `MemoryStore` — default, for notebooks and CI. In-process dict.
+- `PostgresStore` — for production. Async SQLAlchemy.
+
+Server's repositories wrap `PostgresStore` with the auth/tenant layer.
+
+## Server BaseRepository (`apps/server/src/dqt_server/repositories/base.py`)
+```python
+class BaseRepository:
+    session: AsyncSession
+    model: type[SQLAModel]
+
+    async def get(self, id: UUID) -> Model | None
+    async def list(self, filters: ..., cursor: str | None, limit: int) -> Page[Model]
+    async def create(self, data: CreateSchema) -> Model
+    async def update(self, id: UUID, data: UpdateSchema) -> Model
+    async def soft_delete(self, id: UUID) -> None
+```
+
+Features: tenant-aware operations, soft deletes, optimistic concurrency via `version` column, cursor-based pagination for large lists, offset for small.
+
+## TenantScopedRepository
+Extends `BaseRepository`. Every query automatically filters by `tenant_id` from `request.state.tenant_id`. Never pass `tenant_id` explicitly — it's injected.
+
+```python
+class TenantScopedRepository(BaseRepository):
+    def _base_query(self) -> Select:
+        return select(self.model).where(self.model.tenant_id == self.tenant_id)
+```
+
+## Soft deletes
+All primary entities (sources, datasets, checks, incidents) use soft deletes (`deleted_at TIMESTAMP`). Hard deletes only for housekeeping tasks (old run history purge).
+
+## Pagination
+- Cursor-based for large lists (check_runs, audit_log): `cursor = base64(last_id + last_timestamp)`.
+- Offset for small lists (sources, datasets, checks).
+
+## TimescaleDB-aware queries
+For time-series tables, use `time_bucket` instead of `date_trunc`:
+```sql
+SELECT time_bucket('1 hour', started_at) AS bucket, avg(score)
+FROM check_runs
+WHERE check_id = $1
+GROUP BY bucket
+ORDER BY bucket;
+```
+
+## Concrete repositories
+`SourceRepository`, `DatasetRepository`, `CheckRepository`, `IncidentRepository`, `MetricRepository`, `LineageRepository`, `AuditRepository`.

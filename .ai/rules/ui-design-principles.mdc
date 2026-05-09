@@ -1,0 +1,57 @@
+---
+description: UI/UX design standards — density, sharpness, interactions, Cmd-K, theme, animation timings.
+alwaysApply: false
+---
+
+# UI Design Principles
+
+## Density
+Power-user tool. Dense by default. Do not add whitespace for aesthetics. Every pixel should carry information or structure. Table rows are compact (32–36px height). Forms are tight but not cramped.
+
+## Sharpness
+Zero border-radius. No `rounded-*` classes. No CSS `border-radius` properties. This is a deliberate brand choice — sharp corners signal precision and professionalism in a data tool.
+
+## Typography hierarchy
+- Headings: Inter Tight, weight 300–400.
+- Body: Inter Tight, weight 400, 13px.
+- All stat values, scores, IDs, numeric KPIs: JetBrains Mono, weight 300, `tabular-nums`.
+- `kpi-label` (10px, 0.16em uppercase) + `kpi-value` (32px, weight 300) for hero numbers.
+
+## Interactions
+- **Hover row**: `bg-2` tint on table rows (220ms ease).
+- **Click row**: navigate to detail page.
+- **Status dot**: 8px circle + 2px halo at 18–22% opacity.
+- **Tooltips**: 6px gap above target, `bg-1` surface, 1px border.
+
+## Cmd-K (global command palette)
+Trigger: `Cmd+K` (Mac) / `Ctrl+K` (Windows). Provides:
+- Quick navigation to any screen.
+- Dataset search.
+- Recent incidents.
+- "Explain X" shortcut → triggers agent.
+
+Uses shadcn `Command` primitive. State is component-local (open/close only).
+
+## Theme toggle
+`data-theme="dark|light"` on `<html>`. Persisted to `localStorage`. Toggle icon in the topbar. Default dark.
+
+## Animations
+Only two:
+1. 220ms `fadeIn` + 2px translate-Y on screen mount.
+2. 240ms `ease-out` on StatGauge bar fill width.
+
+No other animations anywhere. No bounce, spring, parallax, or decorative transitions. Do not add motion to data updates.
+
+## Connection wizard interactions
+- Forward button disabled until current step's validation passes.
+- Step 2 (Test & Verify) shows each health-check step in real time as it executes.
+- Step indicators show completed / in-progress / pending states.
+- Wizard state in URL params so the browser back button works correctly.
+
+## Error states
+- Form field errors: inline below the field in `fail` color.
+- API errors: sonner toast (bottom-right, `bg-1` surface, 1px border).
+- Full-page errors: centred panel with error code, message, and "Try again" button.
+
+## Responsiveness
+The design is optimised for 1440px+ desktop. Sidebar collapses at 1024px. No mobile layout in MVP.

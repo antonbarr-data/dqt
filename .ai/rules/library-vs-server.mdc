@@ -1,0 +1,65 @@
+---
+description: The hard boundary between library (packages/dqt) and server (apps/server) code. Enforced by ruff import rules.
+alwaysApply: true
+---
+
+# Library vs Server Boundary
+
+## The hard rule
+`packages/dqt/` must remain importable without the server, without Redis, and without Postgres. The library degrades to `MemoryStore` if no Postgres is configured. **Never import anything from `apps/` inside `packages/`.**
+
+Enforced by a ruff `banned-module-level-imports` rule in CI.
+
+## What belongs in the library (`packages/dqt`)
+- All detectors / algorithms
+- All warehouse adapters (WarehouseAdapter protocol + implementations)
+- Check models, YAML loader, runner
+- ResultsStore protocol + MemoryStore + PostgresStore
+- Lineage models and parsers
+- Semantic layer models
+- Causality models and discovery logic
+- Governance models (catalog, policy engine)
+- HITL models and samplers
+- Agent LLMProvider protocol + Anthropic impl
+- `dqt.utils.logging` (structlog, no web deps)
+
+No FastAPI. No JWT. No auth. No HTTP routing. No web concepts.
+
+## What belongs in the server (`apps/server`)
+- FastAPI routers, middleware, exception handlers
+- JWT / fastapi-users / auth middleware
+- Multi-tenancy (`tenant_id` injection, RLS)
+- Server-side repositories wrapping the library's store
+- REST + WebSocket API surface
+- arq task invocation (scheduled runs, agent loop)
+- Rate limiting, SlowAPI, Redis cache
+- Credential encryption (`cryptography.fernet`)
+- OpenAPI spec generation (`scripts/dump_openapi.py`)
+
+## What belongs in the worker (`apps/worker`)
+- arq `WorkerSettings`
+- Long-running tasks: scheduled check runs, agent loop, baseliner
+- Imports the library directly; never imports from `apps/server`
+
+## Library dependencies (non-optional)
+```toml
+numpy, scipy, pandas, statsmodels, scikit-learn
+pyod          # ECOD, COPOD, HBOS, ABOD
+diptest       # Hartigan's dip
+river         # ADWIN, DDM/EDDM
+structlog
+pydantic >= 2.7
+ibis-framework >= 9.0
+```
+
+## Library extras (optional, user-installed)
+```toml
+[postgres]  = psycopg2-binary, ibis-framework[postgres]
+[causal]    = tigramite, dowhy, causallearn      # deferred
+[forecast]  = prophet, stumpy                     # deferred
+[deep]      = torch, pyod[deep]                   # deferred
+[explain]   = shap, pgmpy                         # deferred
+```
+
+## Testing boundary
+Library tests (`packages/dqt/tests/`) must run without Postgres, without Redis, without network. Use `MemoryStore` and offline fixture data. Must complete in <60s.

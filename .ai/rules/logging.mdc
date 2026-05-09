@@ -1,0 +1,68 @@
+---
+description: Logging standards, structlog configuration, PII redaction, log levels, env vars.
+alwaysApply: false
+---
+
+# Logging
+
+## Logger acquisition
+**Always use**:
+```python
+from dqt.utils.logging import get_logger
+logger = get_logger(__name__)
+```
+
+**Never use**:
+```python
+import logging
+logger = logging.getLogger(__name__)  # WRONG — bypasses structlog config
+```
+
+## Configuration
+`structlog` with JSON output. Same config in library and server:
+- Library: minimal context (no request-scoped fields)
+- Server: request-scoped context (`trace_id`, `tenant_id`, `user_id`) injected via middleware
+
+## Log levels
+| Logger | Level |
+|---|---|
+| Root | INFO |
+| `dqt.algorithms` | DEBUG (dev only) |
+| `sqlalchemy.engine` | WARNING |
+| `httpx` | WARNING |
+
+## Environment control
+```bash
+DQT_LOG_LEVEL=DEBUG                   # root level
+DQT_LOG_LEVEL_DQT_ALGORITHMS=DEBUG    # module-level override
+```
+
+## PII redaction
+Log filters redact values from columns marked `pii = true` in the catalog. Statistical results (aggregates, scores) are safe to log. Raw row values are never logged.
+
+Implementation: structlog processor that scrubs fields matching known PII column names from the bound context.
+
+## Structured fields
+Always use bound loggers with context, not f-strings:
+```python
+# Good
+logger.info("check_run.completed", check_id=check_id, verdict=result.verdict, score=result.score)
+
+# Bad
+logger.info(f"Check {check_id} completed with verdict {result.verdict}")
+```
+
+## Request context (server)
+Middleware binds to every log line in a request:
+```python
+structlog.contextvars.bind_contextvars(
+    trace_id=trace_id,
+    tenant_id=str(request.state.tenant_id),
+    user_id=str(request.state.user_id),
+    method=request.method,
+    path=request.url.path,
+)
+```
+
+## CLI log tail
+`dqt logs --tail` — streams structured log output from the running server (dev mode).

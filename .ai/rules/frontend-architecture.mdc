@@ -1,0 +1,73 @@
+---
+description: Next.js 14 App Router patterns, RSC vs client components, shadcn/ui, React Query, state management.
+alwaysApply: false
+---
+
+# Frontend Architecture
+
+## Stack
+Next.js 14 App Router, React Server Components by default. Client components only for charts, gauges, and any hover/click state. Tailwind CSS, shadcn/ui primitives, lucide-react icons (stroke-width 1.6).
+
+## App Router structure
+```
+apps/web/src/app/
+├── (auth)/
+│   └── login/page.tsx
+└── (app)/
+    ├── layout.tsx              # AppShell
+    ├── overview/page.tsx
+    ├── sources/
+    │   ├── page.tsx
+    │   └── new/[engine]/page.tsx   # wizard (resumable via URL)
+    ├── datasets/
+    │   ├── page.tsx
+    │   └── [id]/page.tsx
+    └── incidents/
+        ├── page.tsx
+        └── [id]/page.tsx
+```
+
+## RSC vs client components
+- **Server** (default): page data fetching, static layout, tables, text content.
+- **Client** (`"use client"`): charts, gauges, hover/click state, forms, theme toggle, Cmd-K.
+
+Do not add `"use client"` unless actually needed. Minimise the client bundle.
+
+## API client
+Typed OpenAPI client generated from the server's `/openapi.json`. Types at `apps/web/src/generated/api.ts` (git-ignored). Frontend **never imports manually-written API types** — only generated ones.
+
+React Query (TanStack Query) wraps all data fetching:
+```typescript
+const { data: incidents } = useQuery({
+  queryKey: ['incidents', filters],
+  queryFn: () => api.incidents.list(filters),
+});
+```
+
+## State management
+| Concern | Tool |
+|---|---|
+| Server data | React Query |
+| Theme | zustand, persisted to localStorage |
+| Cmd-K open | component-local |
+| Wizard progress | URL search params (resumable) |
+| Selected column/metric/DAG node | URL search params (`?col=order_total`) |
+
+## Fonts
+`next/font/google`:
+- Inter Tight — UI, body, headings (weights 200–600, `ss01 cv11`)
+- JetBrains Mono — code, identifiers, numeric KPIs, stat values (weights 300–500, `calt 0`)
+
+## shadcn/ui usage
+Install components to `apps/web/src/components/ui/`. Override `Card` radius to 0. Use `accent` variant on `Button`. Use `pass`/`warn`/`fail` variants on `Badge`. Use Sonner for toasts.
+
+## Custom components
+Live in `apps/web/src/components/`:
+- `charts/` — `StatGauge`, `StatChip`, `Spark`, `TimeSeries`, `HistDual`, `CDFPair`, `KLMatrix`, `CausalDAG`
+- `shared/` — `AppShell`, `InfoTip`, `StatusDot`, `EngineGlyph`
+
+## Build gate
+After writing any frontend code, run `pnpm build` and fix all errors and warnings before reporting done.
+
+## i18n
+All user-facing strings via `next-intl`. See `i18n.mdc`.

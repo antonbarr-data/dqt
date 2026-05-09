@@ -1,0 +1,60 @@
+---
+description: Metric definition format, semantic layer contract, dbt semantic-layer compatibility, auto-watched checks.
+alwaysApply: false
+---
+
+# Semantic Layer
+
+## Metric definition (YAML contract)
+```yaml
+id: gmv_usd
+name: Gross Merchandise Value (USD)
+kind: sum               # sum | count | ratio | model
+source: "SUM(order_total)"
+dimensions:
+  - date
+  - country
+  - product_category
+owner: data-team@company.com
+description: |
+  Total value of all completed orders in USD.
+unit: USD
+```
+
+Fields: `id`, `name`, `kind`, `source` (column expression or other-metric expression), `dimensions[]`, `owner`, `description`, `unit`.
+
+Compatible with dbt's semantic layer where possible — reads `semantic_models.yml` directly.
+
+## Auto-watched checks
+Every metric defined in the semantic layer is automatically watched by four checks:
+1. **Shape change** — KS 2-sample
+2. **Level shift** — Wasserstein-1
+3. **Spike** — STL residual z-score
+4. **Trend break** — BOCPD
+
+Configurable per metric via `watches` override in the metric YAML.
+
+## Catalog enrichment
+Tables, columns, and metrics carry:
+- `description` (markdown)
+- `owner` (email)
+- `domain` (string tag)
+- `tags[]`
+- `classification` (public / internal / confidential / restricted)
+- `pii` (boolean)
+- `freshness_sla` (duration string, e.g. "1h")
+- `relationships[]` (FK-style edges and equivalence relations)
+
+Embeddings on descriptions (via sentence-transformers / pgvector) power semantic search and agent grounding.
+
+## Metric storage
+Metric values are stored as a TimescaleDB hypertable (`metric_runs`) — that's the substrate the causality layer learns on. Schema:
+```sql
+metric_runs (metric_id, tenant_id, measured_at, value, dimensions JSONB)
+```
+
+## dbt semantic layer integration
+- Read `metrics.yml` and `semantic_models.yml` from dbt projects.
+- Map dbt metric definitions to dqt `Metric` objects.
+- Prefer dbt's `label` as dqt `name`, dbt's `description` as dqt `description`.
+- Dimensions come from dbt's `dimensions` field.
