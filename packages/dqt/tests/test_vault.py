@@ -18,14 +18,18 @@ def test_write_vault_creates_expected_files(tmp_path):
     write_vault(manifest, graph, str(tmp_path / "vault"), "Test Vault")
     vault = tmp_path / "vault"
     assert (vault / "00 Index.md").exists()
-    assert (vault / "Datasets" / "marketing_campaigns.md").exists()
-    assert (vault / "Datasets" / "gigler_transactions.md").exists()
-    assert (vault / "Columns" / "marketing_campaigns" / "spend_usd.md").exists()
-    assert (vault / "Lineage" / "causality.md").exists()
-    # verify wiki-link present in causality doc
-    content = (vault / "Lineage" / "causality.md").read_text()
+    # raw/ — semantic layer
+    assert (vault / "raw" / "datasets" / "marketing_campaigns.md").exists()
+    assert (vault / "raw" / "datasets" / "gigler_transactions.md").exists()
+    assert (vault / "raw" / "columns" / "marketing_campaigns" / "spend_usd.md").exists()
+    # wiki/ — synthesised knowledge
+    assert (vault / "wiki" / "lineage" / "causality.md").exists()
+    content = (vault / "wiki" / "lineage" / "causality.md").read_text()
     assert "marketing_campaigns" in content
     assert "gigler_transactions" in content
+    # column doc must link back to dataset via raw/ path
+    col_doc = (vault / "raw" / "columns" / "marketing_campaigns" / "spend_usd.md").read_text()
+    assert "raw/datasets/marketing_campaigns" in col_doc
 
 
 def test_index_links_all_datasets(tmp_path):

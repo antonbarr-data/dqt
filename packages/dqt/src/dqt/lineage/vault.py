@@ -4,9 +4,15 @@ from pathlib import Path
 from dqt.semantic.models import SemanticManifest, DatasetDescription, ColumnDescription
 from dqt.lineage.models import LineageGraph, LineageNode
 
+# Vault layout (Karpathy LLM Wiki pattern):
+#   raw/   — semantic layer: atomic source-of-truth docs (datasets, columns)
+#   wiki/  — synthesised knowledge: metrics, lineage, causal analyses
+
+_RAW = "raw"
+_WIKI = "wiki"
+
 
 def _safe_name(s: str) -> str:
-    """Sanitize a string for use as an Obsidian file name."""
     return re.sub(r'[\\/:*?"<>|]', '_', s)
 
 
@@ -18,19 +24,21 @@ def write_vault(
 ) -> None:
     """
     Generate an Obsidian vault from a semantic manifest + lineage graph.
-    Creates:
+
+    Layout:
       vault_dir/
         .obsidian/app.json
         00 Index.md
-        Datasets/<dataset_id>.md
-        Columns/<dataset_id>/<column_name>.md
-        Metrics/<metric_id>.md  (for metric-kind nodes in graph)
-        Lineage/<edge_kind>.md  (one doc per distinct edge kind)
+        raw/
+          datasets/<dataset_id>.md     ← semantic layer (source-of-truth)
+          columns/<dataset>/<col>.md
+        wiki/
+          metrics/<metric_id>.md       ← synthesised knowledge
+          lineage/causality.md
     """
     root = Path(vault_dir)
     root.mkdir(parents=True, exist_ok=True)
 
-    # Minimal .obsidian config (makes the folder openable in Obsidian)
     obsidian_dir = root / ".obsidian"
     obsidian_dir.mkdir(exist_ok=True)
     (obsidian_dir / "app.json").write_text(
@@ -38,30 +46,26 @@ def write_vault(
         encoding="utf-8",
     )
 
-    # Generate dataset documents
-    (root / "Datasets").mkdir(exist_ok=True)
+    # raw/ — semantic layer
     for ds in manifest.datasets:
         _write_dataset_doc(root, ds, graph)
-        # Generate column documents
-        col_dir = root / "Columns" / _safe_name(ds.id)
+        col_dir = root / _RAW / "columns" / _safe_name(ds.id)
         col_dir.mkdir(parents=True, exist_ok=True)
         for col in ds.columns:
             _write_column_doc(col_dir, ds, col, graph)
 
-    # Generate metric documents
+    # wiki/ — synthesised knowledge
     metric_nodes = [n for n in graph.nodes if n.kind == "metric"]
     if metric_nodes:
-        (root / "Metrics").mkdir(exist_ok=True)
+        (root / _WIKI / "metrics").mkdir(parents=True, exist_ok=True)
         for node in metric_nodes:
             _write_metric_doc(root, node, graph)
 
-    # Generate causal relationship document
     causal_edges = [e for e in graph.edges if e.kind == "causality"]
     if causal_edges:
-        (root / "Lineage").mkdir(exist_ok=True)
+        (root / _WIKI / "lineage").mkdir(parents=True, exist_ok=True)
         _write_causality_doc(root, causal_edges, graph)
 
-    # Index
     _write_index(root, manifest, graph, vault_title)
 
 
@@ -87,10 +91,10 @@ def _write_dataset_doc(root: Path, ds: DatasetDescription, graph: LineageGraph) 
     edges_in = [e for e in graph.edges if e.target == ds.id]
 
     related_nodes = {e.target for e in edges_out} | {e.source for e in edges_in}
-    related_links = "\n".join(f"- [[{r}]]" for r in sorted(related_nodes)) or "_None_"
+    related_links = "\n".join(f"- [[{_node_link(r)}]]" for r in sorted(related_nodes)) or "_None_"
 
     col_links = "\n".join(
-        f"- [[Columns/{_safe_name(ds.id)}/{_safe_name(c.name)}|{c.name}]] — {c.description[:60]}"
+        f"- [[{_RAW}/columns/{_safe_name(ds.id)}/{_safe_name(c.name)}|{c.name}]] — {c.description[:60]}"
         for c in ds.columns
     )
 
@@ -126,7 +130,9 @@ def _write_dataset_doc(root: Path, ds: DatasetDescription, graph: LineageGraph) 
 
 {related_links}
 """
-    (root / "Datasets" / f"{_safe_name(ds.id)}.md").write_text(fm + body, encoding="utf-8")
+    ds_dir = root / _RAW / "datasets"
+    ds_dir.mkdir(parents=True, exist_ok=True)
+    (ds_dir / f"{_safe_name(ds.id)}.md").write_text(fm + body, encoding="utf-8")
 
 
 def _write_column_doc(
@@ -140,14 +146,14 @@ def _write_column_doc(
     edges_in = [e for e in graph.edges if e.target == node_id]
 
     upstream_links = "\n".join(
-        f"- [[{_edge_target_link(e.source)}]] <- {e.kind}"
+        f"- [[{_node_link(e.source)}]] ← {e.kind}"
         + (f" (lag {e.lag_weeks}w)" if e.lag_weeks else "")
         for e in edges_in
     ) or "_No upstream lineage_"
 
     downstream_links = "\n".join(
-        f"- [[{_edge_target_link(e.target)}]] -> {e.kind}"
-        + (f" (lag {e.lag_weeks}w, confidence {e.confidence:.2f})" if e.lag_weeks else "")
+        f"- [[{_node_link(e.target)}]] → {e.kind}"
+        + (f" (lag {e.lag_weeks}w, r={e.confidence:.2f})" if e.lag_weeks else "")
         for e in edges_out
     ) or "_No downstream lineage_"
 
@@ -160,10 +166,10 @@ def _write_column_doc(
         "tags": col.tags,
     })
 
-    pii_label = "Yes" if col.pii else "No"
+    pii_label = "Yes ⚠️" if col.pii else "No"
     body = f"""# {col.name}
 
-> Dataset: [[Datasets/{_safe_name(ds.id)}]]
+> Dataset: [[{_RAW}/datasets/{_safe_name(ds.id)}]]
 
 {col.description}
 
@@ -186,17 +192,17 @@ def _write_column_doc(
     (col_dir / f"{_safe_name(col.name)}.md").write_text(fm + body, encoding="utf-8")
 
 
-def _edge_target_link(node_id: str) -> str:
-    """Convert a node ID like 'marketing_campaigns.spend_usd' to an Obsidian link path."""
+def _node_link(node_id: str) -> str:
+    """Convert a node ID to its vault path. Column: raw/columns/ds/col. Dataset: raw/datasets/ds. Metric: wiki/metrics/id."""
     if "." in node_id:
-        parts = node_id.split(".", 1)
-        return f"Columns/{_safe_name(parts[0])}/{_safe_name(parts[1])}"
-    return f"Datasets/{_safe_name(node_id)}"
+        ds, col = node_id.split(".", 1)
+        return f"{_RAW}/columns/{_safe_name(ds)}/{_safe_name(col)}"
+    return f"{_RAW}/datasets/{_safe_name(node_id)}"
 
 
 def _write_metric_doc(root: Path, node: LineageNode, graph: LineageGraph) -> None:
     edges_in = [e for e in graph.edges if e.target == node.id]
-    source_links = "\n".join(f"- [[{_edge_target_link(e.source)}]]" for e in edges_in) or "_None_"
+    source_links = "\n".join(f"- [[{_node_link(e.source)}]]" for e in edges_in) or "_None_"
 
     fm = _frontmatter({"type": "metric", "id": node.id, **node.metadata})
     body = f"""# {node.label}
@@ -207,13 +213,13 @@ def _write_metric_doc(root: Path, node: LineageNode, graph: LineageGraph) -> Non
 
 {source_links}
 """
-    (root / "Metrics" / f"{_safe_name(node.id)}.md").write_text(fm + body, encoding="utf-8")
+    (root / _WIKI / "metrics" / f"{_safe_name(node.id)}.md").write_text(fm + body, encoding="utf-8")
 
 
 def _write_causality_doc(root: Path, causal_edges: list, graph: LineageGraph) -> None:
     rows = "\n".join(
-        f"| [[{_edge_target_link(e.source)}\\|{e.source}]] "
-        f"| [[{_edge_target_link(e.target)}\\|{e.target}]] "
+        f"| [[{_node_link(e.source)}\\|{e.source}]] "
+        f"| [[{_node_link(e.target)}\\|{e.target}]] "
         f"| {e.lag_weeks}w | {e.confidence:.2f} | {e.description} |"
         for e in causal_edges
     )
@@ -225,19 +231,33 @@ Directed causal edges discovered by statistical analysis (Granger causality / la
 |---|---|---|---|---|
 {rows}
 """
-    (root / "Lineage" / "causality.md").write_text(body, encoding="utf-8")
+    (root / _WIKI / "lineage" / "causality.md").write_text(body, encoding="utf-8")
 
 
 def _write_index(root: Path, manifest: SemanticManifest, graph: LineageGraph, title: str) -> None:
     dataset_links = "\n".join(
-        f"- [[Datasets/{_safe_name(ds.id)}]] — {ds.domain}" for ds in manifest.datasets
+        f"- [[{_RAW}/datasets/{_safe_name(ds.id)}|{ds.id}]] — {ds.domain}"
+        for ds in manifest.datasets
     )
     metric_nodes = [n for n in graph.nodes if n.kind == "metric"]
-    metric_links = "\n".join(f"- [[Metrics/{_safe_name(n.id)}]]" for n in metric_nodes) or "_None defined_"
+    metric_links = (
+        "\n".join(f"- [[{_WIKI}/metrics/{_safe_name(n.id)}|{n.label}]]" for n in metric_nodes)
+        or "_None defined_"
+    )
+    has_causality = any(e.kind == "causality" for e in graph.edges)
 
     body = f"""# {title}
 
-This vault documents the data assets, column semantics, and lineage relationships in the dqt knowledge graph.
+This vault documents data assets, column semantics, and discovered relationships.
+
+## Structure
+
+| Folder | Contents |
+|---|---|
+| `raw/datasets/` | Source-of-truth dataset descriptions (semantic layer) |
+| `raw/columns/` | Per-column atomic notes with metadata and lineage links |
+| `wiki/metrics/` | Derived metrics and aggregations |
+| `wiki/lineage/` | Discovered causal and lineage relationships |
 
 ## Datasets
 
@@ -248,7 +268,6 @@ This vault documents the data assets, column semantics, and lineage relationship
 {metric_links}
 
 ## Lineage
-
-- [[Lineage/causality]] — Causal relationships between datasets
+{"- [[wiki/lineage/causality]] — Causal relationships between datasets" if has_causality else "_None recorded_"}
 """
     (root / "00 Index.md").write_text(body, encoding="utf-8")
