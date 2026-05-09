@@ -5,7 +5,6 @@ description = "dqt FastAPI service"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
-    "dqtlib[postgres]>=0.1.0",
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
     "gunicorn>=22.0",
@@ -23,9 +22,6 @@ dependencies = [
     "anthropic>=0.28",
     "email-validator>=2.1",
 ]
-
-[tool.uv.sources]
-dqtlib = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
