@@ -26,7 +26,7 @@ class HealthCheckResult:
 
     @property
     def passed(self) -> bool:
-        return all(s.status == "pass" for s in self.steps)
+        return all(s.status in ("pass", "skip") for s in self.steps)
 
 
 @dataclass

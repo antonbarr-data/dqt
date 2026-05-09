@@ -54,7 +54,7 @@ class BaseDetector:
     kind: ClassVar[str] = "sample"
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
-        return None
+        raise NotImplementedError
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         raise NotImplementedError

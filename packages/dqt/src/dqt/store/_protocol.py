@@ -26,6 +26,7 @@ class Incident:
     check_id: UUID
     run_id: UUID
     detector_slug: str
+    # temporary: Verdict used as severity stand-in until severity.config.json enum is generated
     severity: Verdict
     opened_at: datetime
     score: float
