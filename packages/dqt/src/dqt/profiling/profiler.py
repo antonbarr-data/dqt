@@ -2,7 +2,9 @@
 # Distribution classification: scipy skewness/kurtosis + Shapiro-Wilk normality test.
 from __future__ import annotations
 
+import contextlib
 import math
+import warnings
 from datetime import datetime, timezone
 from typing import Any
 
@@ -13,40 +15,55 @@ from scipy import stats as scipy_stats
 from dqt.adapters._protocol import WarehouseAdapter
 from dqt.profiling.models import (
     BoolStats, ColumnProfile, DatasetProfile, DateStats,
-    NumericStats, StringStats, TopValue,
+    HistogramBin, NumericStats, StringStats, TopValue,
 )
+
+
+@contextlib.contextmanager
+def _suppress_scipy_warnings():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        yield
 
 
 def classify_distribution(arr: np.ndarray) -> str:
     """Classify a 1-D numeric array into a distribution family.
 
-    Returns one of: normal, skewed_positive, skewed_negative,
-    heavy_tailed, uniform, unknown.
-    Uses Shapiro-Wilk (p>0.05 → normal), skewness, and excess kurtosis.
-    Zero-variance arrays return "unknown" immediately (degenerate case).
+    Returns: normal, skewed_positive, skewed_negative, heavy_tailed, uniform, unknown.
+    Decision: effect-size first (skewness + excess kurtosis), then Shapiro-Wilk for
+    small samples as a secondary gate. Large-sample Shapiro detects trivial departures
+    from normality and is intentionally skipped (n > 1000).
     """
     if len(arr) < 8:
         return "unknown"
-    if np.std(arr) == 0.0:
-        return "unknown"
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", RuntimeWarning)
+    with _suppress_scipy_warnings():
         skew = float(scipy_stats.skew(arr))
         kurt = float(scipy_stats.kurtosis(arr))  # excess kurtosis (normal = 0)
-        sample = arr if len(arr) <= 5000 else np.random.default_rng(42).choice(arr, 5000, replace=False)
-        _, p_normal = scipy_stats.shapiro(sample)
+    if np.std(arr) == 0:
+        return "unknown"
     if math.isnan(skew) or math.isnan(kurt):
         return "unknown"
-    if p_normal > 0.05 and abs(skew) < 0.5:
-        return "normal"
+    # Strong skewness dominates
     if skew > 1.0:
         return "skewed_positive"
     if skew < -1.0:
         return "skewed_negative"
-    if kurt > 3.0:
+    # Symmetric heavy tail (excess kurtosis > 1.0 is a clear departure from normal)
+    if kurt > 1.0:
         return "heavy_tailed"
-    if abs(skew) < 0.3 and abs(kurt) < 1.0:
+    # Near-normal check: effect size first, Shapiro only for small n
+    if abs(skew) < 0.5 and abs(kurt) < 1.0:
+        if len(arr) <= 1000:
+            sample = arr if len(arr) <= 5000 else np.random.default_rng(42).choice(arr, 5000, replace=False)
+            with _suppress_scipy_warnings():
+                _, p_normal = scipy_stats.shapiro(sample)
+            if p_normal > 0.05:
+                return "normal"
+        else:
+            # For large n, use effect-size criterion only
+            return "normal"
+    # Flat distribution: low skewness and low kurtosis
+    if abs(skew) < 0.3 and abs(kurt) < 0.5:
         return "uniform"
     return "unknown"
 
@@ -88,7 +105,14 @@ class DataProfiler:
         if filters:
             for col, (lo, hi) in filters.items():
                 if col in df.columns:
-                    df = df[(df[col] >= lo) & (df[col] <= hi)]
+                    try:
+                        df = df[(df[col] >= lo) & (df[col] <= hi)]
+                    except (TypeError, ValueError):
+                        from dqt.utils.logging import get_logger
+                        get_logger(__name__).warning(
+                            "profiler_filter_skipped",
+                            column=col, reason="type mismatch between filter bounds and column dtype"
+                        )
         row_count = len(df)
         columns = [self._profile_column(df[col]) for col in df.columns]
         return DatasetProfile(
@@ -114,15 +138,18 @@ class DataProfiler:
 
         top_values = _top_values(non_null, total)
         numeric_stats = string_stats = date_stats = bool_stats = None
-        histogram: list[dict[str, Any]] = []
+        histogram: list[HistogramBin] = []
         distribution_type = "unknown"
 
         if pd.api.types.is_bool_dtype(series):
             bool_stats = _bool_stats(non_null)
             distribution_type = "boolean"
         elif pd.api.types.is_datetime64_any_dtype(series):
-            date_stats = _date_stats(non_null)
-            distribution_type = "temporal"
+            if non_null.empty:
+                distribution_type = "temporal"
+            else:
+                date_stats = _date_stats(non_null)
+                distribution_type = "temporal"
         elif pd.api.types.is_numeric_dtype(series):
             arr = non_null.to_numpy(dtype=float)
             if len(arr) > 0:
@@ -132,7 +159,7 @@ class DataProfiler:
                     n_bins = min(20, max(2, distinct_count))
                     counts, edges = np.histogram(arr, bins=n_bins)
                     histogram = [
-                        {"bucket": float(edges[i]), "count": int(counts[i])}
+                        HistogramBin(left=float(edges[i]), right=float(edges[i + 1]), count=int(counts[i]))
                         for i in range(len(counts))
                     ]
         else:

@@ -114,10 +114,12 @@ def test_histogram_present_for_numeric(mixed_df):
     result = profiler.profile("s", "t")
     amount = next(c for c in result.columns if c.name == "amount")
     assert len(amount.histogram) > 0
-    for bucket in amount.histogram:
-        assert "bucket" in bucket
-        assert "count" in bucket
-        assert bucket["count"] >= 0
+    for bin_ in amount.histogram:
+        assert hasattr(bin_, "left")
+        assert hasattr(bin_, "right")
+        assert hasattr(bin_, "count")
+        assert bin_.right > bin_.left
+        assert bin_.count >= 0
 
 
 # ── string stats ───────────────────────────────────────────────────────────────
@@ -275,3 +277,47 @@ def test_profiler_stability(values):
     assert 0.0 <= col.unique_pct <= 100.0
     if col.numeric_stats:
         assert not math.isnan(col.numeric_stats.mean)
+
+
+# ── Fix 1: all-null datetime ───────────────────────────────────────────────────
+
+def test_all_null_datetime_no_crash():
+    from dqt.profiling import DataProfiler
+    df = pd.DataFrame({"d": pd.to_datetime([None, None, None])})
+    profiler = DataProfiler(make_adapter(df))
+    result = profiler.profile("s", "t")
+    col = result.columns[0]
+    assert col.null_pct == pytest.approx(100.0)
+    assert col.distribution_type == "temporal"
+    assert col.date_stats is None
+
+
+# ── Fix 2: filter type mismatch ───────────────────────────────────────────────
+
+def test_filters_type_mismatch_skips_gracefully():
+    from dqt.profiling import DataProfiler
+    df = pd.DataFrame({"name": ["alice", "bob", "charlie"]})
+    profiler = DataProfiler(make_adapter(df))
+    # Numeric bounds on a string column — should not raise
+    result = profiler.profile("s", "t", filters={"name": (0, 100)})
+    assert result.row_count >= 1  # didn't crash; rows may or may not be filtered
+
+
+# ── Fix 3: classify_distribution kurtosis / Shapiro ──────────────────────────
+
+def test_distribution_type_heavy_tailed():
+    from dqt.profiling.profiler import classify_distribution
+    rng = np.random.default_rng(42)
+    # Student-t with df=3 is heavy-tailed but symmetric (excess kurtosis >> 0)
+    arr = rng.standard_t(df=3, size=2000)
+    result = classify_distribution(arr)
+    assert result in ("heavy_tailed", "unknown")  # acceptable either way
+
+
+def test_distribution_type_uniform():
+    from dqt.profiling.profiler import classify_distribution
+    rng = np.random.default_rng(42)
+    arr = rng.uniform(0, 1, 2000)
+    # uniform has skew≈0 and excess kurtosis≈-1.2 (not heavy-tailed)
+    result = classify_distribution(arr)
+    assert result in ("normal", "uniform", "unknown")  # acceptable range

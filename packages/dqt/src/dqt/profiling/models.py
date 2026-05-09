@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -44,6 +43,13 @@ class TopValue:
 
 
 @dataclass
+class HistogramBin:
+    left: float
+    right: float
+    count: int
+
+
+@dataclass
 class ColumnProfile:
     name: str
     data_type: str
@@ -57,7 +63,7 @@ class ColumnProfile:
     string_stats: StringStats | None = None
     date_stats: DateStats | None = None
     bool_stats: BoolStats | None = None
-    histogram: list[dict[str, Any]] = field(default_factory=list)
+    histogram: list[HistogramBin] = field(default_factory=list)
     top_values: list[TopValue] = field(default_factory=list)
 
 
