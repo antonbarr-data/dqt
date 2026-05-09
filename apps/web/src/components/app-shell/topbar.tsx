@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, RefreshCw, Bell } from "lucide-react";
+import { getToken, decodeToken } from "@/lib/auth";
 
 export function Topbar() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [statusText] = useState("9.4k tests/min · all engines healthy");
 
   useEffect(() => {
     const stored = localStorage.getItem("dqt-theme") as "dark" | "light" | null;
@@ -23,63 +25,72 @@ export function Topbar() {
 
   return (
     <header
-      className="flex items-center gap-4 px-4 border-b border-line"
+      className="flex items-center gap-3 px-4 border-b border-line"
       style={{ height: 44, background: "var(--bg-1)", flexShrink: 0 }}
     >
-      {/* logo */}
-      <span
-        className="font-mono font-light select-none"
-        style={{
-          color: "var(--accent)",
-          fontSize: 15,
-          letterSpacing: "-0.05em",
-          fontWeight: 300,
-          whiteSpace: "nowrap",
-        }}
-      >
-        dqt
-      </span>
-
       {/* search */}
-      <div className="flex-1 flex items-center gap-2 border border-line px-2.5 py-1" style={{ background: "var(--bg-2)", maxWidth: 440 }}>
-        <Search size={12} strokeWidth={1.6} style={{ color: "var(--fg-2)", flexShrink: 0 }} />
+      <div
+        className="flex items-center gap-2 border border-line px-2.5 py-1"
+        style={{ background: "var(--bg-2)", width: 320 }}
+      >
+        <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
         <input
           type="text"
-          placeholder="Search datasets, checks, metrics..."
+          placeholder="Search datasets, incidents, tests…"
           className="flex-1 bg-transparent t-small outline-none"
-          style={{ color: "var(--fg-0)" }}
+          style={{ color: "var(--fg-1)" }}
         />
-        <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)" }}>
+        <kbd
+          className="t-micro px-1 border border-line"
+          style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}
+        >
           ⌘K
         </kbd>
       </div>
 
       <div className="flex-1" />
 
-      {/* theme toggle */}
+      {/* status pill */}
+      <div className="flex items-center gap-2">
+        <span
+          className="t-micro"
+          style={{ color: "var(--pass)" }}
+        >
+          ●
+        </span>
+        <span className="t-small" style={{ color: "var(--fg-1)" }}>
+          {statusText}
+        </span>
+      </div>
+
+      <div className="w-px self-stretch" style={{ background: "var(--line)", margin: "10px 0" }} />
+
+      {/* icon actions */}
       <button
         onClick={toggleTheme}
         className="w-7 h-7 flex items-center justify-center border border-line t-small transition-colors hover:bg-bg-2"
-        style={{ color: "var(--fg-1)" }}
+        style={{ color: "var(--fg-2)" }}
         aria-label="Toggle theme"
-        title="Toggle dark/light"
+        title="Toggle theme"
       >
         ◐
       </button>
 
-      {/* user avatar */}
-      <div
-        className="w-7 h-7 flex items-center justify-center t-micro font-medium border border-line"
-        style={{
-          background: "var(--accent-bg)",
-          color: "var(--accent)",
-          fontFamily: "var(--font-jetbrains-mono)",
-          letterSpacing: 0,
-        }}
-        title="Jamie Lin"
+      <button
+        className="w-7 h-7 flex items-center justify-center border border-line transition-colors hover:bg-bg-2"
+        style={{ color: "var(--fg-2)" }}
+        title="Refresh"
       >
-        JL
-      </div>
+        <RefreshCw size={12} strokeWidth={1.6} />
+      </button>
+
+      <button
+        className="w-7 h-7 flex items-center justify-center border border-line transition-colors hover:bg-bg-2"
+        style={{ color: "var(--fg-2)" }}
+        title="Notifications"
+      >
+        <Bell size={12} strokeWidth={1.6} />
+      </button>
     </header>
   );
 }
