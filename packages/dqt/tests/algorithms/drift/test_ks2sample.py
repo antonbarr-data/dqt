@@ -56,6 +56,18 @@ def test_ks_stability(n, shift):
     assert not math.isinf(result.score)
 
 
+def test_ks_empty_current_returns_pass():
+    from dqt.algorithms.drift.ks2sample import KS2SampleDetector
+    rng = np.random.default_rng(42)
+    ref = pd.DataFrame({"value": rng.normal(0, 1, 100)})
+    curr = pd.DataFrame({"value": pd.array([None, None, None], dtype="Float64")})
+    det = KS2SampleDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+    assert result.verdict == Verdict.pass_
+    assert result.score == 0.0
+
+
 def test_ks_stat_scale_verdict():
     from dqt.algorithms._base import compute_verdict
     assert compute_verdict(0.90, "ks_pvalue") == Verdict.pass_

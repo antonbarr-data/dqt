@@ -49,7 +49,7 @@ def test_stl_constant_series():
 
 @given(
     n_ref=st.integers(min_value=4, max_value=15),
-    n_curr=st.integers(min_value=2, max_value=8),
+    n_curr=st.integers(min_value=3, max_value=8),
     period=st.integers(min_value=2, max_value=5),
     noise=st.floats(min_value=0.01, max_value=5.0, allow_nan=False, allow_infinity=False),
 )
@@ -69,6 +69,15 @@ def test_stl_stability(n_ref, n_curr, period, noise):
     assert not math.isnan(result.score)
     assert not math.isinf(result.score)
     assert result.score >= 0.0
+
+
+def test_stl_rejects_too_short_current():
+    from dqt.algorithms.timeseries.stl import STLAnomalyDetector
+    det = STLAnomalyDetector(period=7)
+    # 56 points = valid reference (> 2*7+1=15)
+    state = det.fit(pd.DataFrame({"value": [10.0] * 56}))
+    with pytest.raises(ValueError, match="requires at least"):
+        det.score(pd.DataFrame({"value": [10.0] * 5}), state)
 
 
 def test_stl_stat_scale_verdict():

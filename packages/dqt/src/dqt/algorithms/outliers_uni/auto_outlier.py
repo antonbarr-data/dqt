@@ -61,8 +61,8 @@ class AutoOutlierDetector(BaseDetector):
         }
 
         if selected_slug is not None:
-            from dqt.algorithms._registry import registry as _reg
-            cls = _reg.get(selected_slug)
+            from dqt.algorithms._registry import registry
+            cls = registry.get(selected_slug)
             inner = cls()
             state["inner_state"] = inner.fit(reference)
         else:
@@ -94,8 +94,8 @@ class AutoOutlierDetector(BaseDetector):
                 },
             )
 
-        from dqt.algorithms._registry import registry as _reg
-        cls = _reg.get(state["detector_slug"])
+        from dqt.algorithms._registry import registry
+        cls = registry.get(state["detector_slug"])
         inner = cls()
         result = inner.score(current, state["inner_state"])
         return DetectorResult(

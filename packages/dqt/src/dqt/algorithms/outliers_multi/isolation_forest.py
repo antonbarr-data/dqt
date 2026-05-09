@@ -27,7 +27,10 @@ class IsolationForestDetector(BaseDetector):
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         model = state["model"]
         cols: list[str] = state["columns"]
-        X = current[cols].fillna(0.0) if cols else current.select_dtypes(include="number").fillna(0.0)
+        missing = [c for c in cols if c not in current.columns]
+        if missing:
+            raise ValueError(f"IsolationForest: columns missing in current data: {missing}")
+        X = current[cols].fillna(0.0)
         preds = model.predict(X)  # -1 = outlier, 1 = inlier
         outlier_frac = float(np.mean(preds == -1))
         return DetectorResult(

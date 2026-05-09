@@ -20,6 +20,9 @@ class STLAnomalyDetector(BaseDetector):
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         from statsmodels.tsa.seasonal import STL
         values = reference.iloc[:, 0].to_numpy(dtype=float)
+        min_len = 2 * self._period + 1
+        if len(values) < min_len:
+            raise ValueError(f"STL requires at least {min_len} observations, got {len(values)}")
         result = STL(values, period=self._period, robust=True).fit()
         resid = result.resid
         resid_std = float(np.std(resid, ddof=1))
@@ -32,6 +35,9 @@ class STLAnomalyDetector(BaseDetector):
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         from statsmodels.tsa.seasonal import STL
         values = current.iloc[:, 0].to_numpy(dtype=float)
+        min_len = 2 * state["period"] + 1
+        if len(values) < min_len:
+            raise ValueError(f"STL requires at least {min_len} observations, got {len(values)}")
         result = STL(values, period=state["period"], robust=True).fit()
         resid = result.resid
         z_scores = np.abs((resid - state["resid_mean"]) / state["resid_std"])

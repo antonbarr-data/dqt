@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState
+from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState, Verdict
 from dqt.algorithms._registry import registry
 
 
@@ -20,6 +20,13 @@ class KS2SampleDetector(BaseDetector):
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         curr = current.iloc[:, 0].dropna().to_numpy(dtype=float)
+        if len(curr) == 0 or len(state["reference"]) == 0:
+            return DetectorResult(
+                score=0.0,
+                verdict=Verdict.pass_,
+                plain_english="Insufficient data for KS test.",
+                details={"p_value": 1.0, "ks_statistic": 0.0},
+            )
         ks_stat, p_value = stats.ks_2samp(state["reference"], curr)
         score = 1.0 - float(p_value)
         return DetectorResult(
