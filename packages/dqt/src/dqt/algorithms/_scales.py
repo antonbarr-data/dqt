@@ -58,5 +58,7 @@ STAT_SCALES: dict[str, StatScale] = {
                   "Date-part completeness", "Fraction of expected date buckets with no data"),
         StatScale("outlier_fraction_drift", 1.0, 0.001, 0.01, "lower_is_better",
                   "Outlier fraction drift", "Deviation of current outlier fraction from historical baseline range"),
+        StatScale("row_count_in_range", 1.0, 0.5, 0.5, "lower_is_better",
+                  "Row count in range", "1.0 if row count in the date window is outside [min_rows, max_rows]; 0.0 if within range"),
     ]
 }

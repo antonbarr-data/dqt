@@ -49,9 +49,20 @@ class Runner:
         state = self._states[check.id]
 
         started_at = datetime.now(timezone.utc)
-        curr_df = self._fetch(check, adapter)
+        # Pass the same detector instance to _fetch so aggregate detectors can store
+        # the column name during get_aggregations() and use it in score().
+        curr_df = self._fetch(check, adapter, detector=detector)
         result = detector.score(curr_df, state)
         finished_at = datetime.now(timezone.utc)
+
+        diagnostic_sql: str | None = None
+        if result.failing_filter_sql and result.verdict != Verdict.pass_:
+            fq_table = f"{check.schema_name}.{check.table_name}"
+            diagnostic_sql = (
+                f"SELECT * FROM {fq_table}\n"
+                f"WHERE {result.failing_filter_sql}\n"
+                f"LIMIT 20;"
+            )
 
         run_result = RunResult(
             check_id=check.id,
@@ -62,6 +73,7 @@ class Runner:
             score=result.score,
             plain_english=result.plain_english,
             details=result.details,
+            diagnostic_sql=diagnostic_sql,
         )
         self._store.save_run(run_result)
 
@@ -84,11 +96,17 @@ class Runner:
         )
         return run_result
 
-    def _fetch(self, check: Check, adapter: WarehouseAdapter) -> pd.DataFrame:
+    def _fetch(
+        self,
+        check: "Check",
+        adapter: "WarehouseAdapter",
+        detector: "DetectorState | None" = None,
+    ) -> pd.DataFrame:
         """Fetch data for a check, applying scope, filters, and sampling settings."""
         from dqt.algorithms._registry import registry
-        cls = registry.get(check.detector_slug)
-        detector = cls(**(check.params or {}))
+        if detector is None:
+            cls = registry.get(check.detector_slug)
+            detector = cls(**(check.params or {}))
 
         if detector.kind == "aggregate":
             col = check.column_name or "*"

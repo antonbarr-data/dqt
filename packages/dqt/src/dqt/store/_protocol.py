@@ -19,6 +19,8 @@ class RunResult:
     plain_english: str
     details: dict[str, Any] = field(default_factory=dict)
     run_id: UUID = field(default_factory=uuid4)
+    # SQL the on-call team can run to inspect failing rows directly in the warehouse
+    diagnostic_sql: str | None = None
 
 
 @dataclass

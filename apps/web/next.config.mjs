@@ -4,8 +4,9 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // output: "standalone" is enabled in CI/Linux builds only;
-  // creating symlinks for standalone on Windows requires elevated privileges.
+  // standalone bundles the minimal server for Railway/Docker deployments.
+  // On Windows local dev, skip it (symlinks require elevated privileges).
+  output: process.env.CI ? "standalone" : undefined,
   experimental: {
     typedRoutes: true,
   },

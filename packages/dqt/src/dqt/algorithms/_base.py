@@ -24,6 +24,8 @@ class DetectorResult:
     verdict: Verdict
     plain_english: str
     details: dict[str, Any] = field(default_factory=dict)
+    # WHERE clause (no "WHERE" keyword) identifying failing rows; runner constructs full SQL
+    failing_filter_sql: str | None = None
 
 
 DetectorState = Any

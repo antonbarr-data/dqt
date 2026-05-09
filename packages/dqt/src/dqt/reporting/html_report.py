@@ -7,6 +7,7 @@ Light theme is the default; a theme toggle button switches to dark in the browse
 from __future__ import annotations
 
 import html as _html
+import re as _re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -66,6 +67,15 @@ h1 { font-size: 18px; font-weight: 500; color: var(--fg-0); }
   color: var(--accent); margin-bottom: 6px;
   font-family: 'JetBrains Mono', monospace;
 }
+.ai-summary h2, .ai-summary h3 {
+  font-size: 12px; font-weight: 600; color: var(--fg-0);
+  margin: 10px 0 4px;
+}
+.ai-summary h3 { font-size: 11px; }
+.ai-summary p { margin: 4px 0; }
+.ai-summary ul { margin: 4px 0 4px 18px; }
+.ai-summary li { margin: 2px 0; }
+.ai-summary strong { color: var(--fg-0); }
 .summary-bar {
   display: flex; gap: 1px;
   margin: 0 28px 16px; border: 1px solid var(--line);
@@ -155,6 +165,20 @@ h1 { font-size: 18px; font-weight: 500; color: var(--fg-0); }
   margin-top: 8px; font-size: 11px;
   font-family: 'JetBrains Mono', monospace; color: var(--fg-2);
 }
+.diag-row td {
+  padding: 0 !important; border-top: none !important; background: var(--bg-2) !important;
+}
+.diag-sql {
+  margin: 0; padding: 8px 10px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--fg-1); white-space: pre; overflow-x: auto;
+}
+.diag-toggle {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--fg-2); cursor: pointer; padding: 6px 10px;
+  display: inline-block; user-select: none;
+}
+.diag-toggle:hover { color: var(--accent); }
 """
 
 # ── Theme JS ──────────────────────────────────────────────────────────────────
@@ -206,6 +230,64 @@ def _e(text: object) -> str:
     return _html.escape(str(text))
 
 
+def _md_to_html(text: str) -> str:
+    """Convert a subset of Markdown to HTML (no external deps).
+
+    Handles: ## / ### headings, **bold**, *italic*, - / * bullet lists,
+    blank-line paragraph breaks. Content is HTML-escaped before inline
+    formatting is applied so user-supplied text is always safe.
+    """
+    def _inline(s: str) -> str:
+        s = _html.escape(s)
+        s = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', s)
+        s = _re.sub(r'\*([^*]+?)\*', r'<em>\1</em>', s)
+        return s
+
+    lines = text.split('\n')
+    out: list[str] = []
+    in_ul = False
+    para: list[str] = []
+
+    def _flush_para() -> None:
+        if para:
+            out.append(f'<p>{" ".join(para)}</p>')
+            para.clear()
+
+    def _close_ul() -> None:
+        nonlocal in_ul
+        if in_ul:
+            out.append('</ul>')
+            in_ul = False
+
+    for line in lines:
+        s = line.strip()
+        if not s:
+            _flush_para()
+            _close_ul()
+        elif s.startswith('### '):
+            _flush_para(); _close_ul()
+            out.append(f'<h3>{_inline(s[4:])}</h3>')
+        elif s.startswith('## '):
+            _flush_para(); _close_ul()
+            out.append(f'<h2>{_inline(s[3:])}</h2>')
+        elif s.startswith('# '):
+            _flush_para(); _close_ul()
+            out.append(f'<h2>{_inline(s[2:])}</h2>')
+        elif s.startswith('- ') or s.startswith('* '):
+            _flush_para()
+            if not in_ul:
+                out.append('<ul>')
+                in_ul = True
+            out.append(f'<li>{_inline(s[2:])}</li>')
+        else:
+            _close_ul()
+            para.append(_inline(s))
+
+    _flush_para()
+    _close_ul()
+    return '\n'.join(out)
+
+
 def _null_badge(null_pct: float) -> str:
     if null_pct < 1.0:
         cls = "badge-pass"
@@ -239,7 +321,7 @@ def _ai_section(ai_summary: str) -> str:
     return (
         f'<div class="ai-summary">'
         f'<div class="ai-summary-label">AI Summary</div>'
-        f'{_e(ai_summary)}'
+        f'{_md_to_html(ai_summary)}'
         f'</div>'
     )
 
@@ -440,7 +522,7 @@ def quality_report(
     )
 
     rows = ""
-    for r in results:
+    for i, r in enumerate(results):
         verdict = r.get("verdict", "")
         score_raw = r.get("score", "")
         try:
@@ -448,6 +530,7 @@ def quality_report(
         except (TypeError, ValueError):
             score_str = _e(score_raw)
 
+        diag_sql = r.get("diagnostic_sql")
         row_cls = verdict.lower() if verdict.lower() in ("pass", "warn", "fail") else ""
         rows += (
             f'<tr class="{row_cls}">'
@@ -459,6 +542,17 @@ def quality_report(
             f'<td>{_e(r.get("plain_english", ""))}</td>'
             f'</tr>'
         )
+        if diag_sql and verdict.lower() in ("warn", "fail"):
+            rows += (
+                f'<tr class="diag-row">'
+                f'<td colspan="6">'
+                f'<details>'
+                f'<summary class="diag-toggle">&#9656; diagnostic SQL (run in warehouse to inspect failing rows)</summary>'
+                f'<pre class="diag-sql">{_e(diag_sql)}</pre>'
+                f'</details>'
+                f'</td>'
+                f'</tr>'
+            )
 
     table = (
         f'<table class="dq-table">'

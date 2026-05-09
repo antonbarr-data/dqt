@@ -15,7 +15,11 @@ class NullFractionDetector(BaseAggregateDetector):
     slug = "null_fraction"
     group = "basic"
 
+    def __init__(self) -> None:
+        self._col: str | None = None
+
     def get_aggregations(self, col: str) -> list[AggExpr]:
+        self._col = col
         return [
             AggExpr("null_count", f"SUM(CASE WHEN {col} IS NULL THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
@@ -34,4 +38,5 @@ class NullFractionDetector(BaseAggregateDetector):
             verdict=self._verdict(frac),
             plain_english=f"{null_count}/{total} rows are NULL ({frac:.1%})",
             details={"null_count": null_count, "total_count": total},
+            failing_filter_sql=f"{self._col} IS NULL" if self._col and frac > 0 else None,
         )

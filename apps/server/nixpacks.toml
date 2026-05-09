@@ -1,0 +1,17 @@
+# nixpacks build config for dqt-server (FastAPI).
+# Railway root directory for this service should be the REPO ROOT so that
+# uv can resolve the workspace member `dqtlib`. If root dir is set to
+# `apps/server`, the pip path is used instead (dqtlib pulled from PyPI).
+
+[phases.setup]
+nixPkgs = ["python312"]
+
+[phases.install]
+# pip install reads pyproject.toml; dqtlib[postgres] resolves from PyPI (>=0.1.0 published)
+cmds = [
+  "pip install --upgrade pip",
+  "pip install ."
+]
+
+[start]
+cmd = "uvicorn dqt_server.main:app --host 0.0.0.0 --port $PORT"

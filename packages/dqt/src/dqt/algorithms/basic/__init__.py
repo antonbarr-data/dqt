@@ -2,7 +2,7 @@ from dqt.algorithms.basic.completeness import CompletenessDetector
 from dqt.algorithms.basic.uniqueness import UniquenessDetector
 from dqt.algorithms.basic.validity import ValidityDetector
 from dqt.algorithms.basic.numeric import NumericMeanDetector
-from dqt.algorithms.basic.volume import VolumeDetector
+from dqt.algorithms.basic.volume import VolumeDetector, RowCountInRangeDetector
 from dqt.algorithms.basic.numeric_bounds import (
     MaxInRangeDetector, MinInRangeDetector, MedianInRangeDetector,
     StdDevInRangeDetector, SumInRangeDetector, CardinalityInRangeDetector,
@@ -22,7 +22,7 @@ from dqt.algorithms.basic.date_part import DatePartCompletenessDetector
 
 __all__ = [
     "CompletenessDetector", "UniquenessDetector", "ValidityDetector",
-    "NumericMeanDetector", "VolumeDetector",
+    "NumericMeanDetector", "VolumeDetector", "RowCountInRangeDetector",
     "MaxInRangeDetector", "MinInRangeDetector", "MedianInRangeDetector",
     "StdDevInRangeDetector", "SumInRangeDetector", "CardinalityInRangeDetector",
     "QuantileInRangeDetector",

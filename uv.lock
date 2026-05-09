@@ -22,11 +22,11 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "dqt",
     "dqt-cli",
     "dqt-server",
     "dqt-worker",
     "dqt-workspace",
+    "dqtlib",
 ]
 
 [[package]]
@@ -1015,8 +1015,126 @@ wheels = [
 ]
 
 [[package]]
-name = "dqt"
+name = "dqt-cli"
 version = "0.1.0"
+source = { editable = "packages/dqt-cli" }
+dependencies = [
+    { name = "dqtlib" },
+    { name = "duckdb" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "dqtlib", editable = "packages/dqt" },
+    { name = "duckdb", specifier = ">=0.10" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "typer", specifier = ">=0.12" },
+]
+
+[[package]]
+name = "dqt-server"
+version = "0.1.0"
+source = { editable = "apps/server" }
+dependencies = [
+    { name = "alembic" },
+    { name = "anthropic" },
+    { name = "arq" },
+    { name = "asyncpg" },
+    { name = "cryptography" },
+    { name = "dqtlib", extra = ["postgres"] },
+    { name = "email-validator" },
+    { name = "fastapi" },
+    { name = "gunicorn" },
+    { name = "httpx" },
+    { name = "passlib", extra = ["bcrypt"] },
+    { name = "python-jose", extra = ["cryptography"] },
+    { name = "python-multipart" },
+    { name = "redis", extra = ["hiredis"] },
+    { name = "slowapi" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.13" },
+    { name = "anthropic", specifier = ">=0.28" },
+    { name = "arq", specifier = ">=0.26" },
+    { name = "asyncpg", specifier = ">=0.29" },
+    { name = "cryptography", specifier = ">=42.0" },
+    { name = "dqtlib", extras = ["postgres"], editable = "packages/dqt" },
+    { name = "email-validator", specifier = ">=2.1" },
+    { name = "fastapi", specifier = ">=0.111" },
+    { name = "gunicorn", specifier = ">=22.0" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7" },
+    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "redis", extras = ["hiredis"], specifier = ">=5.0" },
+    { name = "slowapi", specifier = ">=0.1" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
+]
+
+[[package]]
+name = "dqt-worker"
+version = "0.1.0"
+source = { editable = "apps/worker" }
+dependencies = [
+    { name = "arq" },
+    { name = "dqt-server" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "arq", specifier = ">=0.26" },
+    { name = "dqt-server", editable = "apps/server" },
+]
+
+[[package]]
+name = "dqt-workspace"
+version = "0.0.0"
+source = { virtual = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "freezegun" },
+    { name = "httpx" },
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-randomly" },
+    { name = "ruff" },
+    { name = "testcontainers" },
+    { name = "vcrpy" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "freezegun", specifier = ">=1.5" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "hypothesis", specifier = ">=6.100" },
+    { name = "mypy", specifier = ">=1.10" },
+    { name = "pytest", specifier = ">=8.2" },
+    { name = "pytest-asyncio", specifier = ">=0.23" },
+    { name = "pytest-cov", specifier = ">=5.0" },
+    { name = "pytest-randomly", specifier = ">=3.15" },
+    { name = "ruff", specifier = ">=0.5" },
+    { name = "testcontainers", specifier = ">=4.5" },
+    { name = "vcrpy", specifier = ">=6.0" },
+]
+
+[[package]]
+name = "dqtlib"
+version = "0.1.2"
 source = { editable = "packages/dqt" }
 dependencies = [
     { name = "diptest" },
@@ -1099,124 +1217,6 @@ requires-dist = [
     { name = "torch", marker = "extra == 'deep'", specifier = ">=2.3" },
 ]
 provides-extras = ["postgres", "causal", "forecast", "deep", "explain", "files", "reports"]
-
-[[package]]
-name = "dqt-cli"
-version = "0.1.0"
-source = { editable = "packages/dqt-cli" }
-dependencies = [
-    { name = "dqt" },
-    { name = "duckdb" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "dqt", editable = "packages/dqt" },
-    { name = "duckdb", specifier = ">=0.10" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=13.0" },
-    { name = "typer", specifier = ">=0.12" },
-]
-
-[[package]]
-name = "dqt-server"
-version = "0.1.0"
-source = { editable = "apps/server" }
-dependencies = [
-    { name = "alembic" },
-    { name = "anthropic" },
-    { name = "arq" },
-    { name = "asyncpg" },
-    { name = "cryptography" },
-    { name = "dqt", extra = ["postgres"] },
-    { name = "email-validator" },
-    { name = "fastapi" },
-    { name = "gunicorn" },
-    { name = "httpx" },
-    { name = "passlib", extra = ["bcrypt"] },
-    { name = "python-jose", extra = ["cryptography"] },
-    { name = "python-multipart" },
-    { name = "redis", extra = ["hiredis"] },
-    { name = "slowapi" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.13" },
-    { name = "anthropic", specifier = ">=0.28" },
-    { name = "arq", specifier = ">=0.26" },
-    { name = "asyncpg", specifier = ">=0.29" },
-    { name = "cryptography", specifier = ">=42.0" },
-    { name = "dqt", extras = ["postgres"], editable = "packages/dqt" },
-    { name = "email-validator", specifier = ">=2.1" },
-    { name = "fastapi", specifier = ">=0.111" },
-    { name = "gunicorn", specifier = ">=22.0" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7" },
-    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "redis", extras = ["hiredis"], specifier = ">=5.0" },
-    { name = "slowapi", specifier = ">=0.1" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
-]
-
-[[package]]
-name = "dqt-worker"
-version = "0.1.0"
-source = { editable = "apps/worker" }
-dependencies = [
-    { name = "arq" },
-    { name = "dqt-server" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "arq", specifier = ">=0.26" },
-    { name = "dqt-server", editable = "apps/server" },
-]
-
-[[package]]
-name = "dqt-workspace"
-version = "0.0.0"
-source = { virtual = "." }
-
-[package.dev-dependencies]
-dev = [
-    { name = "freezegun" },
-    { name = "httpx" },
-    { name = "hypothesis" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "pytest-randomly" },
-    { name = "ruff" },
-    { name = "testcontainers" },
-    { name = "vcrpy" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "freezegun", specifier = ">=1.5" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "hypothesis", specifier = ">=6.100" },
-    { name = "mypy", specifier = ">=1.10" },
-    { name = "pytest", specifier = ">=8.2" },
-    { name = "pytest-asyncio", specifier = ">=0.23" },
-    { name = "pytest-cov", specifier = ">=5.0" },
-    { name = "pytest-randomly", specifier = ">=3.15" },
-    { name = "ruff", specifier = ">=0.5" },
-    { name = "testcontainers", specifier = ">=4.5" },
-    { name = "vcrpy", specifier = ">=6.0" },
-]
 
 [[package]]
 name = "duckdb"

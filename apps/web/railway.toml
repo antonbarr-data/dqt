@@ -1,0 +1,11 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "node .next/standalone/server.js"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+[deploy.healthcheck]
+path = "/"
+timeout = 60

@@ -510,7 +510,7 @@ The server (`apps/server`) imports the library and adds auth, multi-tenancy, sch
 | Outlier detection | ✅ MAD, IQR, IF, ... | ❌ | ❌ | ❌ | ❌ |
 | Drift detection | ✅ KS, PSI, Wasserstein | ❌ | ❌ | ✅ | ✅ |
 | Causal discovery | ✅ Granger, PCMCI+ | ❌ | ❌ | ❌ | ❌ |
-| Semantic layer | ✅ Obsidian vault | ❌ | ❌ | ❌ | ✅ |
+| Semantic layer | ✅ Obsidian vault (Karpathy LLM Wiki pattern) | ❌ | ❌ | ❌ | ✅ |
 | Column lineage | ✅ sqlglot | ❌ | ❌ | ✅ | ✅ |
 | AI explanations | ✅ Claude | ❌ | ❌ | ❌ | ❌ |
 | HTML reports | ✅ | ⚠️ Data Docs | ⚠️ | ❌ | ❌ |

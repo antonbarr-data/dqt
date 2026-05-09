@@ -5,7 +5,7 @@ description = "dqt command-line interface"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 dependencies = [
-    "dqt>=0.1.0",
+    "dqtlib>=0.1.0",
     "typer>=0.12",
     "rich>=13.0",
     "pyyaml>=6.0",
@@ -16,7 +16,7 @@ dependencies = [
 dqt = "dqt_cli.main:app"
 
 [tool.uv.sources]
-dqt = { workspace = true }
+dqtlib = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

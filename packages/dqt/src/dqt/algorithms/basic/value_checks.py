@@ -16,8 +16,10 @@ class ValueInRangeDetector(BaseAggregateDetector):
 
     def __init__(self, min_val: float = float("-inf"), max_val: float = float("inf")) -> None:
         self._min, self._max = min_val, max_val
+        self._col: str | None = None
 
     def get_aggregations(self, col: str) -> list[AggExpr]:
+        self._col = col
         return [
             AggExpr("violation_count", f"SUM(CASE WHEN {col} < {self._min} OR {col} > {self._max} THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
@@ -27,7 +29,10 @@ class ValueInRangeDetector(BaseAggregateDetector):
         return {}
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
-        return fraction_result(current, "value_in_range_violation", f"range [{self._min}, {self._max}]")
+        result = fraction_result(current, "value_in_range_violation", f"range [{self._min}, {self._max}]")
+        if self._col and result.score > 0:
+            result.failing_filter_sql = f"({self._col} < {self._min} OR {self._col} > {self._max})"
+        return result
 
 
 @registry.register
