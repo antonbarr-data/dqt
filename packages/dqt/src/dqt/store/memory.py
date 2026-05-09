@@ -15,7 +15,7 @@ class MemoryStore:
         self._runs[run.check_id].append(run)
 
     def list_runs(self, check_id: UUID, limit: int = 100) -> list[RunResult]:
-        return list(reversed(self._runs[check_id]))[:limit]
+        return self._runs[check_id][-limit:][::-1]
 
     def save_incident(self, incident: Incident) -> None:
         self._incidents[incident.check_id].append(incident)
