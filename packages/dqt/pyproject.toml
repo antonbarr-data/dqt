@@ -19,6 +19,8 @@ dependencies = [
     "pydantic>=2.7",
     "ibis-framework>=9.0",
     "duckdb>=0.9",
+    "jsonschema>=4.22",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

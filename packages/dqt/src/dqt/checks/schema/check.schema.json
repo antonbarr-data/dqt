@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CheckDefinition",
+  "description": "A single dqt check binding a detector to a table/column.",
+  "type": "object",
+  "required": ["schema_name", "table_name", "detector_slug"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Auto-generated if omitted."
+    },
+    "schema_name": { "type": "string" },
+    "table_name": { "type": "string" },
+    "column_name": { "type": ["string", "null"] },
+    "detector_slug": { "type": "string" },
+    "params": {
+      "type": "object",
+      "default": {}
+    },
+    "baseline": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "window_days": { "type": "integer", "minimum": 1, "default": 14 },
+            "min_rows": { "type": "integer", "minimum": 1, "default": 1000 }
+          }
+        }
+      ]
+    },
+    "schedule": { "type": ["string", "null"] },
+    "sample_n": { "type": "integer", "minimum": 1000, "default": 100000 },
+    "sampling_pct": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "number", "minimum": 0.001, "maximum": 100 }
+      ],
+      "description": "Fraction of rows to sample, 0-100. Overrides sample_n when set."
+    },
+    "scope": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["entire", "incremental", "custom"] },
+            "key_col": { "type": ["string", "null"] },
+            "since": { "type": ["string", "null"] },
+            "custom_sql": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+    "filters": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["col", "values"],
+        "additionalProperties": false,
+        "properties": {
+          "col": { "type": "string" },
+          "values": { "type": "array", "minItems": 1 }
+        }
+      }
+    }
+  }
+}
