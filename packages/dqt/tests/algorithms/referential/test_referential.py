@@ -10,7 +10,7 @@ from dqt.algorithms._base import Verdict
 @pytest.fixture()
 def detector():
     from dqt.algorithms.referential.referential import ReferentialIntegrityDetector
-    return ReferentialIntegrityDetector()
+    return ReferentialIntegrityDetector(parent_table="parent_orders", parent_col="id")
 
 
 def agg(orphan_count: int, total: int) -> pd.DataFrame:
@@ -48,11 +48,21 @@ def test_referential_stability(orphans, total):
     from dqt.algorithms.referential.referential import ReferentialIntegrityDetector
     orphans = min(orphans, total)
     df = agg(orphans, total)
-    det = ReferentialIntegrityDetector()
+    det = ReferentialIntegrityDetector(parent_table="p", parent_col="id")
     state = det.fit(df)
     result = det.score(df, state)
     assert 0.0 <= result.score <= 1.0
     assert not math.isnan(result.score)
+
+
+def test_zero_total_count():
+    from dqt.algorithms.referential.referential import ReferentialIntegrityDetector
+    df = agg(0, 0)
+    det = ReferentialIntegrityDetector(parent_table="p", parent_col="id")
+    state = det.fit(df)
+    result = det.score(df, state)
+    assert result.score == pytest.approx(1.0)
+    assert result.verdict == Verdict.pass_
 
 
 def test_referential_stat_scale_verdict():

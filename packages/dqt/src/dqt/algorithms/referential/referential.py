@@ -17,10 +17,10 @@ class ReferentialIntegrityDetector(BaseAggregateDetector):
     parent table. The caller supplies a `parent_table` and `parent_col` in params; the runner
     substitutes them into the SQL.
     """
-    slug = "referential_integrity"
+    slug = "referential_integrity_rate"
     group = "referential"
 
-    def __init__(self, parent_table: str = "", parent_col: str = "id") -> None:
+    def __init__(self, parent_table: str, parent_col: str = "id") -> None:
         self._parent_table = parent_table
         self._parent_col = parent_col
 
@@ -37,10 +37,7 @@ class ReferentialIntegrityDetector(BaseAggregateDetector):
         ]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
-        row = reference.iloc[0]
-        total = int(row["total_count"])
-        rate = 1.0 - (int(row["orphan_count"]) / total) if total > 0 else 1.0
-        return {"baseline_integrity_rate": rate}
+        return {}
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         row = current.iloc[0]
@@ -53,7 +50,3 @@ class ReferentialIntegrityDetector(BaseAggregateDetector):
             plain_english=f"Referential integrity {rate:.2%} ({orphans:,} orphan rows out of {total:,})",
             details={"integrity_rate": rate, "orphan_count": orphans, "total_count": total},
         )
-
-    def _verdict(self, score: float):
-        from dqt.algorithms._base import compute_verdict
-        return compute_verdict(score, "referential_integrity_rate")

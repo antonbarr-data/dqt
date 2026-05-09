@@ -18,13 +18,10 @@ class SchemaChangeDetector(BaseDetector):
     group = "schema"
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
-        return {
-            row["col_name"]: row["data_type"]
-            for _, row in reference.iterrows()
-        }
+        return dict(zip(reference["col_name"], reference["data_type"]))
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
-        curr_schema = {row["col_name"]: row["data_type"] for _, row in current.iterrows()}
+        curr_schema = dict(zip(current["col_name"], current["data_type"]))
         baseline_schema: dict[str, str] = state
 
         added = set(curr_schema) - set(baseline_schema)
