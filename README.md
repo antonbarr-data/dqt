@@ -68,7 +68,7 @@ Lineage feeds the **failure blast radius**: from any incident, dqt traces downst
 
 Every entity (dataset, column, metric) lives as a single `.md` document. Relationships use `[[wiki-links]]`. Embeddings on descriptions power semantic search and the AI agent's grounding.
 
-The vault layout is inspired by [Andrej Karpathy's LLM Wiki](https://github.com/karpathy/llmwiki) pattern: `raw/` holds atomic source-of-truth documents (your semantic layer — editable, version-controlled), `wiki/` holds synthesised knowledge produced by the system (discovered lineage, causal edges, derived metrics).
+The vault layout is inspired by [Andrej Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) pattern: `raw/` holds atomic source-of-truth documents (your semantic layer — editable, version-controlled), `wiki/` holds synthesised knowledge produced by the system (discovered lineage, causal edges, derived metrics).
 
 ```
 vault/
