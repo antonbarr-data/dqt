@@ -6,7 +6,7 @@ dqt
 
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
-[![PyPI](https://img.shields.io/badge/pip%20install-dqt-orange?style=flat-square)](https://pypi.org/project/dqt/)
+[![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
 
@@ -327,7 +327,7 @@ source:
 ## CLI quick start
 
 ```bash
-pip install dqt
+pip install dqtlib
 ```
 
 ```bash
@@ -523,22 +523,22 @@ The server (`apps/server`) imports the library and adds auth, multi-tenancy, sch
 
 ```bash
 # Core library + CLI
-pip install dqt
+pip install dqtlib
 
 # + matplotlib for HTML profiling and quality reports
-pip install "dqt[reports]"
+pip install "dqtlib[reports]"
 
 # + Prophet for time-series forecasting detectors
-pip install "dqt[forecast]"
+pip install "dqtlib[forecast]"
 
 # + tigramite for PCMCI+ causal discovery
-pip install "dqt[causal]"
+pip install "dqtlib[causal]"
 
 # + deep learning detectors (autoencoder, etc.)
-pip install "dqt[deep]"
+pip install "dqtlib[deep]"
 
 # Everything
-pip install "dqt[all]"
+pip install "dqtlib[all]"
 ```
 
 Requires Python ≥ 3.12.

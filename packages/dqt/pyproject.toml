@@ -1,11 +1,15 @@
 [project]
-name = "dqt"
+name = "dqtlib"
 version = "0.1.0"
 description = "Data quality, observability, semantic, and causality library"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-keywords = ["data-quality", "observability", "anomaly-detection", "causality"]
+keywords = ["data-quality", "observability", "anomaly-detection", "causality", "data-drift", "causal-inference"]
+authors = [
+    { name = "Anton Barr", email = "antonbar@gmail.com" },
+]
+urls = { Homepage = "https://github.com/antonbarr-data/dqt", Repository = "https://github.com/antonbarr-data/dqt" }
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.13",
