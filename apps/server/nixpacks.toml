@@ -2,7 +2,10 @@
 nixPkgs = ["python312", "uv"]
 
 [phases.install]
-cmds = ["uv pip install --system ."]
+cmds = [
+  "uv venv",
+  "uv pip install --python .venv/bin/python ."
+]
 
 [start]
-cmd = "uvicorn dqt_server.main:app --host 0.0.0.0 --port $PORT"
+cmd = ".venv/bin/uvicorn dqt_server.main:app --host 0.0.0.0 --port $PORT"
