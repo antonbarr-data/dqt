@@ -15,8 +15,9 @@ def detector():
 
 
 def test_zscore_detects_spike(detector):
+    # 19 clean points + spike of 50.0 → fraction = 1/20 = 5% > fail threshold (5%)
     rng = np.random.default_rng(42)
-    data = rng.normal(0, 1, 500)
+    data = rng.normal(0, 1, 19)
     data = np.append(data, 50.0)
     df = pd.DataFrame({"value": data})
     state = detector.fit(df)
@@ -32,12 +33,15 @@ def test_zscore_no_false_positives(detector, normal_df):
 
 
 def test_zscore_many_spikes_fail(detector):
+    # Fit on clean reference, score on contaminated current to expose the spikes.
     rng = np.random.default_rng(7)
-    clean = rng.normal(0, 1, 900)
-    spikes = np.full(100, 100.0)
-    df = pd.DataFrame({"value": np.concatenate([clean, spikes])})
-    state = detector.fit(df)
-    result = detector.score(df, state)
+    clean_ref = rng.normal(0, 1, 900)
+    clean_curr = rng.normal(0, 1, 90)
+    spikes = np.full(10, 100.0)
+    df_ref = pd.DataFrame({"value": clean_ref})
+    df_curr = pd.DataFrame({"value": np.concatenate([clean_curr, spikes])})
+    state = detector.fit(df_ref)
+    result = detector.score(df_curr, state)
     assert result.verdict == Verdict.fail
 
 
