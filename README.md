@@ -27,6 +27,22 @@ The core library (`packages/dqt`) is zero-dependency on web or server infrastruc
 
 ---
 
+## Screenshots
+
+**Overview** — fleet KPIs, dataset health table with sparklines, live activity feed
+
+![Overview dashboard](docs/screenshots/overview.png)
+
+**Incident detail** — statistical evidence, distribution overlay, causal trace, AI explanation
+
+![Incident detail](docs/screenshots/incident.png)
+
+**Causality DAG** — confirmed metric→metric graph, Shapley attribution, KL divergence matrix
+
+![Causality DAG](docs/screenshots/causality.png)
+
+---
+
 ## Core capability hierarchy
 
 ### Data Lineage
@@ -51,6 +67,8 @@ Lineage feeds the **failure blast radius**: from any incident, dqt traces downst
 **Metric definitions** as YAML contracts: `id`, `name`, `kind`, `source`, `dimensions`, `owner`, `description`, `unit`. Compatible with dbt's semantic layer — dqt reads `semantic_models.yml` directly.
 
 Every entity (dataset, column, metric) lives as a single `.md` document. Relationships use `[[wiki-links]]`. Embeddings on descriptions power semantic search and the AI agent's grounding.
+
+The vault layout is inspired by [Andrej Karpathy's LLM Wiki](https://github.com/karpathy/llmwiki) pattern: `raw/` holds atomic source-of-truth documents (your semantic layer — editable, version-controlled), `wiki/` holds synthesised knowledge produced by the system (discovered lineage, causal edges, derived metrics).
 
 ```
 vault/
