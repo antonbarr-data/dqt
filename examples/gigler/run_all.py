@@ -594,6 +594,11 @@ def main() -> None:
     print("dqt -- Gigler End-to-End Demo")
     print("=" * 64)
 
+    print("\n[Phase 0] Generating knowledge graph vault...")
+    import subprocess
+    subprocess.run([sys.executable, Path(__file__).parent / "generate_vault.py"], check=True)
+    print("  Vault: examples/gigler/vault/")
+
     print("\n[Phase 1] Loading data...")
     conn, adapter = load_data()
 
