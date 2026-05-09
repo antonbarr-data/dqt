@@ -1,6 +1,6 @@
 """Matplotlib chart helpers returning base64-encoded PNG strings for HTML reports.
 
-All charts use the dqt dark theme. matplotlib is an optional dep (dqt[reports]).
+Supports light and dark themes. matplotlib is an optional dep (dqt[reports]).
 """
 from __future__ import annotations
 
@@ -11,19 +11,35 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402 (must be after matplotlib.use)
 
-# dqt dark theme applied globally for this module
-plt.rcParams.update({
-    "figure.facecolor": "#0F1117",
-    "axes.facecolor": "#161B25",
-    "axes.edgecolor": "#2A3147",
-    "grid.color": "#2A3147",
-    "text.color": "#A0A8B8",
-    "xtick.color": "#666E82",
-    "ytick.color": "#666E82",
-    "font.family": "monospace",
-})
-
 _DPI = 96
+
+_THEMES: dict[str, dict[str, str]] = {
+    "light": {
+        "figure.facecolor": "#FFFFFF",
+        "axes.facecolor":   "#F5F7FA",
+        "axes.edgecolor":   "#DDE1EC",
+        "grid.color":       "#DDE1EC",
+        "text.color":       "#3D4663",
+        "xtick.color":      "#8892A4",
+        "ytick.color":      "#8892A4",
+        "font.family":      "monospace",
+    },
+    "dark": {
+        "figure.facecolor": "#0F1117",
+        "axes.facecolor":   "#161B25",
+        "axes.edgecolor":   "#2A3147",
+        "grid.color":       "#2A3147",
+        "text.color":       "#A0A8B8",
+        "xtick.color":      "#666E82",
+        "ytick.color":      "#666E82",
+        "font.family":      "monospace",
+    },
+}
+
+_ACCENT_LIGHT = "#1E8A52"
+_ACCENT_DARK  = "#9DD0B0"
+_LABEL_LIGHT  = "#8892A4"
+_LABEL_DARK   = "#666E82"
 
 
 def _fig_to_b64(fig: plt.Figure) -> str:
@@ -37,15 +53,20 @@ def _fig_to_b64(fig: plt.Figure) -> str:
 def histogram_chart(
     data: list[float],
     title: str,
-    color: str = "#9DD0B0",
+    color: str | None = None,
+    theme: str = "light",
     width: int = 600,
     height: int = 200,
 ) -> str:
-    """Render a histogram as base64 PNG. Dark background."""
+    """Render a histogram as base64 PNG."""
+    if color is None:
+        color = _ACCENT_LIGHT if theme == "light" else _ACCENT_DARK
+    plt.rcParams.update(_THEMES[theme])
+    edge = _THEMES[theme]["axes.edgecolor"]
     fig, ax = plt.subplots(figsize=(width / _DPI, height / _DPI))
     if data:
         n_bins = min(30, max(5, len(set(data))))
-        ax.hist(data, bins=n_bins, color=color, edgecolor="#2A3147", linewidth=0.5)
+        ax.hist(data, bins=n_bins, color=color, edgecolor=edge, linewidth=0.5)
     ax.set_title(title, fontsize=9, pad=4)
     ax.tick_params(labelsize=7)
     ax.grid(axis="y", linewidth=0.4, alpha=0.5)
@@ -59,27 +80,30 @@ def distribution_bars(
     labels: list[str],
     values: list[float],
     title: str,
+    theme: str = "light",
     width: int = 600,
     height: int = 200,
 ) -> str:
-    """Render a horizontal bar chart for top_values. Dark background."""
+    """Render a horizontal bar chart for top_values."""
+    accent = _ACCENT_LIGHT if theme == "light" else _ACCENT_DARK
+    label_color = _LABEL_LIGHT if theme == "light" else _LABEL_DARK
+    plt.rcParams.update(_THEMES[theme])
+    edge = _THEMES[theme]["axes.edgecolor"]
     fig, ax = plt.subplots(figsize=(width / _DPI, height / _DPI))
     if labels and values:
-        # Show at most 10 bars; truncate long labels
         disp_labels = [str(l)[:20] for l in labels[:10]]
         disp_values = values[:10]
-        colors = ["#9DD0B0"] * len(disp_labels)
-        bars = ax.barh(range(len(disp_labels)), disp_values, color=colors, edgecolor="#2A3147", linewidth=0.5)
+        colors = [accent] * len(disp_labels)
+        bars = ax.barh(range(len(disp_labels)), disp_values, color=colors, edgecolor=edge, linewidth=0.5)
         ax.set_yticks(range(len(disp_labels)))
         ax.set_yticklabels(disp_labels, fontsize=7)
         ax.invert_yaxis()
-        # Value labels on bars
         for bar, val in zip(bars, disp_values):
             ax.text(
                 bar.get_width() + max(disp_values) * 0.01,
                 bar.get_y() + bar.get_height() / 2,
                 f"{val:.1f}%",
-                va="center", ha="left", fontsize=6, color="#A0A8B8",
+                va="center", ha="left", fontsize=6, color=label_color,
             )
     ax.set_title(title, fontsize=9, pad=4)
     ax.tick_params(axis="x", labelsize=7)
@@ -94,15 +118,18 @@ def time_series_chart(
     dates: list[str],
     values: list[float],
     title: str,
-    color: str = "#9DD0B0",
+    color: str | None = None,
+    theme: str = "light",
     width: int = 800,
     height: int = 200,
 ) -> str:
-    """Render a time series line chart as base64 PNG. Dark background."""
+    """Render a time series line chart as base64 PNG."""
+    if color is None:
+        color = _ACCENT_LIGHT if theme == "light" else _ACCENT_DARK
+    plt.rcParams.update(_THEMES[theme])
     fig, ax = plt.subplots(figsize=(width / _DPI, height / _DPI))
     if dates and values:
         ax.plot(range(len(values)), values, color=color, linewidth=1.2)
-        # Show a subset of x-tick labels to avoid crowding
         step = max(1, len(dates) // 8)
         ticks = list(range(0, len(dates), step))
         ax.set_xticks(ticks)
@@ -120,12 +147,15 @@ def correlation_heatmap(
     labels: list[str],
     matrix: list[list[float]],
     title: str,
+    theme: str = "light",
     width: int = 500,
     height: int = 500,
 ) -> str:
     """Render a correlation heatmap as base64 PNG."""
     import numpy as np
 
+    label_color = _LABEL_LIGHT if theme == "light" else _LABEL_DARK
+    plt.rcParams.update(_THEMES[theme])
     fig, ax = plt.subplots(figsize=(width / _DPI, height / _DPI))
     if labels and matrix:
         arr = np.array(matrix)
@@ -135,10 +165,9 @@ def correlation_heatmap(
         ax.set_yticks(range(len(labels)))
         ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=7)
         ax.set_yticklabels(labels, fontsize=7)
-        # Annotate cells
         for i in range(len(labels)):
             for j in range(len(labels)):
-                ax.text(j, i, f"{arr[i, j]:.2f}", ha="center", va="center", fontsize=6, color="#E8EAF0")
+                ax.text(j, i, f"{arr[i, j]:.2f}", ha="center", va="center", fontsize=6, color=label_color)
     ax.set_title(title, fontsize=9, pad=4)
     fig.tight_layout(pad=0.4)
     return _fig_to_b64(fig)

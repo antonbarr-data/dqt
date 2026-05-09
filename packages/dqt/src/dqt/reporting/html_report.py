@@ -2,6 +2,7 @@
 
 No external template dependencies — HTML is generated via Python f-strings.
 Charts require the optional dqt[reports] extra (matplotlib>=3.8).
+Light theme is the default; a theme toggle button switches to dark in the browser.
 """
 from __future__ import annotations
 
@@ -11,133 +12,192 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dqt.profiling.models import DatasetProfile
 
-# ── Design tokens ─────────────────────────────────────────────────────────────
-_ACCENT = "#9DD0B0"
-_PASS = "#7FB394"
-_WARN = "#D9B566"
-_FAIL = "#E07B6E"
-_BG0 = "#0F1117"
-_BG1 = "#161B25"
-_BG2 = "#1E2433"
-_FG0 = "#E8EAF0"
-_FG1 = "#A0A8B8"
-_FG2 = "#666E82"
-_LINE = "#2A3147"
-
-# ── Shared CSS ────────────────────────────────────────────────────────────────
-_CSS = f"""
-*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-html, body {{
-  background: {_BG0}; color: {_FG0};
+# ── CSS: design tokens + shared rules ─────────────────────────────────────────
+_CSS = """
+:root {
+  --bg-0: #FFFFFF; --bg-1: #F5F7FA; --bg-2: #EDF0F5;
+  --fg-0: #1A1F2E; --fg-1: #3D4663; --fg-2: #8892A4;
+  --line: #DDE1EC;
+  --accent: #1E8A52; --pass: #1E7A4A; --warn: #9A7220; --fail: #C44D40;
+  --badge-pass-bg: #E8F5EE; --badge-warn-bg: #FAF4E0; --badge-fail-bg: #FAE8E6;
+  --row-pass: #F2FAF5; --row-warn: #FAF7EC; --row-fail: #FAF0EF;
+}
+[data-theme="dark"] {
+  --bg-0: #0F1117; --bg-1: #161B25; --bg-2: #1E2433;
+  --fg-0: #E8EAF0; --fg-1: #A0A8B8; --fg-2: #666E82;
+  --line: #2A3147;
+  --accent: #9DD0B0; --pass: #7FB394; --warn: #D9B566; --fail: #E07B6E;
+  --badge-pass-bg: #1A2E24; --badge-warn-bg: #2E2A1A; --badge-fail-bg: #2E1A1A;
+  --row-pass: #141e18; --row-warn: #1e1c12; --row-fail: #1e1212;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg-0); color: var(--fg-0);
   font-family: Inter, system-ui, sans-serif;
   font-size: 13px; line-height: 1.5;
-}}
-header {{
+}
+header {
+  position: relative;
   padding: 20px 28px 16px;
-  border-bottom: 1px solid {_LINE};
+  border-bottom: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 4px;
-}}
-.brand {{
+}
+.brand {
   font-family: 'JetBrains Mono', monospace; font-weight: 300;
   font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-  color: {_ACCENT};
-}}
-h1 {{ font-size: 18px; font-weight: 500; color: {_FG0}; }}
-.meta {{ font-size: 11px; color: {_FG2}; font-family: 'JetBrains Mono', monospace; }}
-.ai-summary {{
+  color: var(--accent);
+}
+h1 { font-size: 18px; font-weight: 500; color: var(--fg-0); }
+.meta { font-size: 11px; color: var(--fg-2); font-family: 'JetBrains Mono', monospace; }
+#theme-btn {
+  position: absolute; top: 16px; right: 20px;
+  background: none; border: 1px solid var(--line); color: var(--fg-2);
+  cursor: pointer; padding: 4px 10px; font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; letter-spacing: 0.05em;
+}
+.ai-summary {
   margin: 16px 28px; padding: 14px 16px;
-  background: {_BG1}; border: 1px solid {_LINE};
-  border-left: 3px solid {_ACCENT};
-  font-size: 12px; color: {_FG1};
-}}
-.ai-summary-label {{
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  font-size: 12px; color: var(--fg-1);
+}
+.ai-summary-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: {_ACCENT}; margin-bottom: 6px;
+  color: var(--accent); margin-bottom: 6px;
   font-family: 'JetBrains Mono', monospace;
-}}
-.summary-bar {{
+}
+.summary-bar {
   display: flex; gap: 1px;
-  margin: 0 28px 16px; border: 1px solid {_LINE};
-}}
-.summary-stat {{
-  flex: 1; padding: 10px 14px; background: {_BG1};
-}}
-.summary-stat .label {{
+  margin: 0 28px 16px; border: 1px solid var(--line);
+}
+.summary-stat {
+  flex: 1; padding: 10px 14px; background: var(--bg-1);
+}
+.summary-stat .label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: {_FG2}; font-family: 'JetBrains Mono', monospace;
-}}
-.summary-stat .value {{
+  color: var(--fg-2); font-family: 'JetBrains Mono', monospace;
+}
+.summary-stat .value {
   font-size: 22px; font-weight: 300;
-  font-family: 'JetBrains Mono', monospace; color: {_FG0};
-}}
-.profile-grid {{
+  font-family: 'JetBrains Mono', monospace; color: var(--fg-0);
+}
+.profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
   gap: 1px; margin: 0 28px 28px;
-  border: 1px solid {_LINE};
-}}
-.col-card {{
-  background: {_BG1}; padding: 14px 16px;
-}}
-.col-header {{
+  border: 1px solid var(--line);
+}
+.col-card {
+  background: var(--bg-1); padding: 14px 16px;
+}
+.col-header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
-}}
-.col-name {{
+}
+.col-name {
   font-family: 'JetBrains Mono', monospace; font-weight: 400;
-  font-size: 13px; color: {_FG0};
-}}
-.badge {{
+  font-size: 13px; color: var(--fg-0);
+}
+.badge {
   font-size: 10px; padding: 2px 6px;
   font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em;
-  border: 1px solid {_LINE}; color: {_FG2};
-}}
-.badge-pass {{ background: #1A2E24; color: {_PASS}; border-left: 3px solid {_PASS}; }}
-.badge-warn {{ background: #2E2A1A; color: {_WARN}; border-left: 3px solid {_WARN}; }}
-.badge-fail {{ background: #2E1A1A; color: {_FAIL}; border-left: 3px solid {_FAIL}; }}
-.stats-row {{
+  border: 1px solid var(--line); color: var(--fg-2);
+}
+.badge-pass { background: var(--badge-pass-bg); color: var(--pass); border-left: 3px solid var(--pass); }
+.badge-warn { background: var(--badge-warn-bg); color: var(--warn); border-left: 3px solid var(--warn); }
+.badge-fail { background: var(--badge-fail-bg); color: var(--fail); border-left: 3px solid var(--fail); }
+.stats-row {
   display: flex; gap: 16px; margin-bottom: 10px;
-}}
-.stat-item .label {{
+}
+.stat-item .label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: {_FG2}; font-family: 'JetBrains Mono', monospace;
-}}
-.stat-item .value {{
-  font-size: 13px; font-family: 'JetBrains Mono', monospace; color: {_FG1};
-}}
-.stats-table {{
+  color: var(--fg-2); font-family: 'JetBrains Mono', monospace;
+}
+.stat-item .value {
+  font-size: 13px; font-family: 'JetBrains Mono', monospace; color: var(--fg-1);
+}
+.stats-table {
   width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px;
-}}
-.stats-table th, .stats-table td {{
-  padding: 4px 8px; border: 1px solid {_LINE};
+}
+.stats-table th, .stats-table td {
+  padding: 4px 8px; border: 1px solid var(--line);
   font-family: 'JetBrains Mono', monospace; text-align: right;
-}}
-.stats-table th {{ color: {_FG2}; background: {_BG2}; font-weight: 400; }}
-.stats-table td {{ color: {_FG1}; }}
-.chart-img {{ display: block; max-width: 100%; margin-top: 8px; }}
+}
+.stats-table th { color: var(--fg-2); background: var(--bg-2); font-weight: 400; }
+.stats-table td { color: var(--fg-1); }
+.chart-img { display: block; max-width: 100%; margin-top: 8px; }
 /* Quality report table */
-.dq-table {{
+.dq-table {
   width: calc(100% - 56px); margin: 0 28px 28px; border-collapse: collapse;
   font-size: 12px;
-}}
-.dq-table th {{
-  padding: 6px 10px; border: 1px solid {_LINE};
-  background: {_BG2}; color: {_FG2};
+}
+.dq-table th {
+  padding: 6px 10px; border: 1px solid var(--line);
+  background: var(--bg-2); color: var(--fg-2);
   font-family: 'JetBrains Mono', monospace; font-weight: 400;
   text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px;
   text-align: left;
-}}
-.dq-table td {{
-  padding: 6px 10px; border: 1px solid {_LINE}; color: {_FG1};
-}}
-.dq-table tr.pass td {{ background: #141e18; }}
-.dq-table tr.warn td {{ background: #1e1c12; }}
-.dq-table tr.fail td {{ background: #1e1212; }}
-.dq-table tr:hover td {{ filter: brightness(1.15); }}
-.verdict-pass {{ color: {_PASS}; font-family: 'JetBrains Mono', monospace; font-size: 10px; }}
-.verdict-warn {{ color: {_WARN}; font-family: 'JetBrains Mono', monospace; font-size: 10px; }}
-.verdict-fail {{ color: {_FAIL}; font-family: 'JetBrains Mono', monospace; font-size: 10px; }}
-.score {{ font-family: 'JetBrains Mono', monospace; }}
+}
+.dq-table td {
+  padding: 6px 10px; border: 1px solid var(--line); color: var(--fg-1);
+}
+.dq-table tr.pass td { background: var(--row-pass); }
+.dq-table tr.warn td { background: var(--row-warn); }
+.dq-table tr.fail td { background: var(--row-fail); }
+.dq-table tr:hover td { filter: brightness(1.05); }
+.verdict-pass { color: var(--pass); font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+.verdict-warn { color: var(--warn); font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+.verdict-fail { color: var(--fail); font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+.score { font-family: 'JetBrains Mono', monospace; }
+.bool-stats, .date-stats {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--fg-1);
+}
+.string-meta {
+  margin-top: 8px; font-size: 11px;
+  font-family: 'JetBrains Mono', monospace; color: var(--fg-2);
+}
 """
+
+# ── Theme JS ──────────────────────────────────────────────────────────────────
+_THEME_JS = """
+<script>
+function toggleTheme() {
+  var html = document.documentElement;
+  var current = html.getAttribute('data-theme') || 'light';
+  var next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('dqt-theme', next);
+  document.querySelectorAll('.chart-light').forEach(function(el) {
+    el.style.display = next === 'dark' ? 'none' : '';
+  });
+  document.querySelectorAll('.chart-dark').forEach(function(el) {
+    el.style.display = next === 'light' ? 'none' : '';
+  });
+}
+(function() {
+  var saved = localStorage.getItem('dqt-theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    if (saved === 'dark') {
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.chart-light').forEach(function(el) {
+          el.style.display = 'none';
+        });
+        document.querySelectorAll('.chart-dark').forEach(function(el) {
+          el.style.display = '';
+        });
+      });
+    }
+  }
+})();
+</script>
+"""
+
+_THEME_BTN = (
+    '<button id="theme-btn" onclick="toggleTheme()" title="Toggle theme">'
+    '◐ theme'
+    '</button>'
+)
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -159,17 +219,17 @@ def _null_badge(null_pct: float) -> str:
 def _verdict_badge(verdict: str) -> str:
     v = verdict.lower()
     if v == "pass":
-        return f'<span class="verdict-pass">PASS</span>'
+        return '<span class="verdict-pass">PASS</span>'
     if v == "warn":
-        return f'<span class="verdict-warn">WARN</span>'
-    return f'<span class="verdict-fail">FAIL</span>'
+        return '<span class="verdict-warn">WARN</span>'
+    return '<span class="verdict-fail">FAIL</span>'
 
 
-def _html_page(title: str, body: str) -> str:
+def _html_page(title: str, body: str, initial_theme: str = "light") -> str:
     return (
-        f'<!DOCTYPE html>\n<html data-theme="dark">\n<head>\n'
+        f'<!DOCTYPE html>\n<html data-theme="{initial_theme}">\n<head>\n'
         f'  <meta charset="utf-8">\n  <title>{_e(title)}</title>\n'
-        f'  <style>{_CSS}</style>\n</head>\n<body>\n{body}\n</body>\n</html>'
+        f'  <style>{_CSS}</style>\n</head>\n<body>\n{body}\n{_THEME_JS}</body>\n</html>'
     )
 
 
@@ -195,10 +255,17 @@ def _summary_bar(**stats: object) -> str:
     return f'<div class="summary-bar">{items}</div>'
 
 
+def _dual_chart_imgs(b64_light: str, b64_dark: str, alt: str) -> str:
+    """Render two chart images for light/dark — JS toggles visibility."""
+    return (
+        f'<img class="chart-img chart-light" src="data:image/png;base64,{b64_light}" alt="{_e(alt)}">'
+        f'<img class="chart-img chart-dark"  src="data:image/png;base64,{b64_dark}"  alt="{_e(alt)}" style="display:none">'
+    )
+
+
 # ── Column card ───────────────────────────────────────────────────────────────
 
 def _column_card(col: "ColumnProfile") -> str:  # type: ignore[name-defined]
-    # Lazy import — matplotlib required only if charts are rendered
     try:
         from dqt.reporting._charts import histogram_chart, distribution_bars
         _charts_available = True
@@ -243,17 +310,18 @@ def _column_card(col: "ColumnProfile") -> str:  # type: ignore[name-defined]
         if _charts_available and col.histogram:
             centers = [(b.left + b.right) / 2 for b in col.histogram for _ in range(b.count)]
             if centers:
-                b64 = histogram_chart(centers, title=col.name, width=520, height=160)
-                detail += f'<img class="chart-img" src="data:image/png;base64,{b64}" alt="histogram">'
+                b64_light = histogram_chart(centers, title=col.name, theme="light", width=520, height=160)
+                b64_dark  = histogram_chart(centers, title=col.name, theme="dark",  width=520, height=160)
+                detail += _dual_chart_imgs(b64_light, b64_dark, "histogram")
 
     elif col.top_values:
         labels = [tv.value for tv in col.top_values]
         values = [tv.pct for tv in col.top_values]
         if _charts_available:
-            b64 = distribution_bars(labels, values, title=f"{col.name} — top values", width=520, height=160)
-            detail += f'<img class="chart-img" src="data:image/png;base64,{b64}" alt="top values">'
+            b64_light = distribution_bars(labels, values, title=f"{col.name} — top values", theme="light", width=520, height=160)
+            b64_dark  = distribution_bars(labels, values, title=f"{col.name} — top values", theme="dark",  width=520, height=160)
+            detail += _dual_chart_imgs(b64_light, b64_dark, "top values")
         else:
-            # Fallback: plain text list
             rows = "".join(
                 f'<tr><td>{_e(tv.value)}</td><td>{tv.count:,}</td><td>{tv.pct:.1f}%</td></tr>'
                 for tv in col.top_values
@@ -266,8 +334,7 @@ def _column_card(col: "ColumnProfile") -> str:  # type: ignore[name-defined]
         if col.string_stats is not None:
             ss = col.string_stats
             detail += (
-                f'<div style="margin-top:8px;font-size:11px;color:{_FG2};'
-                f'font-family:\'JetBrains Mono\',monospace;">'
+                f'<div class="string-meta">'
                 f'len: min={ss.min_length} avg={ss.avg_length:.1f} '
                 f'median={ss.median_length:.1f} max={ss.max_length}'
                 f'</div>'
@@ -276,7 +343,7 @@ def _column_card(col: "ColumnProfile") -> str:  # type: ignore[name-defined]
     elif col.bool_stats is not None:
         bs = col.bool_stats
         detail += (
-            f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:{_FG1};">'
+            f'<div class="bool-stats">'
             f'true: {bs.true_count:,} ({bs.true_pct:.1f}%) &nbsp;|&nbsp; '
             f'false: {bs.false_count:,}'
             f'</div>'
@@ -285,7 +352,7 @@ def _column_card(col: "ColumnProfile") -> str:  # type: ignore[name-defined]
     elif col.date_stats is not None:
         ds = col.date_stats
         detail += (
-            f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:{_FG1};">'
+            f'<div class="date-stats">'
             f'range: {_e(ds.min)} → {_e(ds.max)} ({ds.date_range_days} days)'
             f'</div>'
         )
@@ -299,12 +366,14 @@ def profiling_report(
     profile: "DatasetProfile",
     title: str = "Data Profiling Report",
     ai_summary: str = "",
+    initial_theme: str = "light",
 ) -> str:
     """Generate a self-contained HTML profiling report."""
     dataset_name = f"{profile.schema_name}.{profile.table_name}"
 
     header = (
         f'<header>'
+        f'{_THEME_BTN}'
         f'<div class="brand">dqt</div>'
         f'<h1>{_e(title)}</h1>'
         f'<div class="meta">'
@@ -330,7 +399,7 @@ def profiling_report(
     grid = f'<div class="profile-grid">{cards}</div>'
 
     body = f"{header}\n{_ai_section(ai_summary)}\n{summary}\n{grid}"
-    return _html_page(title, body)
+    return _html_page(title, body, initial_theme=initial_theme)
 
 
 def quality_report(
@@ -338,6 +407,7 @@ def quality_report(
     dataset_name: str = "Dataset",
     title: str = "Data Quality Report",
     ai_summary: str = "",
+    initial_theme: str = "light",
 ) -> str:
     """Generate a self-contained HTML DQ check results report."""
     from datetime import datetime, timezone
@@ -351,6 +421,7 @@ def quality_report(
 
     header = (
         f'<header>'
+        f'{_THEME_BTN}'
         f'<div class="brand">dqt</div>'
         f'<h1>{_e(title)}</h1>'
         f'<div class="meta">'
@@ -400,7 +471,7 @@ def quality_report(
     )
 
     body = f"{header}\n{_ai_section(ai_summary)}\n{summary}\n{table}"
-    return _html_page(title, body)
+    return _html_page(title, body, initial_theme=initial_theme)
 
 
 def save_report(html: str, path: str) -> None:
