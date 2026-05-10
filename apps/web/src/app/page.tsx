@@ -277,8 +277,9 @@ export default function RootPage() {
           A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
-        <p className="mt-5" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 540, lineHeight: 1.7 }}>
-          Statistical drift detection, column-level lineage, and causal discovery — for dbt, warehouses, and data lakes. In one Python library.
+        <p className="mt-5" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 580, lineHeight: 1.7 }}>
+          Statistical drift detection, column-level lineage, and causal discovery — for dbt, warehouses, and data lakes.
+          A <span style={{ color: "var(--fg-0)" }}>Python library</span>, <span style={{ color: "var(--fg-0)" }}>CLI</span>, and <span style={{ color: "var(--fg-0)" }}>Web app</span> — all MIT licensed. Not just the Python library, like the others.
         </p>
 
         <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: 12, color: "var(--fg-2)" }}>
@@ -299,7 +300,8 @@ export default function RootPage() {
           </a>
         </p>
 
-        <div className="mt-6 border-l-2 pl-4 py-1" style={{ borderColor: "var(--accent)", maxWidth: 560 }}>
+
+<div className="mt-6 border-l-2 pl-4 py-1" style={{ borderColor: "var(--accent)", maxWidth: 560 }}>
           <p style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500, marginBottom: 6 }}>
             New · LLM Wiki semantic layer
           </p>
