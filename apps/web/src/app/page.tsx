@@ -233,8 +233,8 @@ export default function RootPage() {
       </nav>
 
       {/* ── hero ── */}
-      <section className="px-8 pt-12 pb-10 max-w-5xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
+      <section className="px-8 pt-10 pb-8 max-w-5xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
           <span
             className="px-2.5 py-1 border t-small"
             style={{ color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
@@ -273,11 +273,11 @@ export default function RootPage() {
           </a>
         </div>
 
-        <h1 style={{ fontSize: "clamp(48px, 6.5vw, 84px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.04, color: "var(--fg-0)", maxWidth: 740 }}>
+        <h1 style={{ fontSize: "clamp(44px, 5.6vw, 78px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.05, color: "var(--fg-0)", maxWidth: 740 }}>
           A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
-        <p className="mt-5" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 580, lineHeight: 1.7 }}>
+        <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 580, lineHeight: 1.7 }}>
           Statistical drift detection, column-level lineage, and causal discovery — for dbt, warehouses, and data lakes.
           A <span style={{ color: "var(--fg-0)" }}>Python library</span>, <span style={{ color: "var(--fg-0)" }}>CLI</span>, and <span style={{ color: "var(--fg-0)" }}>Web app</span> — all MIT licensed. Not just the Python library, like the others.
         </p>
@@ -301,12 +301,12 @@ export default function RootPage() {
         </p>
 
 
-<div className="mt-6 border-l-2 pl-4 py-1" style={{ borderColor: "var(--accent)", maxWidth: 560 }}>
+        <div className="mt-5 border-l-2 pl-4 py-1" style={{ borderColor: "var(--accent)", maxWidth: 560 }}>
           <p style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500, marginBottom: 6 }}>
             New · LLM Wiki semantic layer
           </p>
           <p style={{ fontSize: 15, color: "var(--fg-0)", fontWeight: 400, lineHeight: 1.55, marginBottom: 8 }}>
-            Your Trello board is already a semantic layer. dqt extracts it.
+            Your task board is already a semantic layer. dqt extracts it.
           </p>
           <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, marginBottom: 10 }}>
             Dump tickets, SQL, and BI reports into{" "}
@@ -326,7 +326,7 @@ export default function RootPage() {
           </a>
         </div>
 
-        <div className="flex items-center gap-3 mt-8 flex-wrap">
+        <div className="flex items-center gap-3 mt-6 flex-wrap">
           <button
             onClick={copyInstall}
             className="flex items-center gap-2 px-5 py-3 border transition-colors hover:opacity-85"
