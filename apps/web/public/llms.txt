@@ -9,8 +9,11 @@ dqt is a pip-installable Python library (`pip install dqtlib`) that runs standal
 - **Check**: binds a detector to a target column or table with optional scope, filters, and baseline config
 - **Detector**: a statistical method that implements `fit(reference) → state` and `score(current, state) → DetectorResult`
 - **Runner**: orchestrates fit and score operations against a warehouse adapter
+- **RunResult**: returned by `runner.run()` — carries verdict, score, plain_english, details, diagnostic_sql
+- **Incident**: created automatically when a run returns warn or fail — carries severity, score, opened_at, status
 - **MemoryStore**: in-memory results store — no database needed for notebooks and CI
 - **LocalAdapter**: wraps any pandas DataFrame — no warehouse connection needed
+- **LineageGraph**: directed graph of LineageNode and LineageEdge objects — built from SQL, dbt manifests, or manually
 - **SemanticManifest**: YAML-defined dataset/column descriptions loaded with `load_semantic_manifest()`
 - **write_vault()**: generates an Obsidian-compatible LLM Wiki vault (raw/ + wiki/) from the semantic manifest and lineage graph
 
@@ -19,6 +22,9 @@ dqt is a pip-installable Python library (`pip install dqtlib`) that runs standal
 - [Quickstart](https://github.com/antonbarr-data/dqt/blob/main/docs/api/quickstart.md): End-to-end example — load a CSV, run checks, read results
 - [Detectors reference](https://github.com/antonbarr-data/dqt/blob/main/docs/api/detectors.md): All 38 detectors with parameters and Gigler sample dataset examples
 - [Checks & Runner API](https://github.com/antonbarr-data/dqt/blob/main/docs/api/checks-and-runner.md): Check model, CheckScope, CheckFilter, BaselineConfig, Runner, MemoryStore
+- [Results & AI explanations](https://github.com/antonbarr-data/dqt/blob/main/docs/api/results.md): RunResult fields, Incident fields, causal discovery results, agent explanation output, MemoryStore queries
+- [Lineage API](https://github.com/antonbarr-data/dqt/blob/main/docs/api/lineage.md): LineageGraph construction from SQL (sqlglot), dbt manifest ingestion, OpenLineage events, graph queries
+- [Vault: LLM Wiki structure](https://github.com/antonbarr-data/dqt/blob/main/docs/api/vault.md): write_vault() output, raw/ Markdown frontmatter schema, wiki/ generated files, custom node types, Obsidian usage
 - [YAML check format](https://github.com/antonbarr-data/dqt/blob/main/docs/api/yaml-reference.md): Complete YAML config reference with annotated examples
 - [CLI reference](https://github.com/antonbarr-data/dqt/blob/main/docs/api/cli-reference.md): dqt run, dqt version, CI/CD integration
 - [Adapters](https://github.com/antonbarr-data/dqt/blob/main/docs/api/adapters.md): LocalAdapter, PostgresAdapter, custom adapter protocol
@@ -44,8 +50,70 @@ result = runner.run(Check(
 ), adapter)
 
 print(result.verdict)        # Verdict.pass_
+print(result.score)          # 0.0082
 print(result.plain_english)  # "0.82% of values are outliers — within the 1% warn threshold"
+print(result.diagnostic_sql) # "amount_usd > 487.3 OR amount_usd < -12.4"
+print(result.details)        # {"outlier_count": 82, "total_count": 10000, "mad": 45.2, ...}
 ```
+
+## RunResult fields
+
+verdict (Verdict: pass_/warn/fail), score (float), plain_english (str), details (dict — detector breakdown), diagnostic_sql (str|None — WHERE clause for failing rows), check_id (UUID), detector_slug (str), run_id (UUID), started_at (datetime), finished_at (datetime)
+
+## Incident fields
+
+id (UUID), check_id (UUID), run_id (UUID), severity (Verdict: warn/fail), score (float), plain_english (str), opened_at (datetime), resolved_at (datetime|None), status ("open"|"resolved")
+
+## Querying MemoryStore after runs
+
+```python
+runs = store.list_runs(check.id, limit=50)
+incidents = store.list_incidents()                       # all incidents
+open_incidents = store.list_incidents(status="open")     # open only
+check_incidents = store.list_incidents(check_id=check.id)
+triggering_run = store.get_run(incident.run_id)
+```
+
+## Causal discovery results
+
+```python
+from dqt.causality import CausalRunner, CausalConfig
+
+dag = CausalRunner(config=CausalConfig(method="pcmci_plus", max_lag=4)).discover(metric_panel)
+
+for edge in dag.edges:
+    print(edge.source, "→", edge.target)
+    print(edge.lag_weeks, edge.confidence, edge.e_value)  # e_value < 1.5 = fragile
+
+attribution = dag.shapley_attribution(target="weekly_transaction_volume", t="2024-04-15", metric_panel=metric_panel)
+parents = dag.parents("weekly_transaction_volume")
+```
+
+## CausalEdge fields
+
+source (str), target (str), kind ("causality"|"aggregates"|"filters"|"joins"|"derives"), lag_weeks (int|None), confidence (float 0–1), e_value (float|None — sensitivity to unobserved confounders), description (str|None), method_stats (dict — Granger F, Transfer Entropy, etc.)
+
+## AI explanation output
+
+```python
+from dqt.agent import AgentExplainer
+
+explanation = AgentExplainer().explain(incident=incident, adapter=adapter, dag=dag)
+
+print(explanation.plain_english)   # full narrative
+print(explanation.confidence)      # 0.87
+print(explanation.level)           # "intervention" (Pearl ladder: association/intervention/counterfactual)
+
+for ev in explanation.evidence:
+    print(ev.kind, ev.label, ev.detail, ev.source_ref)
+
+for q in explanation.follow_up_questions:
+    print(q)
+```
+
+## Explanation fields
+
+plain_english (str), confidence (float), level ("association"|"intervention"|"counterfactual"), evidence (list[Evidence] — kind/label/detail/source_ref), follow_up_questions (list[str]), incident_id (UUID), model (str), token_usage (dict)
 
 ## All detector slugs
 
@@ -59,9 +127,154 @@ schema_name (str, required), table_name (str, required), column_name (str|None),
 
 mode: "entire" | "incremental" | "custom" — key_col (str, for incremental) — since (ISO date or "last_run") — custom_sql (WHERE clause)
 
+## Lineage: building a LineageGraph
+
+```python
+from dqt.lineage import LineageGraph, LineageNode, LineageEdge
+
+graph = LineageGraph(nodes=[
+    LineageNode(id="gigler_transactions", kind="dataset", label="Transactions"),
+    LineageNode(id="weekly_transaction_volume", kind="metric", label="Weekly Volume",
+                meta={"description": "Sum of completed transactions per week", "unit": "count"}),
+], edges=[
+    LineageEdge(source="gigler_transactions.amount_usd", target="weekly_transaction_volume", kind="aggregates"),
+    LineageEdge(source="marketing_campaigns.spend_usd", target="weekly_transaction_volume",
+                kind="causality", confidence=0.72, lag_weeks=2,
+                description="Acquisition spend drives volume with 2-week lag"),
+])
+```
+
+## Lineage: parsing from SQL (sqlglot)
+
+```python
+from dqt.lineage import parse_sql_lineage, merge_graphs
+import pathlib
+
+# Single SQL string
+graph = parse_sql_lineage(sql, dialect="bigquery")
+
+# Multiple files
+graphs = [parse_sql_lineage(p.read_text(), dialect="clickhouse")
+          for p in pathlib.Path("raw/sql/").glob("*.sql")]
+graph = merge_graphs(graphs)
+```
+
+Supported dialects: duckdb, postgres, bigquery, clickhouse, snowflake, spark, mysql, trino
+
+## Lineage: dbt manifest ingestion
+
+```python
+from dqt.lineage import load_dbt_manifest
+
+graph = load_dbt_manifest("target/manifest.json")
+# Extracts: model/source nodes, column-level depends_on edges, semantic_models.yml metrics
+```
+
+## Lineage: OpenLineage ingestion
+
+```python
+from dqt.lineage import load_openlineage_events
+
+graph = load_openlineage_events("openlineage_events.ndjson")
+graph = load_openlineage_events(marquez_url="http://localhost:5000", namespace="my_pipeline")
+```
+
+## Lineage: graph queries
+
+```python
+upstreams   = graph.upstreams("weekly_transaction_volume")
+downstreams = graph.downstreams("gigler_transactions.amount_usd")  # blast radius
+path        = graph.path("marketing_campaigns.spend_usd", "weekly_transaction_volume")
+causal      = [e for e in graph.edges if e.kind == "causality"]
+```
+
+## Vault: LLM Wiki structure
+
+The vault is an Obsidian-compatible Markdown knowledge graph. `raw/` = source-of-truth documents you own. `wiki/` = synthesised knowledge generated by dqt or Claude Code.
+
+```
+vault/
+├── raw/
+│   ├── datasets/<id>.md          # dataset metadata + known issues
+│   └── columns/<dataset>/<col>.md  # per-column atomic note
+└── wiki/
+    ├── metrics/<id>.md           # metric definition + lineage (generated)
+    ├── lineage/causality.md      # discovered causal edges (generated)
+    └── datasets/<id>.md          # synthesised dataset knowledge (generated)
+```
+
+## Vault: raw/ Markdown frontmatter
+
+Dataset note (`raw/datasets/<id>.md`):
+```yaml
+---
+id: gigler_transactions
+kind: dataset
+owner: platform-analytics@gigler.com
+domain: platform
+freshness_sla_hours: 4
+classification: internal
+tags: [transactions, platform]
+---
+```
+
+Column note (`raw/columns/<dataset>/<column>.md`):
+```yaml
+---
+dataset: gigler_transactions
+column: amount_usd
+kind: column
+pii: false
+classification: internal
+unit: USD
+nullable: false
+tags: [financial, core]
+---
+```
+
+## Vault: generating
+
+```python
+from dqt.semantic import load_semantic_manifest
+from dqt.lineage import LineageGraph, LineageEdge, write_vault
+
+manifest = load_semantic_manifest("semantic.yaml")
+graph = LineageGraph(nodes=[...], edges=[...])
+write_vault(manifest, graph, vault_dir="vault/", vault_title="My Knowledge Graph")
+```
+
+## Vault: extending with custom node types
+
+```python
+from dqt.lineage import LineageNode, LineageEdge
+
+graph.nodes.append(LineageNode(
+    id="gtm_001_revenue_report",
+    kind="report",   # custom kind — rendered as generic wiki note
+    label="GTM-001 Weekly Revenue Report",
+    meta={"requestor": "Sarah Chen", "date": "2024-03-15"},
+))
+graph.edges.append(LineageEdge(
+    source="gigler_transactions.amount_usd",
+    target="gtm_001_revenue_report",
+    kind="aggregates",
+))
+# → writes vault/wiki/reports/gtm_001_revenue_report.md with [[wiki-links]]
+```
+
 ## YAML source types
 
 csv (path + table_name), parquet (path + table_name), duckdb (database), postgres (connection_string)
+
+## Use with Claude Code (recommended)
+
+Three plugins turn Claude Code into a grounded data-quality engineer for dqt:
+
+**1. Context7** (https://claude.com/plugins/context7) — connects Claude Code to dqt's live documentation and source. Claude always has the current API, all 38 detector slugs, and the exact YAML schema — not a training-data snapshot from months ago. Ask Claude Code to write checks, pick detectors, or debug failures and it grounds every answer in the actual dqt code.
+
+**2. Superpowers** (https://claude.com/plugins/superpowers) — gives Claude Code structured agentic workflows for planning and executing multi-step tasks. Useful for building out a full check suite, generating a semantic layer from scratch, or TDD-ing a detector config.
+
+**3. Warehouse MCP** — each warehouse publishes its own MCP server. Example: mcp-clickhouse (https://github.com/ClickHouse/mcp-clickhouse) for ClickHouse. Connect Claude Code to your warehouse and it can inspect live schemas, sample real column distributions, and generate dqt checks and `semantic.yaml` grounded in your actual data.
 
 ## Optional
 

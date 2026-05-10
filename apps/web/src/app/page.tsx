@@ -191,6 +191,21 @@ export default function RootPage() {
             pip install dqtlib
             <span style={{ color: "var(--accent)", marginLeft: 4 }}>{copied ? "✓" : "⎘"}</span>
           </button>
+          <a
+            href="https://claude.com/plugins/context7"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1 border flex items-center gap-1.5 transition-colors hover:opacity-80"
+            style={{
+              color: "var(--fg-1)",
+              borderColor: "var(--line-2)",
+              background: "var(--bg-2)",
+              fontSize: 11,
+            }}
+          >
+            <span style={{ color: "var(--accent)", fontSize: 10 }}>◆</span>
+            Context7 plugin
+          </a>
         </div>
 
         <h1 style={{ fontSize: "clamp(48px, 6.5vw, 84px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.04, color: "var(--fg-0)", maxWidth: 740 }}>
@@ -200,6 +215,49 @@ export default function RootPage() {
         <p className="mt-5" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 540, lineHeight: 1.7 }}>
           Statistical drift detection, column-level lineage, and causal discovery — for dbt, warehouses, and data lakes. In one Python library.
         </p>
+
+        <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: 12, color: "var(--fg-2)" }}>
+          <span>Built for</span>
+          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)" }}>ClickHouse</span>
+          <span>and</span>
+          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)" }}>BigQuery</span>
+          <span>first.</span>
+          <span style={{ color: "var(--line-2)" }}>·</span>
+          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--warn)", borderColor: "var(--warn)", background: "rgba(217,181,102,0.07)" }}>Postgres · Snowflake · others — WIP</span>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--accent)", fontSize: 12, borderBottom: "1px solid rgba(157,208,176,0.4)", textDecoration: "none" }}
+          >
+            contributors welcome ↗
+          </a>
+        </p>
+
+        <div className="mt-6 border-l-2 pl-4 py-1" style={{ borderColor: "var(--accent)", maxWidth: 560 }}>
+          <p style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500, marginBottom: 6 }}>
+            New · LLM Wiki semantic layer
+          </p>
+          <p style={{ fontSize: 15, color: "var(--fg-0)", fontWeight: 400, lineHeight: 1.55, marginBottom: 8 }}>
+            Your Trello board is already a semantic layer. dqt extracts it.
+          </p>
+          <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, marginBottom: 10 }}>
+            Dump tickets, SQL, and BI reports into{" "}
+            <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>raw/</span>.
+            Point Claude Code at the vault — it synthesises dataset descriptions, metric definitions, and causal edges into{" "}
+            <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>wiki/</span>.
+            No manual YAML authoring.
+          </p>
+          <a
+            href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, color: "var(--fg-1)", textDecoration: "none" }}
+            className="transition-opacity hover:opacity-70"
+          >
+            Based on Karpathy&apos;s LLM Wiki pattern ↗
+          </a>
+        </div>
 
         <div className="flex items-center gap-3 mt-8 flex-wrap">
           <button
@@ -346,6 +404,111 @@ export default function RootPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Claude Code + plugins ── */}
+      <section className="border-t border-line px-8 py-14" style={{ background: "var(--bg-1)" }}>
+        <div className="max-w-5xl mx-auto">
+          <p style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10, fontWeight: 500 }}>
+            Recommended workflow
+          </p>
+          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 6 }}>
+            Use dqt with Claude Code.
+          </h2>
+          <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 32, maxWidth: 600 }}>
+            Three plugins turn Claude Code into a grounded data-quality engineer that knows your warehouse, knows the dqt API, and can run checks from natural language.
+          </p>
+
+          <div className="grid grid-cols-3 gap-0 border border-line">
+            {[
+              {
+                num: "1",
+                badge: "Context7",
+                href: "https://claude.com/plugins/context7",
+                title: "Up-to-date dqt docs",
+                desc: "Connects Claude Code to dqt's live documentation and source — all 38 detector slugs, the exact YAML schema, and adapter protocol. No training-data lag.",
+                bullets: [
+                  "Write checks from business rules",
+                  "Pick the right detector for your data shape",
+                  "Debug failures with current API knowledge",
+                ],
+                color: "var(--accent)",
+              },
+              {
+                num: "2",
+                badge: "Superpowers",
+                href: "https://claude.com/plugins/superpowers",
+                title: "Agentic development skills",
+                desc: "Gives Claude Code structured workflows for planning, executing, and reviewing multi-step tasks — essential for building out a full dqt check suite or semantic layer from scratch.",
+                bullets: [
+                  "Plan + execute check suites step by step",
+                  "TDD for detector configs",
+                  "Subagent-driven semantic layer build",
+                ],
+                color: "var(--warn)",
+              },
+              {
+                num: "3",
+                badge: "Warehouse MCP",
+                href: "https://github.com/ClickHouse/mcp-clickhouse",
+                title: "Live warehouse access",
+                desc: "Each warehouse publishes its own MCP — e.g. mcp-clickhouse for ClickHouse, or the Postgres MCP server. Connect Claude Code to your warehouse and it can inspect live schemas, sample real distributions, and write dqt checks grounded in your actual data.",
+                bullets: [
+                  "Schema introspection from live tables",
+                  "Sample-driven detector recommendations",
+                  "Auto-generate semantic.yaml from DDL",
+                ],
+                color: "var(--pass)",
+              },
+            ].map((plugin, i) => (
+              <div key={i} className="px-6 py-6 border-r border-line last:border-0">
+                <div className="flex items-center gap-2 mb-4">
+                  <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 10, color: "var(--fg-3)" }}>{plugin.num}</span>
+                  <a
+                    href={plugin.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2 py-0.5 border transition-colors hover:opacity-80"
+                    style={{ color: plugin.color, borderColor: plugin.color, fontSize: 11, fontWeight: 600 }}
+                  >
+                    {plugin.badge} ↗
+                  </a>
+                </div>
+                <h3 style={{ fontSize: 16, fontWeight: 400, color: "var(--fg-0)", letterSpacing: "-0.01em", marginBottom: 8 }}>{plugin.title}</h3>
+                <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, marginBottom: 14 }}>{plugin.desc}</p>
+                <ul className="space-y-1.5">
+                  {plugin.bullets.map((b, j) => (
+                    <li key={j} className="flex items-start gap-2">
+                      <span style={{ color: plugin.color, fontSize: 10, paddingTop: 3 }}>▸</span>
+                      <span style={{ fontSize: 13, color: "var(--fg-1)" }}>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 border border-line" style={{ background: "var(--bg-0)" }}>
+            <div className="px-4 py-2 border-b border-line flex items-center gap-2" style={{ background: "var(--bg-2)" }}>
+              <span style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Claude Code · all three plugins active</span>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-line">
+              {[
+                { role: "user", text: "Look at my orders table and write dqt checks for amount_usd. Flag outliers and distribution shift." },
+                { role: "assistant", text: "Querying your warehouse via MCP... orders.amount_usd: right-skewed, p99=$4,820.\n\nContext7 confirms: use adjusted_boxplot_fraction (handles skew via medcouple) + ks_pvalue for drift.\n\nchecks:\n  - table_name: orders\n    column_name: amount_usd\n    detector_slug: adjusted_boxplot_fraction\n  - table_name: orders\n    column_name: amount_usd\n    detector_slug: ks_pvalue\n    params: {alpha: 0.01}" },
+              ].map((msg, i) => (
+                <div key={i} className="px-4 py-3">
+                  <p style={{ fontSize: 10, color: msg.role === "user" ? "var(--fg-3)" : "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+                    {msg.role === "user" ? "you" : "claude code"}
+                  </p>
+                  <p style={{ fontSize: 11, color: "var(--fg-1)", lineHeight: 1.6, fontFamily: "var(--font-jetbrains-mono)", whiteSpace: "pre-wrap" }}>
+                    {msg.text}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -528,6 +691,9 @@ export default function RootPage() {
         <div className="flex items-center gap-6">
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
             GitHub
+          </a>
+          <a href="https://www.linkedin.com/in/antonbar/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
+            LinkedIn
           </a>
           <span style={{ fontSize: 12, color: "var(--fg-2)" }}>MIT License</span>
           <span style={{ fontSize: 12, color: "var(--fg-2)" }}>Python 3.12+</span>

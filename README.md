@@ -554,6 +554,9 @@ Full API reference with Gigler sample dataset examples:
 | [Quickstart](docs/api/quickstart.md) | End-to-end example — load a CSV, run checks, read results |
 | [Detectors reference](docs/api/detectors.md) | All 38 detectors with parameters and Gigler examples |
 | [Checks & Runner API](docs/api/checks-and-runner.md) | Check model, CheckScope, CheckFilter, BaselineConfig, Runner, MemoryStore |
+| [Results & AI explanations](docs/api/results.md) | RunResult fields, Incident fields, causal discovery results, agent explanation output, MemoryStore queries |
+| [Lineage API](docs/api/lineage.md) | LineageGraph from SQL (sqlglot), dbt manifest ingestion, OpenLineage, graph queries |
+| [Vault: LLM Wiki structure](docs/api/vault.md) | write_vault() output, raw/ frontmatter schema, wiki/ generated files, custom node types, Obsidian |
 | [YAML check format](docs/api/yaml-reference.md) | Complete YAML config reference with annotated Gigler example |
 | [CLI reference](docs/api/cli-reference.md) | `dqt run`, `dqt version`, CI/CD integration |
 | [Adapters](docs/api/adapters.md) | LocalAdapter, PostgresAdapter, custom adapter protocol |
