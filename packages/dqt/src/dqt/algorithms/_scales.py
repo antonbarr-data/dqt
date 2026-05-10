@@ -60,5 +60,15 @@ STAT_SCALES: dict[str, StatScale] = {
                   "Outlier fraction drift", "Deviation of current outlier fraction from historical baseline range"),
         StatScale("row_count_in_range", 1.0, 0.5, 0.5, "lower_is_better",
                   "Row count in range", "1.0 if row count in the date window is outside [min_rows, max_rows]; 0.0 if within range"),
+        StatScale("iqr_fence",           0.20, 0.01,  0.05,  "lower_is_better", "Outlier fraction (IQR)",          "Fraction of values outside Tukey IQR fences; k=1.5 by default"),
+        StatScale("grubbs",              1.0,  0.95,  0.99,  "lower_is_better", "Grubbs outlier (1−p)",            "1 − p-value from Grubbs test; warn p<0.05, fail p<0.01"),
+        StatScale("generalized_esd",     0.10, 0.01,  0.05,  "lower_is_better", "Outlier fraction (GESD)",         "Fraction of outliers found by Generalized ESD (Rosner 1983)"),
+        StatScale("wasserstein_1",       10.0, 0.20,  0.50,  "lower_is_better", "Wasserstein-1 (norm.)",           "Earth-mover distance normalized by reference std; 0.2=moderate shift, 0.5=large"),
+        StatScale("psi",                 2.0,  0.10,  0.20,  "lower_is_better", "Population Stability Index",      "PSI<0.1 stable, 0.1–0.2 moderate shift, >0.2 significant population shift"),
+        StatScale("kl_divergence",       5.0,  0.10,  0.30,  "lower_is_better", "KL divergence",                   "Kullback–Leibler divergence (binned); 0=identical distributions"),
+        StatScale("js_divergence",       1.0,  0.10,  0.20,  "lower_is_better", "Jensen-Shannon distance",         "JS distance (bounded [0,1]); 0=identical, 1=maximally different"),
+        StatScale("chi_square_drift",    1.0,  0.95,  0.99,  "lower_is_better", "Chi-square drift (1−p)",          "1 − p-value from chi-square test for categorical drift; warn p<0.05, fail p<0.01"),
+        StatScale("cramers_v",           1.0,  0.15,  0.30,  "lower_is_better", "Cramér's V (drift)",              "V from 2×k contingency table; 0=no drift, 1=maximum categorical drift"),
+        StatScale("benford_law_fit",     1.0,  0.95,  0.99,  "lower_is_better", "Benford's Law fit (1−p)",         "1 − p-value from chi-square vs expected first-digit frequencies"),
     ]
 }
