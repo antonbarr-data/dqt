@@ -545,6 +545,24 @@ Requires Python ≥ 3.12.
 
 ---
 
+## Documentation
+
+Full API reference with Gigler sample dataset examples:
+
+| Doc | Description |
+|-----|-------------|
+| [Quickstart](docs/api/quickstart.md) | End-to-end example — load a CSV, run checks, read results |
+| [Detectors reference](docs/api/detectors.md) | All 38 detectors with parameters and Gigler examples |
+| [Checks & Runner API](docs/api/checks-and-runner.md) | Check model, CheckScope, CheckFilter, BaselineConfig, Runner, MemoryStore |
+| [YAML check format](docs/api/yaml-reference.md) | Complete YAML config reference with annotated Gigler example |
+| [CLI reference](docs/api/cli-reference.md) | `dqt run`, `dqt version`, CI/CD integration |
+| [Adapters](docs/api/adapters.md) | LocalAdapter, PostgresAdapter, custom adapter protocol |
+| [Semantic layer & LLM Wiki](docs/semantic-layer.md) | Build your data knowledge graph from Trello tickets, SQL, and BI reports using Karpathy's LLM Wiki pattern + Claude Code |
+
+The [Gigler sample dataset](examples/gigler/) ships with the repo — four CSVs (transactions, prices, vendor stats, marketing campaigns) covering 5 quarters. Every doc page uses it for real, runnable examples.
+
+---
+
 ## Project layout
 
 ```

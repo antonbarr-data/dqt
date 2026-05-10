@@ -54,6 +54,16 @@ def build_graph(manifest) -> LineageGraph:
             "domain": "platform",
         },
     ))
+    graph.add_node(LineageNode(
+        id="weekly_avg_gig_price",
+        kind="metric",
+        label="Weekly Avg Gig Price",
+        metadata={
+            "description": "Average listed gig price (USD) across all categories, aggregated by ISO week. Lower values correlate with increased buyer demand 1 week later.",
+            "unit": "USD",
+            "domain": "marketplace",
+        },
+    ))
 
     # Causal edge: acquisition spend -> transaction volume (2-week lag)
     graph.add_edge(LineageEdge(
@@ -65,6 +75,58 @@ def build_graph(manifest) -> LineageGraph:
         description="Acquisition spend drives transaction volume with 2-week lag (Pearson r=0.603)",
     ))
 
+    # Causal edge: avg gig price -> transaction volume (1-week lag, negative)
+    graph.add_edge(LineageEdge(
+        source="gig_prices.avg_price_usd",
+        target="gigler_transactions.amount_usd",
+        kind="causality",
+        lag_weeks=1,
+        confidence=0.55,
+        description="Lower avg gig price drives higher transaction volume with 1-week lag (Pearson r≈-0.55, negative direction)",
+    ))
+
+    # Causal edge: vendor competition -> gig price (1-week lag, negative)
+    graph.add_edge(LineageEdge(
+        source="gig_vendor_stats.n_active_vendors",
+        target="gig_prices.avg_price_usd",
+        kind="causality",
+        lag_weeks=1,
+        confidence=0.55,
+        description="More competing vendors suppress avg gig price with 1-week lag (Pearson r≈-0.55, competition effect)",
+    ))
+
+    # Causal edge: profile views -> transaction volume (1-week lag, positive)
+    graph.add_edge(LineageEdge(
+        source="gig_vendor_stats.total_profile_views",
+        target="gigler_transactions.amount_usd",
+        kind="causality",
+        lag_weeks=1,
+        confidence=0.65,
+        description="Higher buyer profile views drive transaction volume with 1-week lag (Pearson r≈+0.65, eyeball-to-purchase funnel)",
+    ))
+
+    # Metric nodes: vendor competition
+    graph.add_node(LineageNode(
+        id="weekly_vendor_count",
+        kind="metric",
+        label="Weekly Active Vendor Count",
+        metadata={
+            "description": "Total active vendors across all gig categories, aggregated by ISO week. Rising count predicts gig price compression with a 1-week lag.",
+            "unit": "count",
+            "domain": "marketplace",
+        },
+    ))
+    graph.add_node(LineageNode(
+        id="weekly_profile_views",
+        kind="metric",
+        label="Weekly Profile Views",
+        metadata={
+            "description": "Total buyer profile views across all categories, aggregated by ISO week. Strong predictor of transaction volume with a 1-week lag (eyeball-to-purchase funnel).",
+            "unit": "count",
+            "domain": "marketplace",
+        },
+    ))
+
     # Aggregation edges: columns -> metrics
     graph.add_edge(LineageEdge(
         source="marketing_campaigns.spend_usd",
@@ -74,6 +136,21 @@ def build_graph(manifest) -> LineageGraph:
     graph.add_edge(LineageEdge(
         source="gigler_transactions.amount_usd",
         target="weekly_transaction_volume",
+        kind="aggregates",
+    ))
+    graph.add_edge(LineageEdge(
+        source="gig_prices.avg_price_usd",
+        target="weekly_avg_gig_price",
+        kind="aggregates",
+    ))
+    graph.add_edge(LineageEdge(
+        source="gig_vendor_stats.n_active_vendors",
+        target="weekly_vendor_count",
+        kind="aggregates",
+    ))
+    graph.add_edge(LineageEdge(
+        source="gig_vendor_stats.total_profile_views",
+        target="weekly_profile_views",
         kind="aggregates",
     ))
 

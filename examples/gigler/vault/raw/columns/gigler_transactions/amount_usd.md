@@ -23,6 +23,8 @@ Gross transaction value in USD. Values >$5,000 indicate enterprise/custom contra
 ## Upstream Lineage
 
 - [[raw/columns/marketing_campaigns/spend_usd]] ← causality (lag 2w)
+- [[raw/columns/gig_prices/avg_price_usd]] ← causality (lag 1w)
+- [[raw/columns/gig_vendor_stats/total_profile_views]] ← causality (lag 1w)
 
 ## Downstream Lineage
 

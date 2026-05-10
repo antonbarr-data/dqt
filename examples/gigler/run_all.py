@@ -35,7 +35,7 @@ import dqt  # triggers all detector registrations via __init__.py
 from dqt.adapters._protocol import AggExpr, ColumnMeta, HealthCheckResult, HealthCheckStep
 from dqt.checks.models import Check
 from dqt.profiling.profiler import DataProfiler
-from dqt.reporting.html_report import profiling_report, quality_report, save_report
+from dqt.reporting.html_report import profiling_report, quality_report, save_report, _md_to_html
 from dqt.reporting._charts import time_series_chart
 from dqt.runner.runner import Runner
 from dqt.store.memory import MemoryStore
@@ -90,14 +90,22 @@ class DemoAdapter:
 
 def load_data() -> tuple[duckdb.DuckDBPyConnection, DemoAdapter]:
     conn = duckdb.connect(":memory:")
-    mkt_glob = str(_DATA_DIR / "marketing_campaigns_*.csv").replace("\\", "/")
-    txn_glob = str(_DATA_DIR / "gigler_transactions_*.csv").replace("\\", "/")
-    conn.execute(f"CREATE TABLE marketing AS SELECT * FROM read_csv_auto('{mkt_glob}')")
-    conn.execute(f"CREATE TABLE transactions AS SELECT * FROM read_csv_auto('{txn_glob}')")
-    mkt_rows = conn.execute("SELECT COUNT(*) FROM marketing").fetchone()[0]
-    txn_rows = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
-    print(f"  Marketing:    {mkt_rows:,} rows")
-    print(f"  Transactions: {txn_rows:,} rows")
+    mkt_glob    = str(_DATA_DIR / "marketing_campaigns_*.csv").replace("\\", "/")
+    txn_glob    = str(_DATA_DIR / "gigler_transactions_*.csv").replace("\\", "/")
+    price_glob  = str(_DATA_DIR / "gig_prices_*.csv").replace("\\", "/")
+    vendor_glob = str(_DATA_DIR / "gig_vendor_stats_*.csv").replace("\\", "/")
+    conn.execute(f"CREATE TABLE marketing       AS SELECT * FROM read_csv_auto('{mkt_glob}')")
+    conn.execute(f"CREATE TABLE transactions    AS SELECT * FROM read_csv_auto('{txn_glob}')")
+    conn.execute(f"CREATE TABLE gig_prices      AS SELECT * FROM read_csv_auto('{price_glob}')")
+    conn.execute(f"CREATE TABLE gig_vendor_stats AS SELECT * FROM read_csv_auto('{vendor_glob}')")
+    mkt_rows    = conn.execute("SELECT COUNT(*) FROM marketing").fetchone()[0]
+    txn_rows    = conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+    price_rows  = conn.execute("SELECT COUNT(*) FROM gig_prices").fetchone()[0]
+    vendor_rows = conn.execute("SELECT COUNT(*) FROM gig_vendor_stats").fetchone()[0]
+    print(f"  Marketing:       {mkt_rows:,} rows")
+    print(f"  Transactions:    {txn_rows:,} rows")
+    print(f"  Gig prices:      {price_rows:,} rows")
+    print(f"  Vendor stats:    {vendor_rows:,} rows")
     return conn, DemoAdapter(conn)
 
 
@@ -107,8 +115,10 @@ def load_data() -> tuple[duckdb.DuckDBPyConnection, DemoAdapter]:
 
 def profile_datasets(adapter: DemoAdapter):
     profiler = DataProfiler(adapter)
-    marketing_profile = profiler.profile("main", "marketing", sample_n=15_000)
-    txn_profile = profiler.profile("main", "transactions", sample_n=20_000)
+    marketing_profile = profiler.profile("main", "marketing",        sample_n=15_000)
+    txn_profile       = profiler.profile("main", "transactions",     sample_n=20_000)
+    price_profile     = profiler.profile("main", "gig_prices",       sample_n=10_000)
+    vendor_profile    = profiler.profile("main", "gig_vendor_stats", sample_n=10_000)
     print(
         f"  Profiled {len(marketing_profile.columns)} marketing columns "
         f"({marketing_profile.row_count:,} sample rows)"
@@ -117,7 +127,15 @@ def profile_datasets(adapter: DemoAdapter):
         f"  Profiled {len(txn_profile.columns)} transaction columns "
         f"({txn_profile.row_count:,} sample rows)"
     )
-    return marketing_profile, txn_profile
+    print(
+        f"  Profiled {len(price_profile.columns)} gig_prices columns "
+        f"({price_profile.row_count:,} sample rows)"
+    )
+    print(
+        f"  Profiled {len(vendor_profile.columns)} gig_vendor_stats columns "
+        f"({vendor_profile.row_count:,} sample rows)"
+    )
+    return marketing_profile, txn_profile, price_profile, vendor_profile
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +178,34 @@ def run_dq_checks(adapter: DemoAdapter) -> list[dict]:
         # roi outliers: plain Z-score is acceptable; ROI is approximately symmetric
         Check(schema_name="main", table_name="marketing", column_name="roi",
               detector_slug="zscore_outlier_fraction"),
+
+        # -- Gig prices dataset ------------------------------------------------
+        # avg_price_usd null fraction: 0.5% data collection failures expected
+        Check(schema_name="main", table_name="gig_prices", column_name="avg_price_usd",
+              detector_slug="null_fraction"),
+        # avg_price_usd outliers: MAD catches the injected 10× price spikes
+        Check(schema_name="main", table_name="gig_prices", column_name="avg_price_usd",
+              detector_slug="mad_outlier_fraction"),
+        # gig_category completeness: every row must have a category
+        Check(schema_name="main", table_name="gig_prices", column_name="gig_category",
+              detector_slug="completeness"),
+
+        # -- Vendor competition dataset ----------------------------------------
+        # total_profile_views: 0.2% NULL expected (tracking pixel outages)
+        Check(schema_name="main", table_name="gig_vendor_stats", column_name="total_profile_views",
+              detector_slug="null_fraction"),
+        # search_impressions: 0.3% NULL expected (search indexer failures)
+        Check(schema_name="main", table_name="gig_vendor_stats", column_name="search_impressions",
+              detector_slug="null_fraction"),
+        # n_active_vendors completeness: pipeline errors produce 0.4% zeros/negatives
+        Check(schema_name="main", table_name="gig_vendor_stats", column_name="n_active_vendors",
+              detector_slug="completeness"),
+        # total_profile_views outliers: MAD catches spikes from viral promotions
+        Check(schema_name="main", table_name="gig_vendor_stats", column_name="total_profile_views",
+              detector_slug="mad_outlier_fraction"),
+        # click_through_rate: adjusted boxplot catches the injected > 1.0 tracking bugs
+        Check(schema_name="main", table_name="gig_vendor_stats", column_name="click_through_rate",
+              detector_slug="adjusted_boxplot_fraction"),
 
         # -- Transactions dataset -----------------------------------------------
         # amount_usd: double-MAD for asymmetric, skewed payment amounts
@@ -233,6 +279,13 @@ def run_dq_checks(adapter: DemoAdapter) -> list[dict]:
             f"[{check.detector_slug}]  score={result.score:.4f} -- "
             f"{safe_msg}"
         )
+        # Build diagnostic_sql: RunResult has it directly; for DetectorResult construct from failing_filter_sql
+        diag_sql: str | None = getattr(result, "diagnostic_sql", None)
+        if diag_sql is None:
+            failing_filter = getattr(result, "failing_filter_sql", None)
+            if failing_filter and verdict_val in ("warn", "fail"):
+                fq = f"{check.schema_name}.{check.table_name}"
+                diag_sql = f"SELECT * FROM {fq}\nWHERE {failing_filter}\nLIMIT 20;"
         dq_results.append({
             "check": check.detector_slug,
             "table": check.table_name,
@@ -240,6 +293,7 @@ def run_dq_checks(adapter: DemoAdapter) -> list[dict]:
             "verdict": verdict_val,
             "score": result.score,
             "plain_english": result.plain_english,
+            "diagnostic_sql": diag_sql,
         })
 
     return dq_results
@@ -250,7 +304,6 @@ def run_dq_checks(adapter: DemoAdapter) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def run_causality(conn: duckdb.DuckDBPyConnection) -> tuple[dict, pd.DataFrame]:
-    # Weekly acquisition spend -> transaction volume (expected 2-week conversion lag)
     marketing_weekly = conn.execute("""
         SELECT
             DATE_TRUNC('week', CAST(date AS DATE))            AS week,
@@ -273,36 +326,117 @@ def run_causality(conn: duckdb.DuckDBPyConnection) -> tuple[dict, pd.DataFrame]:
         ORDER BY 1
     """).fetchdf()
 
-    weekly = marketing_weekly.merge(txn_weekly, on="week", how="inner")
-    weekly = weekly.sort_values("week").reset_index(drop=True)
+    price_weekly = conn.execute("""
+        SELECT
+            DATE_TRUNC('week', CAST(date AS DATE))  AS week,
+            AVG(avg_price_usd)                      AS avg_gig_price
+        FROM gig_prices
+        WHERE avg_price_usd IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+    """).fetchdf()
 
-    spend = weekly["acquisition_spend"].values.astype(float)
-    txn_vol = weekly["transaction_count"].values.astype(float)
+    vendor_weekly = conn.execute("""
+        SELECT
+            DATE_TRUNC('week', CAST(date AS DATE))              AS week,
+            SUM(CASE WHEN n_active_vendors > 0
+                     THEN n_active_vendors ELSE 0 END)          AS total_vendors,
+            SUM(COALESCE(total_profile_views, 0))               AS total_profile_views,
+            AVG(avg_vendor_rating)                              AS avg_vendor_rating
+        FROM gig_vendor_stats
+        GROUP BY 1
+        ORDER BY 1
+    """).fetchdf()
 
+    weekly = (
+        marketing_weekly
+        .merge(txn_weekly,    on="week", how="inner")
+        .merge(price_weekly,  on="week", how="inner")
+        .merge(vendor_weekly, on="week", how="inner")
+        .sort_values("week")
+        .reset_index(drop=True)
+    )
+
+    spend        = weekly["acquisition_spend"].values.astype(float)
+    txn_vol      = weekly["transaction_count"].values.astype(float)
+    price        = weekly["avg_gig_price"].values.astype(float)
+    vendors      = weekly["total_vendors"].values.astype(float)
+    views        = weekly["total_profile_views"].values.astype(float)
+
+    # Spend → volume (positive, 2-week lag)
     lag0_corr = float(np.corrcoef(spend, txn_vol)[0, 1])
     lag1_corr = float(np.corrcoef(spend[:-1], txn_vol[1:])[0, 1])
     lag2_corr = float(np.corrcoef(spend[:-2], txn_vol[2:])[0, 1])
 
-    print(f"  Same-week correlation:  {lag0_corr:+.3f}")
-    print(f"  Lag-1-week correlation: {lag1_corr:+.3f}")
-    print(f"  Lag-2-week correlation: {lag2_corr:+.3f}  <- expected peak")
+    # Price → volume (negative, 1-week lag)
+    price_lag0_corr = float(np.corrcoef(price, txn_vol)[0, 1])
+    price_lag1_corr = float(np.corrcoef(price[:-1], txn_vol[1:])[0, 1])
+    price_lag2_corr = float(np.corrcoef(price[:-2], txn_vol[2:])[0, 1])
 
-    # Determine which lag has the strongest absolute correlation
-    lags = [(abs(lag0_corr), 0, lag0_corr),
-            (abs(lag1_corr), 1, lag1_corr),
-            (abs(lag2_corr), 2, lag2_corr)]
+    # Vendor count → price (negative, 1-week lag): competition suppresses prices
+    vc_lag0_corr = float(np.corrcoef(vendors, price)[0, 1])
+    vc_lag1_corr = float(np.corrcoef(vendors[:-1], price[1:])[0, 1])
+    vc_lag2_corr = float(np.corrcoef(vendors[:-2], price[2:])[0, 1])
+
+    # Profile views → volume (positive, 1-week lag): eyeballs convert to purchases
+    vw_lag0_corr = float(np.corrcoef(views, txn_vol)[0, 1])
+    vw_lag1_corr = float(np.corrcoef(views[:-1], txn_vol[1:])[0, 1])
+    vw_lag2_corr = float(np.corrcoef(views[:-2], txn_vol[2:])[0, 1])
+
+    print(f"  Spend   -> volume  lag-0={lag0_corr:+.3f}  lag-1={lag1_corr:+.3f}  lag-2={lag2_corr:+.3f}  <- peak expected at 2w")
+    print(f"  Price   -> volume  lag-0={price_lag0_corr:+.3f}  lag-1={price_lag1_corr:+.3f}  lag-2={price_lag2_corr:+.3f}  <- peak expected at 1w (negative)")
+    print(f"  Vendors -> price   lag-0={vc_lag0_corr:+.3f}  lag-1={vc_lag1_corr:+.3f}  lag-2={vc_lag2_corr:+.3f}  <- peak expected at 1w (negative)")
+    print(f"  Views   -> volume  lag-0={vw_lag0_corr:+.3f}  lag-1={vw_lag1_corr:+.3f}  lag-2={vw_lag2_corr:+.3f}  <- peak expected at 1w (positive)")
+
+    lags = [(abs(lag0_corr), 0, lag0_corr), (abs(lag1_corr), 1, lag1_corr), (abs(lag2_corr), 2, lag2_corr)]
     peak_lag = max(lags)[1]
 
     if lag2_corr > lag1_corr and lag2_corr > lag0_corr:
-        conclusion = (
+        spend_conclusion = (
             f"Marketing acquisition spend Granger-causes transaction volume with a "
             f"2-week lag (r={lag2_corr:.3f}). Same-week correlation is weaker "
             f"(r={lag0_corr:.3f}), consistent with delayed conversion attribution."
         )
     else:
-        conclusion = (
-            f"Peak correlation at lag-{peak_lag} week(s). "
+        spend_conclusion = (
+            f"Peak spend correlation at lag-{peak_lag} week(s). "
             "No clear 2-week causal structure detected; check seasonal confounders."
+        )
+
+    if price_lag1_corr < price_lag0_corr and price_lag1_corr < price_lag2_corr:
+        price_conclusion = (
+            f"Average gig price negatively causes transaction volume with a 1-week lag "
+            f"(r={price_lag1_corr:.3f}). Lower prices drive buyer demand — the effect "
+            f"peaks one week after a price change, consistent with search-to-purchase latency."
+        )
+    else:
+        price_conclusion = (
+            f"Price-to-volume correlation: lag-0={price_lag0_corr:.3f}, "
+            f"lag-1={price_lag1_corr:.3f}, lag-2={price_lag2_corr:.3f}."
+        )
+
+    if vc_lag1_corr < vc_lag0_corr and vc_lag1_corr < vc_lag2_corr:
+        vendor_conclusion = (
+            f"Total active vendor count negatively causes avg gig price with a 1-week lag "
+            f"(r={vc_lag1_corr:.3f}). Competition from more vendors suppresses prices — "
+            f"this is the upstream driver in the chain: vendors → price → transactions."
+        )
+    else:
+        vendor_conclusion = (
+            f"Vendor count-to-price correlation: lag-0={vc_lag0_corr:.3f}, "
+            f"lag-1={vc_lag1_corr:.3f}, lag-2={vc_lag2_corr:.3f}."
+        )
+
+    if vw_lag1_corr > vw_lag0_corr and vw_lag1_corr > vw_lag2_corr:
+        views_conclusion = (
+            f"Total buyer profile views positively cause transaction volume with a 1-week lag "
+            f"(r={vw_lag1_corr:.3f}). The eyeball-to-purchase funnel: browsing activity this "
+            f"week predicts orders next week, independent of price or spend effects."
+        )
+    else:
+        views_conclusion = (
+            f"Profile views-to-volume correlation: lag-0={vw_lag0_corr:.3f}, "
+            f"lag-1={vw_lag1_corr:.3f}, lag-2={vw_lag2_corr:.3f}."
         )
 
     causality_result = {
@@ -310,7 +444,19 @@ def run_causality(conn: duckdb.DuckDBPyConnection) -> tuple[dict, pd.DataFrame]:
         "lag1_corr": lag1_corr,
         "lag2_corr": lag2_corr,
         "peak_lag": peak_lag,
-        "conclusion": conclusion,
+        "conclusion": spend_conclusion,
+        "price_lag0_corr": price_lag0_corr,
+        "price_lag1_corr": price_lag1_corr,
+        "price_lag2_corr": price_lag2_corr,
+        "price_conclusion": price_conclusion,
+        "vc_lag0_corr": vc_lag0_corr,
+        "vc_lag1_corr": vc_lag1_corr,
+        "vc_lag2_corr": vc_lag2_corr,
+        "vendor_conclusion": vendor_conclusion,
+        "vw_lag0_corr": vw_lag0_corr,
+        "vw_lag1_corr": vw_lag1_corr,
+        "vw_lag2_corr": vw_lag2_corr,
+        "views_conclusion": views_conclusion,
         "n_weeks": len(weekly),
         "weekly_data": weekly.to_dict(orient="records"),
     }
@@ -378,17 +524,34 @@ def generate_explanations(
     # Causality explanation
     causality_prompt = (
         "You are a data analyst at Gigler, a global freelance marketplace.\n\n"
-        "Marketing-to-transaction causality analysis:\n"
-        f"- Same-week correlation (acquisition spend -> transaction volume): {causality_result['lag0_corr']:.3f}\n"
-        f"- 1-week lag correlation: {causality_result['lag1_corr']:.3f}\n"
-        f"- 2-week lag correlation: {causality_result['lag2_corr']:.3f}\n"
-        f"- Weeks analysed: {causality_result['n_weeks']}\n"
-        f"- Conclusion: {causality_result['conclusion']}\n\n"
-        "Write a concise business explanation (3-5 sentences) covering:\n"
-        "1. What this lag structure means for marketing attribution modelling.\n"
-        "2. Implications for budget planning for acquisition campaigns.\n"
-        "3. How to use this for forecasting transaction volume.\n\n"
-        "Be specific about the 2-week conversion window."
+        "Four causal signals in the data were discovered (full chain):\n\n"
+        "1. Active vendor count → avg gig price (1-week lag, negative: competition suppresses prices):\n"
+        f"   lag-0={causality_result['vc_lag0_corr']:+.3f}, "
+        f"lag-1={causality_result['vc_lag1_corr']:+.3f}, "
+        f"lag-2={causality_result['vc_lag2_corr']:+.3f}\n"
+        f"   {causality_result['vendor_conclusion']}\n\n"
+        "2. Avg gig price → transaction volume (1-week lag, negative: lower price = more orders):\n"
+        f"   lag-0={causality_result['price_lag0_corr']:+.3f}, "
+        f"lag-1={causality_result['price_lag1_corr']:+.3f}, "
+        f"lag-2={causality_result['price_lag2_corr']:+.3f}\n"
+        f"   {causality_result['price_conclusion']}\n\n"
+        "3. Buyer profile views → transaction volume (1-week lag, positive: eyeballs convert):\n"
+        f"   lag-0={causality_result['vw_lag0_corr']:+.3f}, "
+        f"lag-1={causality_result['vw_lag1_corr']:+.3f}, "
+        f"lag-2={causality_result['vw_lag2_corr']:+.3f}\n"
+        f"   {causality_result['views_conclusion']}\n\n"
+        "4. Acquisition spend → transaction volume (2-week lag, positive):\n"
+        f"   lag-0={causality_result['lag0_corr']:+.3f}, "
+        f"lag-1={causality_result['lag1_corr']:+.3f}, "
+        f"lag-2={causality_result['lag2_corr']:+.3f}\n"
+        f"   {causality_result['conclusion']}\n\n"
+        f"Weeks analysed: {causality_result['n_weeks']}\n\n"
+        "Write a concise business explanation (5-7 sentences) covering:\n"
+        "1. The full causal chain: vendor competition → prices → transactions.\n"
+        "2. The independent eyeball funnel: profile views → transactions.\n"
+        "3. How the 2-week spend window complements the 1-week price/views signals.\n"
+        "4. How to use all four signals together for short-term transaction forecasting.\n\n"
+        "Be specific about lag structures and business levers."
     )
 
     print("  Calling Claude for causality explanation...", end=" ", flush=True)
@@ -406,12 +569,27 @@ def _build_causality_report(
     causality_result: dict,
     weekly_chart: str,
     txn_chart: str,
+    price_chart: str,
+    vendor_chart: str,
+    views_chart: str,
     ai_explanation: str,
 ) -> str:
-    lag0 = causality_result["lag0_corr"]
-    lag1 = causality_result["lag1_corr"]
-    lag2 = causality_result["lag2_corr"]
-    conclusion = causality_result["conclusion"]
+    lag0  = causality_result["lag0_corr"]
+    lag1  = causality_result["lag1_corr"]
+    lag2  = causality_result["lag2_corr"]
+    pl0   = causality_result["price_lag0_corr"]
+    pl1   = causality_result["price_lag1_corr"]
+    pl2   = causality_result["price_lag2_corr"]
+    vc0   = causality_result["vc_lag0_corr"]
+    vc1   = causality_result["vc_lag1_corr"]
+    vc2   = causality_result["vc_lag2_corr"]
+    vw0   = causality_result["vw_lag0_corr"]
+    vw1   = causality_result["vw_lag1_corr"]
+    vw2   = causality_result["vw_lag2_corr"]
+    conclusion        = causality_result["conclusion"]
+    price_conclusion  = causality_result["price_conclusion"]
+    vendor_conclusion = causality_result["vendor_conclusion"]
+    views_conclusion  = causality_result["views_conclusion"]
     n_weeks = causality_result["n_weeks"]
 
     def _corr_color(v: float) -> str:
@@ -422,15 +600,18 @@ def _build_causality_report(
         return "#666E82"
 
     import html as _html
-    safe_ai = _html.escape(ai_explanation)
-    safe_conclusion = _html.escape(conclusion)
+    safe_ai               = _md_to_html(ai_explanation)
+    safe_conclusion       = _html.escape(conclusion)
+    safe_price_conclusion = _html.escape(price_conclusion)
+    safe_vendor_conclusion = _html.escape(vendor_conclusion)
+    safe_views_conclusion  = _html.escape(views_conclusion)
 
     return (
         '<!DOCTYPE html>\n'
         '<html data-theme="dark">\n'
         '<head>\n'
         '<meta charset="utf-8">\n'
-        '<title>Gigler Causality Report -- Marketing to Transactions</title>\n'
+        '<title>Gigler Causality Report</title>\n'
         '<style>\n'
         '*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }\n'
         'html, body {\n'
@@ -439,64 +620,95 @@ def _build_causality_report(
         '  font-size: 13px; line-height: 1.5;\n'
         '  padding: 24px 48px;\n'
         '}\n'
-        'h1 {\n'
-        '  font-size: 20px; font-weight: 300; letter-spacing: -0.02em;\n'
-        '  color: #9DD0B0; margin-bottom: 6px;\n'
-        '}\n'
+        'h1 { font-size: 20px; font-weight: 300; letter-spacing: -0.02em; color: #9DD0B0; margin-bottom: 6px; }\n'
         'h2 { font-size: 14px; font-weight: 500; color: #E8EAF0; margin-bottom: 12px; }\n'
-        '.brand {\n'
-        '  font-family: "JetBrains Mono", monospace; font-weight: 300;\n'
-        '  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;\n'
-        '  color: #9DD0B0; margin-bottom: 8px;\n'
-        '}\n'
+        'h3 { font-size: 12px; font-weight: 500; color: #9DD0B0; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; }\n'
+        '.brand { font-family: "JetBrains Mono", monospace; font-weight: 300; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #9DD0B0; margin-bottom: 8px; }\n'
         '.subtitle { color: #666E82; font-size: 12px; margin-bottom: 24px; }\n'
-        '.section {\n'
-        '  background: #161B25; border: 1px solid #2A3147;\n'
-        '  padding: 20px 24px; margin-bottom: 16px;\n'
-        '}\n'
+        '.section { background: #161B25; border: 1px solid #2A3147; padding: 20px 24px; margin-bottom: 16px; }\n'
+        '.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }\n'
+        '.chain-label { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #666E82; margin-bottom: 12px; }\n'
         '.metric-row { display: flex; gap: 32px; margin: 8px 0 16px; }\n'
         '.metric { text-align: center; }\n'
-        '.metric-val {\n'
-        '  font-family: "JetBrains Mono", monospace; font-size: 2rem; font-weight: 300;\n'
-        '}\n'
-        '.metric-label {\n'
-        '  color: #666E82; font-size: 10px;\n'
-        '  text-transform: uppercase; letter-spacing: 0.12em;\n'
-        '  font-family: "JetBrains Mono", monospace;\n'
-        '}\n'
-        '.conclusion {\n'
-        '  color: #A0A8B8; font-size: 12px; margin-top: 8px; line-height: 1.6;\n'
-        '}\n'
-        '.ai-box {\n'
-        '  background: #1A2E24; border-left: 3px solid #9DD0B0;\n'
-        '  padding: 16px 20px; color: #E8EAF0; line-height: 1.7; font-size: 12px;\n'
-        '}\n'
+        '.metric-val { font-family: "JetBrains Mono", monospace; font-size: 2rem; font-weight: 300; }\n'
+        '.metric-label { color: #666E82; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; font-family: "JetBrains Mono", monospace; }\n'
+        '.conclusion { color: #A0A8B8; font-size: 12px; margin-top: 8px; line-height: 1.6; }\n'
+        '.ai-box { background: #1A2E24; border-left: 3px solid #9DD0B0; padding: 16px 20px; color: #E8EAF0; line-height: 1.7; font-size: 12px; }\n'
+        '.ai-box h2 { font-size: 13px; font-weight: 600; color: #9DD0B0; margin: 12px 0 4px; }\n'
+        '.ai-box h3 { font-size: 12px; font-weight: 600; color: #A0A8B8; margin: 10px 0 4px; text-transform: none; letter-spacing: 0; }\n'
+        '.ai-box p { margin: 4px 0; }\n'
+        '.ai-box ul { margin: 4px 0 4px 20px; }\n'
+        '.ai-box li { margin: 2px 0; }\n'
         'img { max-width: 100%; display: block; margin-top: 8px; }\n'
         '</style>\n'
         '</head>\n'
         '<body>\n'
         '<div class="brand">dqt</div>\n'
-        '<h1>Causality Analysis: Marketing Campaigns to Transactions</h1>\n'
-        f'<p class="subtitle">Lag-correlation analysis -- acquisition spend driving '
-        f'transaction volume &middot; {n_weeks} weeks analysed</p>\n'
+        '<h1>Causality Analysis: Four Drivers of Transaction Volume</h1>\n'
+        f'<p class="subtitle">Lag-correlation analysis &middot; {n_weeks} weeks &middot; '
+        'full chain: vendors &#8594; price &#8594; volume + views &#8594; volume + spend &#8594; volume</p>\n'
         '\n'
         '<div class="section">\n'
-        '<h2>Correlation by Lag</h2>\n'
-        '<div class="metric-row">\n'
-        f'  <div class="metric">\n'
-        f'    <div class="metric-val" style="color:{_corr_color(lag0)}">{lag0:+.3f}</div>\n'
-        '    <div class="metric-label">Same week</div>\n'
+        '<p class="chain-label">Competition chain: n_active_vendors &#8594; avg_price_usd &#8594; transaction_count</p>\n'
+        '<div class="two-col">\n'
+        '  <div>\n'
+        '    <h3>Vendor Count &#8594; Gig Price (negative)</h3>\n'
+        '    <div class="metric-row">\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(vc0)}">{vc0:+.3f}</div><div class="metric-label">lag 0w</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(vc1)}">{vc1:+.3f}</div><div class="metric-label">lag 1w &#9650;</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(vc2)}">{vc2:+.3f}</div><div class="metric-label">lag 2w</div></div>\n'
+        '    </div>\n'
+        f'    <p class="conclusion">{safe_vendor_conclusion}</p>\n'
         '  </div>\n'
-        f'  <div class="metric">\n'
-        f'    <div class="metric-val" style="color:{_corr_color(lag1)}">{lag1:+.3f}</div>\n'
-        '    <div class="metric-label">1-week lag</div>\n'
-        '  </div>\n'
-        f'  <div class="metric">\n'
-        f'    <div class="metric-val" style="color:{_corr_color(lag2)}">{lag2:+.3f}</div>\n'
-        '    <div class="metric-label">2-week lag (peak)</div>\n'
+        '  <div>\n'
+        '    <h3>Avg Gig Price &#8594; Volume (negative)</h3>\n'
+        '    <div class="metric-row">\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(pl0)}">{pl0:+.3f}</div><div class="metric-label">lag 0w</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(pl1)}">{pl1:+.3f}</div><div class="metric-label">lag 1w &#9650;</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(pl2)}">{pl2:+.3f}</div><div class="metric-label">lag 2w</div></div>\n'
+        '    </div>\n'
+        f'    <p class="conclusion">{safe_price_conclusion}</p>\n'
         '  </div>\n'
         '</div>\n'
-        f'<p class="conclusion">{safe_conclusion}</p>\n'
+        '</div>\n'
+        '\n'
+        '<div class="section">\n'
+        '<p class="chain-label">Eyeball funnel: total_profile_views &#8594; transaction_count &nbsp;&nbsp;&nbsp; Marketing channel: acquisition_spend &#8594; transaction_count</p>\n'
+        '<div class="two-col">\n'
+        '  <div>\n'
+        '    <h3>Profile Views &#8594; Volume (positive)</h3>\n'
+        '    <div class="metric-row">\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(vw0)}">{vw0:+.3f}</div><div class="metric-label">lag 0w</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(vw1)}">{vw1:+.3f}</div><div class="metric-label">lag 1w &#9650;</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(vw2)}">{vw2:+.3f}</div><div class="metric-label">lag 2w</div></div>\n'
+        '    </div>\n'
+        f'    <p class="conclusion">{safe_views_conclusion}</p>\n'
+        '  </div>\n'
+        '  <div>\n'
+        '    <h3>Acquisition Spend &#8594; Volume</h3>\n'
+        '    <div class="metric-row">\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(lag0)}">{lag0:+.3f}</div><div class="metric-label">lag 0w</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(lag1)}">{lag1:+.3f}</div><div class="metric-label">lag 1w</div></div>\n'
+        f'      <div class="metric"><div class="metric-val" style="color:{_corr_color(lag2)}">{lag2:+.3f}</div><div class="metric-label">lag 2w &#9650;</div></div>\n'
+        '    </div>\n'
+        f'    <p class="conclusion">{safe_conclusion}</p>\n'
+        '  </div>\n'
+        '</div>\n'
+        '</div>\n'
+        '\n'
+        '<div class="section">\n'
+        '<h2>Weekly Active Vendor Count</h2>\n'
+        f'<img src="data:image/png;base64,{vendor_chart}" alt="Weekly vendor count">\n'
+        '</div>\n'
+        '\n'
+        '<div class="section">\n'
+        '<h2>Weekly Avg Gig Price (USD)</h2>\n'
+        f'<img src="data:image/png;base64,{price_chart}" alt="Weekly avg gig price">\n'
+        '</div>\n'
+        '\n'
+        '<div class="section">\n'
+        '<h2>Weekly Profile Views</h2>\n'
+        f'<img src="data:image/png;base64,{views_chart}" alt="Weekly profile views">\n'
         '</div>\n'
         '\n'
         '<div class="section">\n'
@@ -511,7 +723,7 @@ def _build_causality_report(
         '\n'
         '<div class="section">\n'
         '<h2>AI Interpretation</h2>\n'
-        f'<div class="ai-box">{safe_ai.replace(chr(10), "<br>")}</div>\n'
+        f'<div class="ai-box">{safe_ai}</div>\n'
         '</div>\n'
         '</body>\n'
         '</html>'
@@ -525,6 +737,8 @@ def _build_causality_report(
 def generate_reports(
     marketing_profile,
     txn_profile,
+    price_profile,
+    vendor_profile,
     dq_results: list[dict],
     causality_result: dict,
     weekly: pd.DataFrame,
@@ -551,10 +765,28 @@ def generate_reports(
     save_report(txn_html, str(_OUTPUT_DIR / "transactions_profile.html"))
     print(f"  Saved: {_OUTPUT_DIR / 'transactions_profile.html'}")
 
+    # Gig prices profiling report
+    price_html = profiling_report(
+        price_profile,
+        title="Gigler Gig Prices -- Data Profile",
+        ai_summary="",
+    )
+    save_report(price_html, str(_OUTPUT_DIR / "gig_prices_profile.html"))
+    print(f"  Saved: {_OUTPUT_DIR / 'gig_prices_profile.html'}")
+
+    # Vendor competition profiling report
+    vendor_html = profiling_report(
+        vendor_profile,
+        title="Gigler Vendor Competition -- Data Profile",
+        ai_summary="",
+    )
+    save_report(vendor_html, str(_OUTPUT_DIR / "vendor_stats_profile.html"))
+    print(f"  Saved: {_OUTPUT_DIR / 'vendor_stats_profile.html'}")
+
     # DQ checks report
     dq_html = quality_report(
         dq_results,
-        dataset_name="Gigler (Marketing + Transactions)",
+        dataset_name="Gigler (Marketing + Transactions + Gig Prices + Vendor Stats)",
         title="Gigler Data Quality Report",
         ai_summary=dq_ai,
     )
@@ -562,23 +794,45 @@ def generate_reports(
     print(f"  Saved: {_OUTPUT_DIR / 'dq_report.html'}")
 
     # Causality report with time series charts
+    weeks = [str(r["week"])[:10] for r in causality_result["weekly_data"]]
     weekly_chart = time_series_chart(
-        dates=[str(r["week"])[:10] for r in causality_result["weekly_data"]],
+        dates=weeks,
         values=[float(r["acquisition_spend"]) for r in causality_result["weekly_data"]],
         title="Weekly Acquisition Spend",
         color="#9DD0B0",
     )
+    price_chart = time_series_chart(
+        dates=weeks,
+        values=[float(r["avg_gig_price"]) for r in causality_result["weekly_data"]],
+        title="Weekly Avg Gig Price (USD)",
+        color="#D9B566",
+    )
     txn_chart = time_series_chart(
-        dates=[str(r["week"])[:10] for r in causality_result["weekly_data"]],
+        dates=weeks,
         values=[float(r["transaction_count"]) for r in causality_result["weekly_data"]],
         title="Weekly Transaction Volume",
-        color="#D9B566",
+        color="#E07B6E",
+    )
+    vendor_chart = time_series_chart(
+        dates=weeks,
+        values=[float(r["total_vendors"]) for r in causality_result["weekly_data"]],
+        title="Weekly Active Vendor Count",
+        color="#B08FE8",
+    )
+    views_chart = time_series_chart(
+        dates=weeks,
+        values=[float(r["total_profile_views"]) for r in causality_result["weekly_data"]],
+        title="Weekly Profile Views",
+        color="#6AAECC",
     )
 
     causality_html = _build_causality_report(
         causality_result=causality_result,
         weekly_chart=weekly_chart,
         txn_chart=txn_chart,
+        price_chart=price_chart,
+        vendor_chart=vendor_chart,
+        views_chart=views_chart,
         ai_explanation=causality_ai,
     )
     save_report(causality_html, str(_OUTPUT_DIR / "causality_report.html"))
@@ -603,12 +857,12 @@ def main() -> None:
     conn, adapter = load_data()
 
     print("\n[Phase 2] Profiling datasets...")
-    marketing_profile, txn_profile = profile_datasets(adapter)
+    marketing_profile, txn_profile, price_profile, vendor_profile = profile_datasets(adapter)
 
     print("\n[Phase 3] Running DQ checks...")
     dq_results = run_dq_checks(adapter)
 
-    print("\n[Phase 4] Causality analysis (marketing -> transactions)...")
+    print("\n[Phase 4] Causality analysis (full chain)...")
     causality_result, weekly = run_causality(conn)
 
     print("\n[Phase 5] Generating AI explanations via Claude API...")
@@ -616,7 +870,7 @@ def main() -> None:
 
     print("\n[Phase 6] Generating HTML reports...")
     generate_reports(
-        marketing_profile, txn_profile,
+        marketing_profile, txn_profile, price_profile, vendor_profile,
         dq_results, causality_result, weekly,
         dq_ai, causality_ai,
     )

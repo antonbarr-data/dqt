@@ -1,0 +1,69 @@
+# dqt
+
+> Open-source data quality, lineage, semantic layer, and causal discovery library for Python. Watches dbt-built warehouses and any SQL warehouse for statistical drift, anomalies, and silent regressions — and explains *why* metrics moved.
+
+dqt is a pip-installable Python library (`pip install dqtlib`) that runs standalone in notebooks, CI pipelines, and orchestration tasks. No server required. The optional FastAPI service and Next.js dashboard add multi-tenancy and scheduling.
+
+## Core concepts
+
+- **Check**: binds a detector to a target column or table with optional scope, filters, and baseline config
+- **Detector**: a statistical method that implements `fit(reference) → state` and `score(current, state) → DetectorResult`
+- **Runner**: orchestrates fit and score operations against a warehouse adapter
+- **MemoryStore**: in-memory results store — no database needed for notebooks and CI
+- **LocalAdapter**: wraps any pandas DataFrame — no warehouse connection needed
+- **SemanticManifest**: YAML-defined dataset/column descriptions loaded with `load_semantic_manifest()`
+- **write_vault()**: generates an Obsidian-compatible LLM Wiki vault (raw/ + wiki/) from the semantic manifest and lineage graph
+
+## Docs
+
+- [Quickstart](https://github.com/antonbarr-data/dqt/blob/main/docs/api/quickstart.md): End-to-end example — load a CSV, run checks, read results
+- [Detectors reference](https://github.com/antonbarr-data/dqt/blob/main/docs/api/detectors.md): All 38 detectors with parameters and Gigler sample dataset examples
+- [Checks & Runner API](https://github.com/antonbarr-data/dqt/blob/main/docs/api/checks-and-runner.md): Check model, CheckScope, CheckFilter, BaselineConfig, Runner, MemoryStore
+- [YAML check format](https://github.com/antonbarr-data/dqt/blob/main/docs/api/yaml-reference.md): Complete YAML config reference with annotated examples
+- [CLI reference](https://github.com/antonbarr-data/dqt/blob/main/docs/api/cli-reference.md): dqt run, dqt version, CI/CD integration
+- [Adapters](https://github.com/antonbarr-data/dqt/blob/main/docs/api/adapters.md): LocalAdapter, PostgresAdapter, custom adapter protocol
+- [Semantic layer & LLM Wiki](https://github.com/antonbarr-data/dqt/blob/main/docs/semantic-layer.md): Build your data knowledge graph from Trello tickets, SQL, and BI reports using Karpathy's LLM Wiki pattern + Claude Code
+
+## Quick usage
+
+```python
+import pandas as pd
+from dqt import Check, Runner, MemoryStore
+from dqt.adapters.local import LocalAdapter
+
+df = pd.read_csv("orders.csv")
+adapter = LocalAdapter({"public.orders": df})
+runner = Runner(MemoryStore())
+
+result = runner.run(Check(
+    schema_name="public",
+    table_name="orders",
+    column_name="amount_usd",
+    detector_slug="mad_outlier_fraction",
+    params={"threshold": 3.5},
+), adapter)
+
+print(result.verdict)        # Verdict.pass_
+print(result.plain_english)  # "0.82% of values are outliers — within the 1% warn threshold"
+```
+
+## All detector slugs
+
+mad_outlier_fraction, double_mad_outlier_fraction, zscore_outlier_fraction, adjusted_boxplot_fraction, auto_outlier_fraction, isolation_forest_fraction, ks_pvalue, stl_residual_zscore, null_fraction, completeness, uniqueness, volume, numeric_mean, value_in_range, set_membership, set_exclusion, regex_match, string_length_range, string_case_violation, date_format, freshness_seconds_behind, monotonicity, sql_assertion_violation, column_pair_comparison, composite_uniqueness, row_count_in_range, max_in_range, min_in_range, median_in_range, sum_in_range, stddev_in_range, cardinality_in_range, quantile_in_range, date_part_missing_fraction, referential_integrity_rate, schema_change
+
+## Check model fields
+
+schema_name (str, required), table_name (str, required), column_name (str|None), detector_slug (str, required), params (dict, default {}), sample_n (int, default 100_000), sampling_pct (float|None), scope (CheckScope|None), filters (list[CheckFilter]), baseline (BaselineConfig|None)
+
+## CheckScope fields
+
+mode: "entire" | "incremental" | "custom" — key_col (str, for incremental) — since (ISO date or "last_run") — custom_sql (WHERE clause)
+
+## YAML source types
+
+csv (path + table_name), parquet (path + table_name), duckdb (database), postgres (connection_string)
+
+## Optional
+
+- [Full API source](https://github.com/antonbarr-data/dqt): GitHub repository with all source code and examples
+- [Gigler sample dataset](https://github.com/antonbarr-data/dqt/tree/main/examples/gigler): Four CSVs (transactions, prices, vendor stats, marketing campaigns) used in all doc examples

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken } from "@/lib/auth";
 
+const GITHUB_URL = "https://github.com/antonbarr-data/dqt";
+
 const DETECTORS = [
   "mad_outlier_fraction", "ks_pvalue", "stl_residual_zscore",
   "isolation_forest_fraction", "wasserstein_1", "psi",
@@ -19,28 +21,36 @@ const DETECTORS = [
 
 const CAPABILITIES = [
   {
-    label: "30+ statistical detectors",
+    label: "Statistical detectors",
     slugline: "Every column. Every run.",
-    desc: "MAD, double-MAD, isolation forest, KS, STL residual z-scores, adjusted boxplot fences. Plus completeness, validity, freshness, schema-change, and SQL-assertion checks. Every detector returns the same (verdict, score, plain_english) shape — so they compose, swap, and stack.",
-    mono: "mad_outlier_fraction · ks_pvalue · stl_residual_zscore · isolation_forest_fraction · referential_integrity_rate",
+    desc: "MAD, double-MAD, isolation forest, KS, STL residual z-scores, adjusted boxplot fences. Plus completeness, validity, freshness, schema-change, and SQL-assertion checks. Every detector returns the same (verdict, score, plain_english) shape.",
+    mono: "mad_outlier_fraction · ks_pvalue · stl_residual_zscore · isolation_forest_fraction",
+    borderColor: "var(--accent)",
+    labelColor: "var(--accent)",
   },
   {
     label: "Column-level lineage",
     slugline: "Parsed from your SQL.",
-    desc: "dqt walks your dbt manifest and warehouse DDL with sqlglot to build a column-level dependency graph. It also ingests OpenLineage events for non-dbt pipelines. From any incident, get an automatic blast radius — every downstream table and metric, ranked by exposure.",
+    desc: "dqt walks your dbt manifest and warehouse DDL with sqlglot to build a column-level dependency graph. From any incident, get an automatic blast radius — every downstream table and metric, ranked by exposure.",
     mono: null,
+    borderColor: "var(--warn)",
+    labelColor: "var(--warn)",
   },
   {
-    label: "Semantic layer",
-    slugline: "A knowledge vault, not a config file.",
-    desc: "Define datasets, columns, and metrics as YAML contracts — compatible with dbt's semantic_models.yml out of the box. Every entity is a document, every relationship is a link, every description gets an embedding. Searchable by humans. Groundable by AI agents.",
-    mono: null,
+    label: "LLM Wiki · Semantic layer",
+    slugline: "raw/ holds facts. wiki/ holds knowledge.",
+    desc: "dqt uses Karpathy's LLM Wiki pattern. Dump your Trello tickets, SQL files, and BI reports into raw/. Point Claude Code at the vault. It synthesises wiki/ — dataset descriptions, metric definitions, causal edges — from the artifacts your team already has. YAML contracts compatible with dbt's semantic_models.yml.",
+    mono: "raw/tickets/ · raw/sql/ · raw/reports/ → wiki/metrics/ · wiki/lineage/",
+    borderColor: "var(--fg-3)",
+    labelColor: "var(--fg-2)",
   },
   {
     label: "Causal discovery",
     slugline: "Granger. PCMCI+. Transfer Entropy.",
-    desc: "dqt runs causal discovery across your metric time series, prunes edges with stability selection over bootstrap resamples, and proposes directed metric→metric relationships annotated with lag, confidence, and E-values. Every proposed edge is reviewed by a human owner before it enters the production DAG.",
+    desc: "dqt runs causal discovery across your metric time series, prunes edges with stability selection, and proposes directed metric→metric relationships annotated with lag, confidence, and E-values. Every edge reviewed by a human before entering the production DAG.",
     mono: null,
+    borderColor: "var(--pass)",
+    labelColor: "var(--pass)",
     highlight: true,
   },
 ];
@@ -78,7 +88,7 @@ print(result.plain_english)
 # → "0.82% of values are outliers — within the 1% warn threshold"`;
 
 function CellValue({ v }: { v: boolean | string }) {
-  if (v === true) return <span style={{ color: "var(--pass)" }}>✓</span>;
+  if (v === true) return <span style={{ color: "var(--pass)", fontWeight: 600 }}>✓</span>;
   if (v === false) return <span style={{ color: "var(--fg-3)" }}>—</span>;
   if (v === "partial") return <span style={{ color: "var(--warn)" }}>partial</span>;
   return <span style={{ color: "var(--fg-2)" }}>{v}</span>;
@@ -129,28 +139,28 @@ export default function RootPage() {
         className="flex items-center justify-between px-8 border-b border-line sticky top-0 z-10"
         style={{ height: 52, background: "var(--bg-1)" }}
       >
-        <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 18, fontWeight: 300, letterSpacing: "-0.05em", color: "var(--accent)" }}>
+        <Link href="/" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 26, fontWeight: 500, letterSpacing: "-0.05em", color: "var(--accent)", textDecoration: "none" }}>
           dqt
-        </span>
-        <div className="flex items-center gap-6">
-          <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-2)" }}>Why dqt</a>
-          <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-2)" }}>Code</a>
-          <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-2)" }}>vs. alternatives</a>
+        </Link>
+        <div className="flex items-center gap-8">
+          <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Why dqt</a>
+          <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Code</a>
+          <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
         </div>
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com/anthropics/dqt"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="t-small border border-line px-3 py-1.5 transition-colors hover:bg-bg-2"
-            style={{ color: "var(--fg-1)" }}
+            style={{ color: "var(--fg-0)" }}
           >
             GitHub ↗
           </a>
           <Link
             href="/login"
             className="t-small border px-3 py-1.5 transition-colors hover:opacity-80"
-            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 500 }}
+            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 600 }}
           >
             Sign in
           </Link>
@@ -158,45 +168,54 @@ export default function RootPage() {
       </nav>
 
       {/* ── hero ── */}
-      <section className="px-8 pt-20 pb-16 max-w-5xl mx-auto">
-        <div className="flex items-center gap-2 mb-8">
-          <span className="t-micro px-2 py-0.5 border border-line" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>
+      <section className="px-8 pt-12 pb-10 max-w-5xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <span
+            className="px-2.5 py-1 border t-small"
+            style={{ color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
+          >
             Open source · MIT licensed
           </span>
           <button
             onClick={copyInstall}
-            className="t-micro px-2 py-0.5 border border-line flex items-center gap-1.5 transition-colors hover:bg-bg-2"
-            style={{ color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)", background: "var(--bg-1)" }}
+            className="px-2.5 py-1 border flex items-center gap-2 transition-colors hover:opacity-80"
+            style={{
+              color: "var(--fg-0)",
+              borderColor: "var(--accent)",
+              background: "rgba(157,208,176,0.08)",
+              fontFamily: "var(--font-jetbrains-mono)",
+              fontSize: 11,
+            }}
           >
-            <span style={{ color: "var(--fg-3)" }}>$</span>
+            <span style={{ color: "var(--accent)" }}>$</span>
             pip install dqtlib
-            <span style={{ color: "var(--fg-3)", marginLeft: 6 }}>{copied ? "✓ copied" : "⌘C"}</span>
+            <span style={{ color: "var(--accent)", marginLeft: 4 }}>{copied ? "✓" : "⎘"}</span>
           </button>
         </div>
 
-        <h1 style={{ fontSize: "clamp(36px, 5.5vw, 68px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.06, color: "var(--fg-0)", maxWidth: 700 }}>
+        <h1 style={{ fontSize: "clamp(48px, 6.5vw, 84px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.04, color: "var(--fg-0)", maxWidth: 740 }}>
           Data quality that tells you <em style={{ fontStyle: "normal", color: "var(--accent)" }}>why</em>.
         </h1>
 
-        <p className="t-body mt-5" style={{ color: "var(--fg-2)", maxWidth: 560, lineHeight: 1.75 }}>
+        <p className="mt-5" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 540, lineHeight: 1.7 }}>
           Statistical drift detection, column-level lineage, and causal discovery — for dbt, warehouses, and data lakes. In one Python library.
         </p>
 
         <div className="flex items-center gap-3 mt-8 flex-wrap">
           <button
             onClick={copyInstall}
-            className="flex items-center gap-2 px-4 py-2.5 border transition-colors hover:opacity-80"
-            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 500 }}
+            className="flex items-center gap-2 px-5 py-3 border transition-colors hover:opacity-85"
+            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 600 }}
           >
-            <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>pip install dqtlib</span>
-            {copied ? " ✓" : " ⎘"}
+            <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 13 }}>pip install dqtlib</span>
+            <span style={{ fontSize: 14 }}>{copied ? "✓" : "⎘"}</span>
           </button>
           <a
-            href="https://github.com/anthropics/dqt"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-4 py-2.5 t-small border border-line transition-colors hover:bg-bg-2"
-            style={{ color: "var(--fg-1)" }}
+            className="flex items-center gap-1.5 px-5 py-3 border border-line transition-colors hover:bg-bg-2"
+            style={{ color: "var(--fg-0)", fontSize: 13 }}
           >
             ★ Star on GitHub →
           </a>
@@ -207,56 +226,56 @@ export default function RootPage() {
       <section className="border-t border-b border-line" style={{ background: "var(--bg-1)" }}>
         <div className="grid mx-auto" style={{ maxWidth: 900, gridTemplateColumns: "repeat(4, 1fr)" }}>
           {[
-            { value: "30+", label: "detector algorithms" },
-            { value: "9+", label: "warehouse engines" },
-            { value: "100k", label: "rows sampled / check" },
-            { value: "MIT", label: "no vendor lock-in" },
+            { value: "30+", label: "detector algorithms", color: "var(--accent)" },
+            { value: "9+", label: "warehouse engines", color: "var(--accent)" },
+            { value: "100k", label: "rows sampled / check", color: "var(--warn)" },
+            { value: "MIT", label: "no vendor lock-in", color: "var(--pass)" },
           ].map((s, i) => (
-            <div key={s.label} className="px-8 py-6 text-center" style={{ borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
-              <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 30, fontWeight: 300, color: "var(--fg-0)", letterSpacing: "-0.02em" }}>
+            <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
+              <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 36, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
                 {s.value}
               </p>
-              <p className="t-micro mt-1" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>{s.label}</p>
+              <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 4 }}>{s.label}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── problem agitation ── */}
-      <section id="why" className="px-8 py-20 max-w-5xl mx-auto">
-        <p className="t-micro mb-3" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>The hour after the alert</p>
-        <h2 className="t-h1 mb-6" style={{ fontWeight: 300 }}>
+      <section id="why" className="px-8 py-14 max-w-5xl mx-auto">
+        <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>The hour after the alert</p>
+        <h2 style={{ fontSize: "clamp(28px, 3.5vw, 44px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: 24 }}>
           Most DQ tools tell you a row count dropped.<br />They don&apos;t tell you why.
         </h2>
-        <div className="grid grid-cols-2 gap-12">
+        <div className="grid grid-cols-2 gap-10">
           <div className="space-y-4">
-            <p className="t-body" style={{ color: "var(--fg-2)", lineHeight: 1.75 }}>
+            <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75 }}>
               You set a threshold. It fires. Slack lights up. Now you&apos;re bouncing between dbt docs, the warehouse, and your BI tool — trying to figure out which upstream model changed, whether the spike in nulls explains the dashboard regression, and whether this is worth waking the on-call engineer for.
             </p>
-            <p className="t-body" style={{ color: "var(--fg-1)", lineHeight: 1.75 }}>
-              <strong>dqt was built for the part that comes after the alert.</strong> It reads your dbt manifest, parses your warehouse SQL into a column-level lineage graph, runs 30+ statistical detectors against your tables, and discovers causal relationships across your metrics. So the next time something moves, you already know what moved it.
+            <p style={{ fontSize: 14, color: "var(--fg-0)", lineHeight: 1.75 }}>
+              <strong>dqt was built for the part that comes after the alert.</strong> It reads your dbt manifest, parses your warehouse SQL into a column-level lineage graph, runs 30+ statistical detectors, and discovers causal relationships across your metrics — so the next time something moves, you already know what moved it.
             </p>
           </div>
           <div className="space-y-3">
             <div className="p-4 border border-line" style={{ background: "var(--bg-1)" }}>
-              <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Without dqt</p>
+              <p style={{ fontSize: 10, color: "var(--fail)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>Without dqt</p>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
                   <span style={{ color: "var(--fail)" }}>✗</span>
-                  <span className="t-small" style={{ color: "var(--fg-2)" }}>orders.amount null_fraction ≥ 0.05 — threshold exceeded</span>
+                  <span style={{ fontSize: 13, color: "var(--fg-1)" }}>orders.amount null_fraction ≥ 0.05 — threshold exceeded</span>
                 </div>
-                <p className="t-micro pl-5" style={{ color: "var(--fg-3)" }}>Now what? Go dig through git log, dbt docs, warehouse history…</p>
+                <p style={{ fontSize: 11, color: "var(--fg-3)", paddingLeft: 20 }}>Now what? Go dig through git log, dbt docs, warehouse history…</p>
               </div>
             </div>
-            <div className="p-4 border" style={{ background: "var(--bg-1)", borderColor: "var(--accent)30" }}>
-              <p className="t-micro mb-2" style={{ color: "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase" }}>With dqt</p>
+            <div className="p-4 border" style={{ background: "var(--bg-1)", borderColor: "var(--accent)" }}>
+              <p style={{ fontSize: 10, color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8, fontWeight: 500 }}>With dqt</p>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
                   <span style={{ color: "var(--fail)" }}>✗</span>
-                  <span className="t-small" style={{ color: "var(--fg-1)" }}>orders.amount null_fraction = 12.4% (baseline 0.3%)</span>
+                  <span style={{ fontSize: 13, color: "var(--fg-0)" }}>orders.amount null_fraction = 12.4% (baseline 0.3%)</span>
                 </div>
-                <p className="t-small pl-5" style={{ color: "var(--fg-2)", lineHeight: 1.6 }}>
-                  Causal trace: <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)" }}>stg_payments → orders → revenue</span>. Upstream model <span style={{ fontFamily: "var(--font-jetbrains-mono)" }}>stg_payments</span> introduced a schema break 6 hours ago. E-value = 3.2 (robust to confounders).
+                <p style={{ fontSize: 13, color: "var(--fg-1)", paddingLeft: 20, lineHeight: 1.6 }}>
+                  Causal trace: <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>stg_payments → orders → revenue</span>. Upstream model <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>stg_payments</span> introduced a schema break 6h ago. E-value = 3.2.
                 </p>
               </div>
             </div>
@@ -265,20 +284,20 @@ export default function RootPage() {
       </section>
 
       {/* ── capabilities ── */}
-      <section className="border-t border-line px-8 py-20" style={{ background: "var(--bg-1)" }}>
+      <section className="border-t border-line px-8 py-14" style={{ background: "var(--bg-1)" }}>
         <div className="max-w-5xl mx-auto">
-          <p className="t-micro mb-3" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>Four layers. One library.</p>
-          <div className="grid grid-cols-2 gap-px mt-8" style={{ background: "var(--line)" }}>
+          <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 24 }}>Four layers. One library.</p>
+          <div className="grid grid-cols-2 gap-px" style={{ background: "var(--line)" }}>
             {CAPABILITIES.map((c) => (
-              <div key={c.label} className="p-6 space-y-2" style={{ background: "var(--bg-1)", borderLeft: c.highlight ? "2px solid var(--accent)" : "2px solid transparent" }}>
-                <p className="t-micro" style={{ color: c.highlight ? "var(--accent)" : "var(--fg-3)", letterSpacing: "0.1em", textTransform: "uppercase" }}>{c.label}</p>
-                <h3 className="t-h3" style={{ color: "var(--fg-0)" }}>{c.slugline}</h3>
-                <p className="t-small" style={{ color: "var(--fg-2)", lineHeight: 1.7 }}>{c.desc}</p>
+              <div key={c.label} className="p-6 space-y-2" style={{ background: "var(--bg-1)", borderLeft: `2px solid ${c.borderColor}` }}>
+                <p style={{ fontSize: 10, color: c.labelColor, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500 }}>{c.label}</p>
+                <h3 style={{ fontSize: 18, fontWeight: 400, color: "var(--fg-0)", letterSpacing: "-0.01em" }}>{c.slugline}</h3>
+                <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7 }}>{c.desc}</p>
                 {c.mono && (
-                  <p className="t-micro pt-2" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)", lineHeight: 1.8 }}>{c.mono}</p>
+                  <p style={{ fontSize: 11, color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)", lineHeight: 1.8, paddingTop: 4 }}>{c.mono}</p>
                 )}
                 {c.highlight && (
-                  <p className="t-micro pt-1" style={{ color: "var(--accent)" }}>The only DQ tool that ships causal discovery.</p>
+                  <p style={{ fontSize: 11, color: "var(--pass)", paddingTop: 4, fontWeight: 500 }}>The only DQ tool that ships causal discovery.</p>
                 )}
               </div>
             ))}
@@ -286,23 +305,82 @@ export default function RootPage() {
         </div>
       </section>
 
+      {/* ── LLM Wiki ── */}
+      <section className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
+        <div className="grid grid-cols-2 gap-12 items-start">
+          <div>
+            <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
+              <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-2)", borderBottom: "1px solid var(--line-2)" }}>Karpathy&apos;s LLM Wiki pattern</a>
+            </p>
+            <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 16 }}>
+              Your data warehouse<br />already has documentation.<br />It&apos;s in your Trello board.
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 12 }}>
+              Every BI request your GTM team filed is a semantic definition waiting to be extracted. The ticket says what the metric means. The SQL says how it&apos;s computed. The report says what thresholds matter.
+            </p>
+            <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 20 }}>
+              dqt uses Karpathy&apos;s LLM Wiki structure: <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>raw/</span> for atomic source documents, <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>wiki/</span> for synthesised knowledge. Point Claude Code at the vault and it writes the semantic layer for you — from the artifacts your team already has.
+            </p>
+            <a
+              href={GITHUB_URL + "/blob/main/docs/semantic-layer.md"}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 13, color: "var(--accent)", borderBottom: "1px solid var(--accent)" }}
+            >
+              Read the full workflow guide →
+            </a>
+          </div>
+          <div className="space-y-0 border border-line" style={{ background: "var(--bg-1)" }}>
+            {[
+              { step: "1", label: "Export Trello tickets + attachments", sub: "SQL files, report HTMLs, metric definitions", color: "var(--fg-3)" },
+              { step: "2", label: "Put them in raw/", sub: "raw/tickets/ · raw/sql/ · raw/reports/ · raw/schema/", color: "var(--fg-3)" },
+              { step: "3", label: "Point Claude Code at the vault", sub: "cd vault && claude .", color: "var(--accent)" },
+              { step: "4", label: "Claude Code synthesises wiki/", sub: "datasets, metrics, lineage, causal edges — grounded in your actual data", color: "var(--accent)" },
+              { step: "5", label: "dqt generates per-column docs + checks", sub: "write_vault() · dqt run checks.yaml", color: "var(--pass)" },
+            ].map((s, i) => (
+              <div key={i} className="flex items-start gap-4 px-5 py-4 border-b border-line last:border-0">
+                <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: s.color, minWidth: 16, paddingTop: 1 }}>{s.step}</span>
+                <div>
+                  <p style={{ fontSize: 13, color: "var(--fg-0)", fontWeight: 500 }}>{s.label}</p>
+                  <p style={{ fontSize: 11, color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)", marginTop: 2 }}>{s.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── detector catalog ── */}
-      <section className="border-t border-line px-8 py-16 max-w-5xl mx-auto">
-        <p className="t-micro mb-6" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+      <section className="border-t border-line px-8 py-12 max-w-5xl mx-auto">
+        <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>
           Detector catalog · {DETECTORS.length} algorithms
         </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+        <div className="flex flex-wrap gap-x-3 gap-y-2">
           {DETECTORS.map((d) => (
-            <span key={d} className="t-micro" style={{ color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)" }}>{d}</span>
+            <span
+              key={d}
+              style={{
+                fontSize: 11,
+                color: "var(--fg-0)",
+                fontFamily: "var(--font-jetbrains-mono)",
+                background: "var(--bg-2)",
+                border: "1px solid var(--line)",
+                padding: "2px 8px",
+              }}
+            >
+              {d}
+            </span>
           ))}
         </div>
       </section>
 
       {/* ── code proof ── */}
-      <section id="code" className="border-t border-line px-8 py-20" style={{ background: "var(--bg-1)" }}>
+      <section id="code" className="border-t border-line px-8 py-14" style={{ background: "var(--bg-1)" }}>
         <div className="max-w-5xl mx-auto">
-          <p className="t-micro mb-3" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>Three lines to your first check.</p>
-          <h2 className="t-h1 mb-8" style={{ fontWeight: 300 }}>Runs in notebooks. Runs in CI.<br />No server required.</h2>
+          <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Three lines to your first check.</p>
+          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 24 }}>
+            Runs in notebooks. Runs in CI.<br />No server required.
+          </h2>
 
           <div className="border border-line" style={{ background: "var(--bg-0)" }}>
             <div className="flex items-center border-b border-line" style={{ background: "var(--bg-2)" }}>
@@ -310,11 +388,12 @@ export default function RootPage() {
                 <button
                   key={t}
                   onClick={() => setTab(t)}
-                  className="px-4 py-2 t-small border-b-2 transition-colors"
+                  className="px-4 py-2 transition-colors"
                   style={{
-                    borderBottomColor: tab === t ? "var(--accent)" : "transparent",
-                    color: tab === t ? "var(--fg-0)" : "var(--fg-3)",
+                    borderBottom: tab === t ? "2px solid var(--accent)" : "2px solid transparent",
+                    color: tab === t ? "var(--fg-0)" : "var(--fg-2)",
                     fontFamily: "var(--font-jetbrains-mono)",
+                    fontSize: 12,
                   }}
                 >
                   {t}
@@ -323,30 +402,25 @@ export default function RootPage() {
             </div>
             <pre
               className="p-6 overflow-x-auto"
-              style={{
-                fontFamily: "var(--font-jetbrains-mono)",
-                fontSize: 12,
-                lineHeight: 1.7,
-                color: "var(--fg-1)",
-                margin: 0,
-              }}
+              style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, lineHeight: 1.75, color: "var(--fg-0)", margin: 0 }}
             >
               {tabContent[tab]}
             </pre>
           </div>
 
-          <p className="t-small mt-4" style={{ color: "var(--fg-2)", lineHeight: 1.7 }}>
-            Runs in notebooks. Runs in CI. Runs as one Python task in Airflow, Dagster, or Prefect.{" "}
-            <strong style={{ color: "var(--fg-1)" }}>No server required.</strong> The optional FastAPI service and dashboard are there when you want them — and stay out of the way when you don&apos;t.
+          <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, marginTop: 14 }}>
+            No server required. The optional FastAPI service and dashboard are there when you want them — and stay out of the way when you don&apos;t.
           </p>
         </div>
       </section>
 
       {/* ── comparison table ── */}
-      <section id="compare" className="border-t border-line px-8 py-20 max-w-5xl mx-auto">
-        <p className="t-micro mb-3" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>Where dqt sits.</p>
-        <h2 className="t-h1 mb-2" style={{ fontWeight: 300 }}>We borrowed the best ideas.<br />Then shipped the parts they don&apos;t have.</h2>
-        <p className="t-small mb-8" style={{ color: "var(--fg-2)" }}>
+      <section id="compare" className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
+        <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Where dqt sits.</p>
+        <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
+          We borrowed the best ideas.<br />Then shipped the parts they don&apos;t have.
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--fg-1)", marginBottom: 24, lineHeight: 1.6 }}>
           Causal discovery isn&apos;t a nice-to-have — it&apos;s the difference between <em>&ldquo;orders are down&rdquo;</em> and <em>&ldquo;orders are down because the EU marketing-spend job missed its 06:00 run.&rdquo;</em>
         </p>
 
@@ -354,7 +428,7 @@ export default function RootPage() {
           <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 640 }}>
             <thead>
               <tr style={{ background: "var(--bg-2)" }}>
-                <th className="px-4 py-3 text-left t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Capability</th>
+                <th className="px-4 py-3 text-left" style={{ fontSize: 10, color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Capability</th>
                 {[
                   { key: "dqt", label: "dqt", accent: true },
                   { key: "gx", label: "Great Expectations", accent: false },
@@ -362,7 +436,7 @@ export default function RootPage() {
                   { key: "elementary", label: "Elementary", accent: false },
                   { key: "dataplex", label: "Dataplex", accent: false },
                 ].map((c) => (
-                  <th key={c.key} className="px-4 py-3 text-center t-micro" style={{ color: c.accent ? "var(--accent)" : "var(--fg-3)", fontWeight: c.accent ? 600 : 400, letterSpacing: "0.08em" }}>
+                  <th key={c.key} className="px-4 py-3 text-center" style={{ fontSize: 11, color: c.accent ? "var(--accent)" : "var(--fg-2)", fontWeight: c.accent ? 700 : 400, letterSpacing: "0.06em" }}>
                     {c.label}
                   </th>
                 ))}
@@ -371,9 +445,9 @@ export default function RootPage() {
             <tbody>
               {COMPARISON.map((row, i) => (
                 <tr key={row.label} className="border-t border-line" style={{ background: i % 2 === 0 ? "var(--bg-1)" : "var(--bg-0)" }}>
-                  <td className="px-4 py-2.5 t-small" style={{ color: "var(--fg-1)" }}>{row.label}</td>
+                  <td className="px-4 py-2.5" style={{ fontSize: 13, color: "var(--fg-0)" }}>{row.label}</td>
                   {[row.dqt, row.gx, row.soda, row.elementary, row.dataplex].map((v, j) => (
-                    <td key={j} className="px-4 py-2.5 text-center t-small">
+                    <td key={j} className="px-4 py-2.5 text-center" style={{ fontSize: 13 }}>
                       <CellValue v={v} />
                     </td>
                   ))}
@@ -385,74 +459,78 @@ export default function RootPage() {
       </section>
 
       {/* ── integrations ── */}
-      <section className="border-t border-line px-8 py-16" style={{ background: "var(--bg-1)" }}>
+      <section className="border-t border-line px-8 py-12" style={{ background: "var(--bg-1)" }}>
         <div className="max-w-5xl mx-auto">
-          <p className="t-micro mb-3" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>Drop it in next to the tools you already use.</p>
-          <div className="mt-6 space-y-0 border border-line" style={{ background: "var(--bg-0)" }}>
+          <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>Drop it in next to the tools you already use.</p>
+          <div className="border border-line" style={{ background: "var(--bg-0)" }}>
             {INTEGRATIONS.map((item, i) => (
               <div key={i} className="flex items-center gap-6 px-5 py-3 border-b border-line last:border-0">
-                <span className="t-small" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)", minWidth: 240 }}>{item.name}</span>
-                <span className="t-small" style={{ color: "var(--fg-2)" }}>{item.note}</span>
+                <span style={{ fontSize: 13, color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)", minWidth: 260 }}>{item.name}</span>
+                <span style={{ fontSize: 13, color: "var(--fg-1)" }}>{item.note}</span>
               </div>
             ))}
           </div>
-          <p className="t-small mt-5" style={{ color: "var(--fg-2)" }}>
-            You don&apos;t replace anything to adopt dqt. You point it at the warehouse you already have.
-          </p>
         </div>
       </section>
 
       {/* ── final CTA ── */}
-      <section className="border-t border-line px-8 py-24 text-center" style={{ background: "var(--bg-0)" }}>
-        <h2 className="t-h1 mb-3" style={{ fontWeight: 300 }}>
+      <section className="border-t border-line px-8 py-20 text-center" style={{ background: "var(--bg-0)" }}>
+        <h2 style={{ fontSize: "clamp(26px, 3.5vw, 48px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
           Install it. Point it at your warehouse.<br />See your first incident in five minutes.
         </h2>
 
         <button
           onClick={copyInstall}
-          className="flex items-center gap-3 mx-auto mt-8 px-6 py-3 border border-line transition-colors hover:bg-bg-2"
-          style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 14, color: "var(--fg-0)", background: "var(--bg-1)" }}
+          className="flex items-center gap-3 mx-auto mt-8 px-6 py-3 border transition-colors hover:opacity-85"
+          style={{
+            fontFamily: "var(--font-jetbrains-mono)",
+            fontSize: 14,
+            color: "var(--bg-0)",
+            background: "var(--accent)",
+            borderColor: "var(--accent)",
+            fontWeight: 600,
+          }}
         >
-          <span style={{ color: "var(--fg-3)" }}>$</span>
+          <span>$</span>
           pip install dqtlib
-          <span style={{ color: "var(--fg-3)" }}>{copied ? "✓ copied" : "⎘"}</span>
+          <span>{copied ? "✓ copied" : "⎘"}</span>
         </button>
 
-        <div className="flex items-center justify-center gap-3 mt-6 flex-wrap">
+        <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
           <a
-            href="https://github.com/anthropics/dqt"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 t-small border border-line transition-colors hover:bg-bg-2"
-            style={{ color: "var(--fg-1)" }}
+            className="px-5 py-2.5 border border-line transition-colors hover:bg-bg-2"
+            style={{ fontSize: 13, color: "var(--fg-0)" }}
           >
             ★ Star on GitHub →
           </a>
           <Link
             href="/login"
-            className="px-5 py-2.5 t-small border transition-colors hover:opacity-80"
-            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 500 }}
+            className="px-5 py-2.5 border transition-colors hover:opacity-80"
+            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 600, fontSize: 13 }}
           >
             Open the dashboard →
           </Link>
         </div>
 
-        <p className="t-micro mt-8" style={{ color: "var(--fg-3)" }}>
-          Open source. MIT licensed. Python 3.12+. No telemetry. No signup. No credit card.
+        <p style={{ fontSize: 11, color: "var(--fg-2)", marginTop: 24, letterSpacing: "0.04em" }}>
+          Open source · MIT licensed · Python 3.12+ · No telemetry · No signup · No credit card
         </p>
       </section>
 
       {/* ── footer ── */}
       <footer className="border-t border-line px-8 py-4 flex items-center justify-between" style={{ background: "var(--bg-1)" }}>
-        <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 14, fontWeight: 300, letterSpacing: "-0.05em", color: "var(--accent)" }}>
+        <Link href="/" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 22, fontWeight: 500, letterSpacing: "-0.05em", color: "var(--accent)", textDecoration: "none" }}>
           dqt
-        </span>
+        </Link>
         <div className="flex items-center gap-6">
-          <a href="https://github.com/anthropics/dqt" target="_blank" rel="noopener noreferrer" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-3)" }}>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
             GitHub
           </a>
-          <span className="t-small" style={{ color: "var(--fg-3)" }}>MIT License</span>
-          <span className="t-small" style={{ color: "var(--fg-3)" }}>Python 3.12+</span>
+          <span style={{ fontSize: 12, color: "var(--fg-2)" }}>MIT License</span>
+          <span style={{ fontSize: 12, color: "var(--fg-2)" }}>Python 3.12+</span>
         </div>
       </footer>
     </div>

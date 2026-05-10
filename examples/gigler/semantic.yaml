@@ -153,3 +153,109 @@ datasets:
         description: "ISO week number for time-series aggregation."
         classification: internal
         pii: false
+
+  - id: gig_prices
+    description: "Daily snapshot of gig listing prices per category on the Gigler marketplace. Lower prices correlate with increased buyer interest and transaction volume with a 1-week lag."
+    source_files:
+      - "data/gig_prices_2024_q1.csv"
+      - "data/gig_prices_2024_q2.csv"
+      - "data/gig_prices_2024_q3.csv"
+      - "data/gig_prices_2024_q4.csv"
+      - "data/gig_prices_2025_q1.csv"
+    owner: "marketplace-analytics@gigler.com"
+    domain: "marketplace"
+    freshness_sla_hours: 24
+    columns:
+      - name: date
+        description: "Snapshot date. ISO 8601."
+        classification: internal
+        pii: false
+      - name: gig_category
+        description: "Gig service category. Matches gig_category in gigler_transactions."
+        classification: internal
+        pii: false
+      - name: avg_price_usd
+        description: "Average listed price in USD across all active gigs in this category on this date. NULL indicates a data collection failure."
+        classification: internal
+        pii: false
+      - name: median_price_usd
+        description: "Median listed price in USD. More robust to outlier listings than avg_price_usd."
+        classification: internal
+        pii: false
+      - name: min_price_usd
+        description: "Lowest active listing price in USD. Values below $5 indicate data entry errors."
+        classification: internal
+        pii: false
+      - name: max_price_usd
+        description: "Highest active listing price in USD. Values above $50,000 indicate enterprise custom-quote gigs or data errors."
+        classification: internal
+        pii: false
+      - name: n_listings
+        description: "Number of active gig listings in this category on this date."
+        classification: internal
+        pii: false
+      - name: discount_active
+        description: "True when a platform-wide promotional discount is active (e.g. Gigler Spring Sale, Black Friday)."
+        classification: internal
+        pii: false
+      - name: price_change_pct
+        description: "Week-over-week percentage change in avg_price_usd for this category. Negative values indicate price drops. NULL for first 7 days."
+        classification: internal
+        pii: false
+
+  - id: gig_vendor_stats
+    description: "Daily snapshot of vendor competition metrics per gig category on the Gigler marketplace. Captures how many sellers compete in each category, their quality ratings, and buyer engagement (profile views, search impressions). Higher vendor counts suppress prices with a 1-week lag; higher profile views predict transaction volume with a 1-week lag."
+    source_files:
+      - "data/gig_vendor_stats_2024_q1.csv"
+      - "data/gig_vendor_stats_2024_q2.csv"
+      - "data/gig_vendor_stats_2024_q3.csv"
+      - "data/gig_vendor_stats_2024_q4.csv"
+      - "data/gig_vendor_stats_2025_q1.csv"
+    owner: "marketplace-analytics@gigler.com"
+    domain: "marketplace"
+    freshness_sla_hours: 24
+    columns:
+      - name: date
+        description: "Snapshot date. ISO 8601."
+        classification: internal
+        pii: false
+      - name: gig_category
+        description: "Gig service category. Matches gig_category in gig_prices and gigler_transactions."
+        classification: internal
+        pii: false
+      - name: n_active_vendors
+        description: "Count of sellers with at least one active gig listing in this category. Values ≤0 indicate a data pipeline error. Higher counts suppress avg_price_usd with a 1-week lag (competition effect)."
+        classification: internal
+        pii: false
+      - name: n_new_vendors
+        description: "Vendors who published their first listing in this category in the past 7 days. Surges indicate a hot or newly-incentivised market segment."
+        classification: internal
+        pii: false
+      - name: avg_vendor_rating
+        description: "Platform-wide average buyer rating (1.0-5.0) for all sellers in this category. Slowly improves over time as the platform matures."
+        classification: internal
+        pii: false
+      - name: top_rated_fraction
+        description: "Fraction of sellers in this category with level_2 or top_rated status. Higher values correlate with better buyer satisfaction scores."
+        classification: internal
+        pii: false
+      - name: total_profile_views
+        description: "Total buyer views of seller profiles in this category on this day. NULL indicates a tracking pixel outage. Strong predictor of transaction volume with a 1-week lag (eyeball-to-purchase funnel)."
+        classification: internal
+        pii: false
+      - name: avg_profile_views
+        description: "total_profile_views / n_active_vendors. Measures demand intensity per seller — spikes indicate viral or promoted categories."
+        classification: internal
+        pii: false
+      - name: search_impressions
+        description: "Number of times gigs in this category appeared in buyer search results. NULL indicates a search indexer failure. Scales with n_active_vendors × listing quality."
+        classification: internal
+        pii: false
+      - name: click_through_rate
+        description: "Ratio of profile clicks to search impressions (0.0-1.0). Values above 1.0 indicate a tracking bug. Higher values reflect stronger listing titles and thumbnails."
+        classification: internal
+        pii: false
+      - name: avg_response_time_hours
+        description: "Average hours for a seller in this category to respond to buyer enquiries. Values above 48h correlate with lower buyer satisfaction and reduced conversion."
+        classification: internal
+        pii: false
