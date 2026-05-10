@@ -351,7 +351,7 @@ export default function RootPage() {
           {[
             { value: "30+", label: "detector algorithms", color: "var(--accent)" },
             { value: "9+", label: "warehouse engines", color: "var(--accent)" },
-            { value: "100k", label: "rows sampled / check", color: "var(--warn)" },
+            { value: "100B+", label: "rows validated (and counting)", color: "var(--warn)" },
             { value: "MIT", label: "no vendor lock-in", color: "var(--pass)" },
           ].map((s, i) => (
             <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
