@@ -274,7 +274,7 @@ export default function RootPage() {
         </div>
 
         <h1 style={{ fontSize: "clamp(48px, 6.5vw, 84px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.04, color: "var(--fg-0)", maxWidth: 740 }}>
-          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> — and <em style={{ fontStyle: "normal", color: "var(--pass)" }}>why</em>.
+          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
         <p className="mt-5" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 540, lineHeight: 1.7 }}>
@@ -347,14 +347,15 @@ export default function RootPage() {
 
       {/* ── stats band ── */}
       <section className="border-t border-b border-line" style={{ background: "var(--bg-1)" }}>
-        <div className="grid mx-auto" style={{ maxWidth: 900, gridTemplateColumns: "repeat(4, 1fr)" }}>
+        <div className="grid mx-auto" style={{ maxWidth: 1100, gridTemplateColumns: "repeat(5, 1fr)" }}>
           {[
             { value: "30+", label: "detector algorithms", color: "var(--accent)" },
+            { value: "30+", label: "declarative checks", color: "var(--accent)" },
             { value: "9+", label: "warehouse engines", color: "var(--accent)" },
             { value: "100B+", label: "rows validated (and counting)", color: "var(--warn)" },
             { value: "MIT", label: "no vendor lock-in", color: "var(--pass)" },
           ].map((s, i) => (
-            <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
+            <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 4 ? "1px solid var(--line)" : "none" }}>
               <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 36, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
                 {s.value}
               </p>
@@ -772,6 +773,17 @@ export default function RootPage() {
         <p style={{ fontSize: 11, color: "var(--fg-2)", marginTop: 24, letterSpacing: "0.04em" }}>
           Open source · MIT licensed · Python 3.12+ · No telemetry · No signup · No credit card
         </p>
+      </section>
+
+      {/* ── about ── */}
+      <section className="border-t border-line px-8 py-10" style={{ background: "var(--bg-0)" }}>
+        <div className="mx-auto" style={{ maxWidth: 700 }}>
+          <p style={{ fontSize: 13, color: "var(--fg-2)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>About the author</p>
+          <p style={{ fontSize: 15, color: "var(--fg-1)", lineHeight: 1.75 }}>
+            <a href="https://www.linkedin.com/in/antonbar/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }} className="hover:opacity-70">Anton Barr</a>
+            {" "}is a data geek, getting data things done since 1972 and vibe-coding at unreasonable hours. A student of <span style={{ color: "var(--accent)" }}>質</span> (shitsu): quality, substance, the inner nature of a thing. dqt is a personal project — the data quality tool he kept wishing existed.
+          </p>
+        </div>
       </section>
 
       {/* ── footer ── */}
