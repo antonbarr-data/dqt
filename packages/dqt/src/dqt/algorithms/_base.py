@@ -31,21 +31,28 @@ class DetectorResult:
 DetectorState = Any
 
 
-def compute_verdict(score: float, slug: str) -> Verdict:
+def compute_verdict(
+    score: float,
+    slug: str,
+    warn_threshold: float | None = None,
+    fail_threshold: float | None = None,
+) -> Verdict:
     from dqt.algorithms._scales import STAT_SCALES  # deferred to avoid circular deps
     scale = STAT_SCALES.get(slug)
     if scale is None:
         raise KeyError(f"No STAT_SCALE entry for slug '{slug}'. Add it to _scales.py.")
+    warn = warn_threshold if warn_threshold is not None else scale.warn_threshold
+    fail = fail_threshold if fail_threshold is not None else scale.fail_threshold
     if scale.direction == "lower_is_better":
-        if score >= scale.fail_threshold:
+        if score >= fail:
             return Verdict.fail
-        if score >= scale.warn_threshold:
+        if score >= warn:
             return Verdict.warn
         return Verdict.pass_
     else:
-        if score <= scale.fail_threshold:
+        if score <= fail:
             return Verdict.fail
-        if score <= scale.warn_threshold:
+        if score <= warn:
             return Verdict.warn
         return Verdict.pass_
 

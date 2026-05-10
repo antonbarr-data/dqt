@@ -34,6 +34,8 @@ class Check(BaseModel):
     column_name: str | None = None
     detector_slug: str
     params: dict[str, Any] = Field(default_factory=dict)
+    warn_threshold: float | None = None  # overrides STAT_SCALES default for this check
+    fail_threshold: float | None = None  # overrides STAT_SCALES default for this check
     baseline: BaselineConfig | None = None
     schedule: str | None = None
     sample_n: int = 100_000

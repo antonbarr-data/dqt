@@ -19,6 +19,14 @@
       "type": "object",
       "default": {}
     },
+    "warn_threshold": {
+      "type": ["number", "null"],
+      "description": "Override the STAT_SCALES warn threshold for this check. Direction (lower_is_better / higher_is_better) is inherited from the detector."
+    },
+    "fail_threshold": {
+      "type": ["number", "null"],
+      "description": "Override the STAT_SCALES fail threshold for this check. Direction (lower_is_better / higher_is_better) is inherited from the detector."
+    },
     "baseline": {
       "oneOf": [
         { "type": "null" },

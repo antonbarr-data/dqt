@@ -53,6 +53,12 @@ class Runner:
         # the column name during get_aggregations() and use it in score().
         curr_df = self._fetch(check, adapter, detector=detector)
         result = detector.score(curr_df, state)
+        if check.warn_threshold is not None or check.fail_threshold is not None:
+            from dqt.algorithms._base import compute_verdict
+            result.verdict = compute_verdict(
+                result.score, check.detector_slug,
+                check.warn_threshold, check.fail_threshold,
+            )
         finished_at = datetime.now(timezone.utc)
 
         diagnostic_sql: str | None = None
