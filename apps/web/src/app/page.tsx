@@ -588,6 +588,12 @@ export default function RootPage() {
 
       {/* ── detector catalog ── */}
       <section className="border-t border-line px-8 py-12 max-w-5xl mx-auto">
+        <div className="mb-8">
+          <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Full detector catalog</p>
+          <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, maxWidth: 640 }}>
+            Three distinct problem domains: <span style={{ color: "var(--fg-0)" }}>point outliers</span>, <span style={{ color: "var(--fg-0)" }}>distribution drift</span>, and <span style={{ color: "var(--fg-0)" }}>time-series anomalies</span>. For any given column you typically need one or two — <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>auto_outlier_fraction</span> picks the right one automatically based on the data&apos;s distribution. Note: <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>zscore_outlier_fraction</span> assumes normality — use MAD or double-MAD on real warehouse data.
+          </p>
+        </div>
         <div className="space-y-8">
           <div>
             <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>
