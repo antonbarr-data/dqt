@@ -400,9 +400,14 @@ export default function RootPage() {
                   <span style={{ color: "var(--fail)" }}>✗</span>
                   <span style={{ fontSize: 13, color: "var(--fg-0)" }}>orders.amount null_fraction = 12.4% (baseline 0.3%)</span>
                 </div>
-                <p style={{ fontSize: 13, color: "var(--fg-1)", paddingLeft: 20, lineHeight: 1.6 }}>
-                  Causal trace: <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>stg_payments → orders → revenue</span>. Upstream model <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12 }}>stg_payments</span> introduced a schema break 6h ago. E-value = 3.2.
-                </p>
+                <div style={{ paddingLeft: 20, marginTop: 4 }} className="space-y-1">
+                  <p style={{ fontSize: 12, color: "var(--fg-2)", lineHeight: 1.5 }}>
+                    <span style={{ color: "var(--fg-1)" }}>Lineage:</span> <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--accent)" }}>stg_payments → orders → revenue</span>. Schema break in <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}>stg_payments</span> 6h ago.
+                  </p>
+                  <p style={{ fontSize: 12, color: "var(--fg-2)", lineHeight: 1.5 }}>
+                    <span style={{ color: "var(--fg-1)" }}>Causal candidate:</span> <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}>stg_payments → orders.amount</span> (E-value 3.2, pending human review).
+                  </p>
+                </div>
               </div>
             </div>
           </div>
