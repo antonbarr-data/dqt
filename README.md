@@ -1,6 +1,4 @@
-```
-dqt
-```
+# 質 dqt
 
 **Open-source data quality, lineage, semantic layer & causality — for dbt, warehouses and data lakes.**
 
@@ -9,6 +7,12 @@ dqt
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
+
+---
+
+> **質** (shitsu) — quality, substance, the inner nature of a thing. The kanji points to what something truly is, not how it appears. dqt is meant to work the same way: concerned with the truth of the data, not its surface. The mark is also a quiet acknowledgment of a tradition I have learned much from — one in which quality is one of its most distinguishing characteristics, and craft and precision are understood to be the same thing. — *Anton Barr*
+
+---
 
 | Tool | What dqt adds on top |
 |------|----------------------|
