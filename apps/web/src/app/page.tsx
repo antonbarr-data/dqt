@@ -7,16 +7,83 @@ import { getToken } from "@/lib/auth";
 
 const GITHUB_URL = "https://github.com/antonbarr-data/dqt";
 
+const LOGO_TOOLTIP = "質 (shitsu) — quality, substance, the inner nature of a thing. The kanji points to what something truly is, not how it appears. dqt is meant to work the same way: concerned with the truth of the data, not its surface. The mark is also a quiet acknowledgment of a tradition I have learned much from — one in which quality and craft are understood to be the same thing. — Anton Barr";
+
+function LogoMark({ size = "nav" }: { size?: "nav" | "footer" }) {
+  const [visible, setVisible] = useState(false);
+  const monoSize = size === "nav" ? 26 : 20;
+  const kanjiSize = size === "nav" ? 22 : 20;
+  return (
+    <div className="relative" style={{ display: "inline-flex" }}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <Link href="/" className="flex items-center gap-2" style={{ textDecoration: "none" }}>
+        <span style={{ fontSize: kanjiSize, lineHeight: 1, color: "var(--accent)" }}>質</span>
+        <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: monoSize, fontWeight: 500, letterSpacing: "-0.05em", color: "var(--accent)" }}>dqt</span>
+      </Link>
+      {visible && (
+        <div
+          style={{
+            position: "absolute",
+            top: size === "footer" ? "auto" : "calc(100% + 10px)",
+            bottom: size === "footer" ? "calc(100% + 10px)" : "auto",
+            left: 0,
+            width: 320,
+            background: "var(--bg-2)",
+            border: "1px solid var(--line)",
+            padding: "14px 16px",
+            zIndex: 50,
+            pointerEvents: "none",
+          }}
+        >
+          <p style={{ fontSize: 12, color: "var(--fg-1)", lineHeight: 1.75, margin: 0 }}>
+            {LOGO_TOOLTIP}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const DETECTORS = [
-  "mad_outlier_fraction", "ks_pvalue", "stl_residual_zscore",
-  "isolation_forest_fraction", "wasserstein_1", "psi",
-  "modified_zscore", "double_mad", "grubbs", "generalized_esd",
-  "iqr_fence", "adjusted_boxplot", "bocpd", "cusum", "page_hinkley",
+  // univariate outliers
+  "mad_outlier_fraction", "double_mad_outlier_fraction", "zscore_outlier_fraction",
+  "adjusted_boxplot_fraction", "auto_outlier_fraction", "isolation_forest_fraction",
+  "grubbs", "generalized_esd", "iqr_fence",
+  // distribution & drift
+  "ks_pvalue", "wasserstein_1", "psi", "kl_divergence", "js_divergence",
+  "mmd", "adwin", "chi_square_drift",
+  // time series
+  "stl_residual_zscore", "bocpd", "cusum", "page_hinkley",
   "matrix_profile", "holt_winters", "prophet_anomaly",
-  "kl_divergence", "js_divergence", "mmd", "adwin",
-  "chi_square_drift", "cramers_v", "mutual_information",
+  // multivariate
   "mahalanobis_distance", "lof", "one_class_svm", "hbos", "ecod",
-  "benford_law_fit", "null_fraction", "schema_change", "freshness_check",
+  // associations & information
+  "cramers_v", "mutual_information",
+  // pattern
+  "benford_law_fit",
+];
+
+const SIMPLE_CHECKS = [
+  // nullness & completeness
+  "null_fraction", "completeness", "date_part_missing_fraction",
+  // uniqueness & volume
+  "uniqueness", "composite_uniqueness", "volume",
+  // numeric range
+  "numeric_mean", "value_in_range", "max_in_range", "min_in_range",
+  "median_in_range", "sum_in_range", "stddev_in_range",
+  "cardinality_in_range", "quantile_in_range", "row_count_in_range",
+  // categorical
+  "set_membership", "set_exclusion",
+  // string & format
+  "regex_match", "string_length_range", "string_case_violation", "date_format",
+  // relational
+  "column_pair_comparison", "referential_integrity_rate",
+  // structural & freshness
+  "monotonicity", "freshness_seconds_behind", "schema_change",
+  // custom SQL
+  "sql_assertion_violation",
 ];
 
 const CAPABILITIES = [
@@ -139,9 +206,7 @@ export default function RootPage() {
         className="flex items-center justify-between px-8 border-b border-line sticky top-0 z-10"
         style={{ height: 52, background: "var(--bg-1)" }}
       >
-        <Link href="/" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 26, fontWeight: 500, letterSpacing: "-0.05em", color: "var(--accent)", textDecoration: "none" }}>
-          dqt
-        </Link>
+        <LogoMark size="nav" />
         <div className="flex items-center gap-8">
           <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Code</a>
@@ -515,25 +580,51 @@ export default function RootPage() {
 
       {/* ── detector catalog ── */}
       <section className="border-t border-line px-8 py-12 max-w-5xl mx-auto">
-        <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>
-          Detector catalog · {DETECTORS.length} algorithms
-        </p>
-        <div className="flex flex-wrap gap-x-3 gap-y-2">
-          {DETECTORS.map((d) => (
-            <span
-              key={d}
-              style={{
-                fontSize: 11,
-                color: "var(--fg-0)",
-                fontFamily: "var(--font-jetbrains-mono)",
-                background: "var(--bg-2)",
-                border: "1px solid var(--line)",
-                padding: "2px 8px",
-              }}
-            >
-              {d}
-            </span>
-          ))}
+        <div className="space-y-8">
+          <div>
+            <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>
+              Statistical &amp; ML algorithms · {DETECTORS.length}
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-2">
+              {DETECTORS.map((d) => (
+                <span
+                  key={d}
+                  style={{
+                    fontSize: 11,
+                    color: "var(--fg-0)",
+                    fontFamily: "var(--font-jetbrains-mono)",
+                    background: "var(--bg-2)",
+                    border: "1px solid var(--line)",
+                    padding: "2px 8px",
+                  }}
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>
+              Declarative checks · {SIMPLE_CHECKS.length}
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-2">
+              {SIMPLE_CHECKS.map((d) => (
+                <span
+                  key={d}
+                  style={{
+                    fontSize: 11,
+                    color: "var(--fg-1)",
+                    fontFamily: "var(--font-jetbrains-mono)",
+                    background: "var(--bg-1)",
+                    border: "1px solid var(--line)",
+                    padding: "2px 8px",
+                  }}
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -684,19 +775,19 @@ export default function RootPage() {
       </section>
 
       {/* ── footer ── */}
-      <footer className="border-t border-line px-8 py-4 flex items-center justify-between" style={{ background: "var(--bg-1)" }}>
-        <Link href="/" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 22, fontWeight: 500, letterSpacing: "-0.05em", color: "var(--accent)", textDecoration: "none" }}>
-          dqt
-        </Link>
-        <div className="flex items-center gap-6">
-          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
-            GitHub
-          </a>
-          <a href="https://www.linkedin.com/in/antonbar/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
-            LinkedIn
-          </a>
-          <span style={{ fontSize: 12, color: "var(--fg-2)" }}>MIT License</span>
-          <span style={{ fontSize: 12, color: "var(--fg-2)" }}>Python 3.12+</span>
+      <footer className="border-t border-line px-8 py-6" style={{ background: "var(--bg-1)" }}>
+        <div className="flex items-start justify-between gap-12">
+          <LogoMark size="footer" />
+          <div className="flex items-center gap-6 pt-1">
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
+              GitHub
+            </a>
+            <a href="https://www.linkedin.com/in/antonbar/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--fg-1)" }} className="transition-opacity hover:opacity-70">
+              LinkedIn
+            </a>
+            <span style={{ fontSize: 12, color: "var(--fg-2)" }}>MIT License</span>
+            <span style={{ fontSize: 12, color: "var(--fg-2)" }}>Python 3.12+</span>
+          </div>
         </div>
       </footer>
     </div>

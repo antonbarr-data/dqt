@@ -19,6 +19,9 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "dqt",
   description: "Data quality, observability, and causality",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
