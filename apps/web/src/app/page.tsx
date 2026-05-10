@@ -301,7 +301,7 @@ export default function RootPage() {
 
       {/* ── problem agitation ── */}
       <section id="why" className="px-8 py-14 max-w-5xl mx-auto">
-        <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>The hour after the alert</p>
+        <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>The hour after the alert</p>
         <h2 style={{ fontSize: "clamp(28px, 3.5vw, 44px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: 24 }}>
           Most DQ tools tell you a row count dropped.<br />They don&apos;t tell you why.
         </h2>
@@ -344,7 +344,7 @@ export default function RootPage() {
       {/* ── capabilities ── */}
       <section className="border-t border-line px-8 py-14" style={{ background: "var(--bg-1)" }}>
         <div className="max-w-5xl mx-auto">
-          <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 24 }}>Four layers. One library.</p>
+          <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 24 }}>Four layers. One library.</p>
           <div className="grid grid-cols-2 gap-px" style={{ background: "var(--line)" }}>
             {CAPABILITIES.map((c) => (
               <div key={c.label} className="p-6 space-y-2" style={{ background: "var(--bg-1)", borderLeft: `2px solid ${c.borderColor}` }}>
@@ -367,8 +367,8 @@ export default function RootPage() {
       <section className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
         <div className="grid grid-cols-2 gap-12 items-start">
           <div>
-            <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
-              <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-2)", borderBottom: "1px solid var(--line-2)" }}>Karpathy&apos;s LLM Wiki pattern</a>
+            <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
+              <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-1)", borderBottom: "1px solid var(--line)" }}>Karpathy&apos;s LLM Wiki pattern</a>
             </p>
             <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 16 }}>
               Your data warehouse<br />already has documentation.<br />It&apos;s in your Trello board.
@@ -492,7 +492,7 @@ export default function RootPage() {
 
           <div className="mt-6 border border-line" style={{ background: "var(--bg-0)" }}>
             <div className="px-4 py-2 border-b border-line flex items-center gap-2" style={{ background: "var(--bg-2)" }}>
-              <span style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Claude Code · all three plugins active</span>
+              <span style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Claude Code · all three plugins active</span>
             </div>
             <div className="grid grid-cols-2 divide-x divide-line">
               {[
@@ -500,7 +500,7 @@ export default function RootPage() {
                 { role: "assistant", text: "Querying your warehouse via MCP... orders.amount_usd: right-skewed, p99=$4,820.\n\nContext7 confirms: use adjusted_boxplot_fraction (handles skew via medcouple) + ks_pvalue for drift.\n\nchecks:\n  - table_name: orders\n    column_name: amount_usd\n    detector_slug: adjusted_boxplot_fraction\n  - table_name: orders\n    column_name: amount_usd\n    detector_slug: ks_pvalue\n    params: {alpha: 0.01}" },
               ].map((msg, i) => (
                 <div key={i} className="px-4 py-3">
-                  <p style={{ fontSize: 10, color: msg.role === "user" ? "var(--fg-3)" : "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+                  <p style={{ fontSize: 10, color: msg.role === "user" ? "var(--fg-2)" : "var(--accent)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
                     {msg.role === "user" ? "you" : "claude code"}
                   </p>
                   <p style={{ fontSize: 11, color: "var(--fg-1)", lineHeight: 1.6, fontFamily: "var(--font-jetbrains-mono)", whiteSpace: "pre-wrap" }}>
@@ -515,7 +515,7 @@ export default function RootPage() {
 
       {/* ── detector catalog ── */}
       <section className="border-t border-line px-8 py-12 max-w-5xl mx-auto">
-        <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>
+        <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>
           Detector catalog · {DETECTORS.length} algorithms
         </p>
         <div className="flex flex-wrap gap-x-3 gap-y-2">
@@ -540,7 +540,7 @@ export default function RootPage() {
       {/* ── code proof ── */}
       <section id="code" className="border-t border-line px-8 py-14" style={{ background: "var(--bg-1)" }}>
         <div className="max-w-5xl mx-auto">
-          <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Three lines to your first check.</p>
+          <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Three lines to your first check.</p>
           <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 24 }}>
             Runs in notebooks. Runs in CI.<br />No server required.
           </h2>
@@ -579,7 +579,7 @@ export default function RootPage() {
 
       {/* ── comparison table ── */}
       <section id="compare" className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
-        <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Where dqt sits.</p>
+        <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Where dqt sits.</p>
         <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
           We borrowed the best ideas.<br />Then shipped the parts they don&apos;t have.
         </h2>
@@ -624,7 +624,7 @@ export default function RootPage() {
       {/* ── integrations ── */}
       <section className="border-t border-line px-8 py-12" style={{ background: "var(--bg-1)" }}>
         <div className="max-w-5xl mx-auto">
-          <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>Drop it in next to the tools you already use.</p>
+          <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 16 }}>Drop it in next to the tools you already use.</p>
           <div className="border border-line" style={{ background: "var(--bg-0)" }}>
             {INTEGRATIONS.map((item, i) => (
               <div key={i} className="flex items-center gap-6 px-5 py-3 border-b border-line last:border-0">
