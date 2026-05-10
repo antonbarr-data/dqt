@@ -124,7 +124,7 @@ const CAPABILITIES = [
 
 const COMPARISON = [
   { label: "Open source (MIT)", dqt: true, gx: true, soda: "partial", elementary: true, dataplex: false },
-  { label: "30+ statistical detectors", dqt: true, gx: "~", soda: "limited", elementary: "~", dataplex: true },
+  { label: "Statistical & ML detectors (MAD, KS, IF…)", dqt: true, gx: "limited", soda: "limited", elementary: "limited", dataplex: "partial" },
   { label: "Column-level lineage", dqt: true, gx: false, soda: false, elementary: "partial", dataplex: true },
   { label: "Causal discovery", dqt: true, gx: false, soda: false, elementary: false, dataplex: false },
   { label: "AI-grounded incident explainer", dqt: true, gx: false, soda: false, elementary: "partial", dataplex: true },
@@ -680,10 +680,13 @@ export default function RootPage() {
       <section id="compare" className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
         <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Where dqt sits.</p>
         <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
-          We borrowed the best ideas.<br />Then shipped the parts they don&apos;t have.
+          Built on the shoulders of GE, Soda, and Elementary.<br />Different strengths, not a replacement.
         </h2>
-        <p style={{ fontSize: 13, color: "var(--fg-1)", marginBottom: 24, lineHeight: 1.6 }}>
-          Causal discovery isn&apos;t a nice-to-have — it&apos;s the difference between <em>&ldquo;orders are down&rdquo;</em> and <em>&ldquo;orders are down because the EU marketing-spend job missed its 06:00 run.&rdquo;</em>
+        <p style={{ fontSize: 13, color: "var(--fg-1)", marginBottom: 6, lineHeight: 1.6 }}>
+          GE and Soda have larger communities and more declarative checks. dqt goes deeper on statistical detection, lineage, and causal hypothesis generation — the layer that answers <em>&ldquo;why did this break?&rdquo;</em> rather than <em>&ldquo;did this break?&rdquo;</em>
+        </p>
+        <p style={{ fontSize: 12, color: "var(--fg-2)", marginBottom: 24, lineHeight: 1.6 }}>
+          Causal edges are proposed by the algorithm and confirmed by a human before entering the production DAG. They are starting points for investigation, not assertions.
         </p>
 
         <div className="border border-line overflow-x-auto" style={{ background: "var(--bg-1)" }}>
