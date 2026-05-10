@@ -5,7 +5,11 @@ nixPkgs = ["nodejs_20"]
 cmds = ["npm install --legacy-peer-deps"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = [
+  "npm run build",
+  "cp -r .next/static .next/standalone/.next/static",
+  "cp -r public .next/standalone/public",
+]
 
 [start]
 cmd = "HOSTNAME=0.0.0.0 node .next/standalone/server.js"
