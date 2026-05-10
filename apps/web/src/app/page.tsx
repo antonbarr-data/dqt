@@ -274,7 +274,7 @@ export default function RootPage() {
         </div>
 
         <h1 style={{ fontSize: "clamp(44px, 5.6vw, 78px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.05, color: "var(--fg-0)", maxWidth: 740 }}>
-          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> — and surfaces the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
+          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and surfaces the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
         <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 580, lineHeight: 1.7 }}>
