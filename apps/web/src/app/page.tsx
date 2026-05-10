@@ -797,7 +797,7 @@ export default function RootPage() {
           <p style={{ fontSize: 13, color: "var(--fg-2)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>About the author</p>
           <p style={{ fontSize: 15, color: "var(--fg-1)", lineHeight: 1.75 }}>
             <a href="https://www.linkedin.com/in/antonbar/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }} className="hover:opacity-70">Anton Barr</a>
-            {" "}is a data geek, getting things done since 1972 and vibe-coding at unreasonable hours. A student of <span style={{ color: "var(--accent)" }}>質</span> (shitsu): quality, substance, the inner nature of a thing. <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)", fontWeight: 500, letterSpacing: "-0.05em" }}>dqt</span> is a personal project — the data quality tool he kept wishing existed.
+            {" "}is an R&amp;D and data executive with 25+ years leading engineering, currently at Freightos. Getting things done since 1972 — and yes, still writing Python at unreasonable hours. A student of <span style={{ color: "var(--accent)" }}>質</span> (shitsu): quality, substance, the inner nature of a thing. <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)", fontWeight: 500, letterSpacing: "-0.05em" }}>dqt</span> is a personal project built by a practitioner who got tired of data quality tools that answer <em>what</em> but never <em>why</em>.
           </p>
         </div>
       </section>
