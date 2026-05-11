@@ -26,6 +26,7 @@ import dqt.algorithms.outliers_uni    # noqa: F401
 import dqt.algorithms.outliers_multi  # noqa: F401
 import dqt.algorithms.timeseries      # noqa: F401
 import dqt.algorithms.info            # noqa: F401
+import dqt.algorithms.pattern         # noqa: F401
 
 __all__ = [
     "__version__",
