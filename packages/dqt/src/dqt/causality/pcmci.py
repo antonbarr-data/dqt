@@ -150,8 +150,8 @@ def pcmci_pairwise(
         for j, effect in enumerate(usable):
             if i == j:
                 continue
-            p_slice = p_matrix[j, i, 1:]
-            v_slice = val_matrix[j, i, 1:]
+            p_slice = p_matrix[i, j, 1:]
+            v_slice = val_matrix[i, j, 1:]
             best_lag_idx = int(np.argmin(p_slice))
             raw_p = float(p_slice[best_lag_idx])
             val_min = float(v_slice[best_lag_idx])
