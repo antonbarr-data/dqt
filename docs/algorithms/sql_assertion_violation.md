@@ -24,26 +24,49 @@ Evaluates `NOT (condition)` for each row and returns the fraction of violations.
 
 ```python
 from dqt import Check, Runner, MemoryStore
-from dqt.algorithms.basic.sql_assertion import SQLAssertionViolationDetector
+from dqt.algorithms.basic.sql_assertion import SqlAssertionDetector
 
-det = SQLAssertionViolationDetector(
-    condition="amount > 0 AND status IS NOT NULL AND customer_id IS NOT NULL",
-    # condition is a SQL WHERE clause evaluated per row.
-    # every row that satisfies the condition is counted as a violation
-    # (score = violation fraction).
-    # use "amount > list_price * 1.05" to catch overbillings.
-    # can reference multiple columns.
-    # condition must be valid SQL for your warehouse engine.
+# Gigler: every booking must have a positive amount, known status, and a valid buyer
+det = SqlAssertionDetector(
+    condition="amount_paid_usd > 0 AND status IS NOT NULL AND buyer_id IS NOT NULL",
+    # Write the condition that should be TRUE for every valid row.
+    # Rows where the condition is FALSE are violations (score = violation fraction).
+    # Can reference any column in the table — no single-column restriction.
+    # Must be valid SQL for your warehouse engine (standard SQL works everywhere).
 )
 
 check = Check(
     schema_name="public",
-    table_name="orders",
+    table_name="fct_bookings",
     detector_slug="sql_assertion_violation",
-    params={"condition": "amount > 0 AND status IS NOT NULL AND customer_id IS NOT NULL"},
+    params={"condition": "amount_paid_usd > 0 AND status IS NOT NULL AND buyer_id IS NOT NULL"},
 )
-# result = Runner(MemoryStore()).run(check, adapter)
-# print(result.verdict)   # pass / warn / fail
+result = Runner(MemoryStore()).run(check, adapter)
+print(result.plain_english)
+# → "0/48231 rows fail: amount_paid_usd > 0 AND status IS NOT NULL AND buyer_id IS NOT NULL"
+```
+
+### More examples
+
+```python
+# Cross-column business rule: booking amount must not exceed 120% of the gig's listed price
+SqlAssertionDetector(condition="amount_paid_usd <= price_usd * 1.20")
+
+# Referential sanity without a JOIN: gig_id must be a positive integer
+SqlAssertionDetector(condition="gig_id > 0 AND gig_id IS NOT NULL")
+
+# Date ordering: booking must happen after the gig was created
+SqlAssertionDetector(condition="booked_at >= gig_created_at")
+```
+
+### YAML equivalent
+
+```yaml
+checks:
+  - kind: sql_assertion_violation
+    table: public.fct_bookings
+    condition: "amount_paid_usd > 0 AND status IS NOT NULL AND buyer_id IS NOT NULL"
+    fail_if: "> 0"        # zero tolerance for this rule
 ```
 
 ## Compatible with
@@ -55,7 +78,3 @@ check = Check(
 ## Implementation
 
 [`packages/dqt/src/dqt/algorithms/basic/sql_assertion.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/sql_assertion.py)
-
-## Source
-
-`packages/dqt/src/dqt/algorithms/basic/sql_assertion.py`
