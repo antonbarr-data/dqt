@@ -1,14 +1,13 @@
-import textwrap
-
+import yaml
 import pytest
+
+from dqt.checks.models import Check
+from dqt.compat.dbt_tests import checks_to_dbt_yaml
 
 
 @pytest.mark.unit
 def test_compile_to_dbt_yaml():
     """iqr_fence on a numeric column compiles to a dbt custom test."""
-    import yaml
-    from dqt.checks.models import Check
-    from dqt.compat.dbt_tests import checks_to_dbt_yaml
 
     checks = [
         Check(schema_name="analytics", table_name="orders",
@@ -36,9 +35,6 @@ def test_compile_to_dbt_yaml():
 @pytest.mark.unit
 def test_compile_null_fraction_maps_to_native_dbt():
     """null_fraction maps to dbt's built-in not_null test."""
-    import yaml
-    from dqt.checks.models import Check
-    from dqt.compat.dbt_tests import checks_to_dbt_yaml
 
     checks = [
         Check(schema_name="analytics", table_name="users",

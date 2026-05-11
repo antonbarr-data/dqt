@@ -13,9 +13,6 @@ _NATIVE_MAP: dict[str, str | None] = {
     "uniqueness_rate": "unique",
 }
 
-# dqt slugs that map to dbt's accepted_values (need values param)
-_ACCEPTED_VALUES_SLUG = "set_membership_violation"
-
 
 def checks_to_dbt_yaml(checks) -> str:
     """Convert a list of Check objects to a dbt schema.yml YAML string.
@@ -53,9 +50,7 @@ def checks_to_dbt_yaml(checks) -> str:
                 if native:
                     col_entry["tests"].append(native)
                 else:
-                    test_body: dict = {f"dqt_{check.detector_slug}": {}}
-                    if check.params:
-                        test_body[f"dqt_{check.detector_slug}"] = dict(check.params)
+                    test_body = {f"dqt_{check.detector_slug}": dict(check.params) if check.params else {}}
                     col_entry["tests"].append(test_body)
             model_entry["columns"].append(col_entry)
 
