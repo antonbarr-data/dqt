@@ -46,7 +46,7 @@ def test_granger_report_structure(causal_df):
     for e in d["edges"]:
         assert "cause" in e
         assert "effect" in e
-        assert "min_p_value" in e
+        assert "adjusted_p_value" in e
         assert "significant" in e
 
 
