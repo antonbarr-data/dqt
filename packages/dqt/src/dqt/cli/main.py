@@ -211,6 +211,27 @@ def _cmd_demo(_args: argparse.Namespace) -> None:
     _print(f"Details        : {result.details}")
 
 
+def _cmd_compile(args: argparse.Namespace) -> None:
+    """Compile a dqt YAML check file to the target format."""
+    from dqt.checks.loader import load_checks_file, CheckValidationError
+
+    try:
+        checks = load_checks_file(args.yaml_file)
+    except FileNotFoundError:
+        print(f"error: file not found: {args.yaml_file}", file=sys.stderr)
+        sys.exit(1)
+    except CheckValidationError as exc:
+        print(f"error: invalid check YAML: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.to == "dbt":
+        from dqt.compat.dbt_tests import checks_to_dbt_yaml
+        print(checks_to_dbt_yaml(checks))
+    else:
+        print(f"error: unknown target '{args.to}'", file=sys.stderr)
+        sys.exit(1)
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -234,6 +255,12 @@ def main() -> None:
     p_fit = sub.add_parser("fit", help="Validate a check YAML file and print fit targets")
     p_fit.add_argument("yaml_file", help="Path to the YAML check file")
 
+    # compile <yaml_file> --to dbt
+    p_compile = sub.add_parser("compile", help="Compile checks to another format (e.g. dbt)")
+    p_compile.add_argument("yaml_file", help="Path to the YAML check file")
+    p_compile.add_argument("--to", required=True, choices=["dbt"],
+                           help="Target format")
+
     # demo
     sub.add_parser("demo", help="Run a synthetic in-memory demo with wasserstein_1")
 
@@ -243,6 +270,7 @@ def main() -> None:
         "list-detectors": _cmd_list_detectors,
         "run": _cmd_run,
         "fit": _cmd_fit,
+        "compile": _cmd_compile,
         "demo": _cmd_demo,
     }
     dispatch[args.command](args)
