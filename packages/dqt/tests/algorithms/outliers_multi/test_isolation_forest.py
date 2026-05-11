@@ -14,6 +14,49 @@ def detector():
     return IsolationForestDetector(contamination=0.05)
 
 
+@pytest.mark.unit
+def test_isolation_forest_dirty_scores_higher_than_clean():
+    """Dirty data (with extreme outliers) must produce higher outlier fraction than clean data."""
+    rng = np.random.default_rng(42)
+    ref = pd.DataFrame({
+        "x": rng.normal(0, 1, 500),
+        "y": rng.normal(0, 1, 500),
+    })
+    from dqt.algorithms.outliers_multi.isolation_forest import IsolationForestDetector
+    det = IsolationForestDetector()
+    state = det.fit(ref)
+
+    clean = pd.DataFrame({
+        "x": rng.normal(0, 1, 200),
+        "y": rng.normal(0, 1, 200),
+    })
+    dirty_x = np.concatenate([rng.normal(0, 1, 170), rng.uniform(8, 12, 30)])
+    dirty_y = np.concatenate([rng.normal(0, 1, 170), rng.uniform(8, 12, 30)])
+    dirty = pd.DataFrame({"x": dirty_x, "y": dirty_y})
+
+    clean_result = det.score(clean, state)
+    dirty_result = det.score(dirty, state)
+
+    assert dirty_result.score > clean_result.score, (
+        f"Dirty ({dirty_result.score:.3f}) must exceed clean ({clean_result.score:.3f})"
+    )
+    assert dirty_result.score > 0.08, \
+        f"Expected >8% on dirty data (15% true outliers), got {dirty_result.score:.1%}"
+
+
+@pytest.mark.unit
+def test_isolation_forest_result_structure():
+    """Result has required keys and score is in [0, 1]."""
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"a": rng.normal(0, 1, 100), "b": rng.normal(5, 2, 100)})
+    from dqt.algorithms.outliers_multi.isolation_forest import IsolationForestDetector
+    det = IsolationForestDetector()
+    state = det.fit(df)
+    result = det.score(df, state)
+    assert 0.0 <= result.score <= 1.0
+    assert result.details["n_rows"] == 100
+
+
 def test_if_detects_outliers(detector):
     rng = np.random.default_rng(42)
     clean = rng.normal(0, 1, (900, 3))

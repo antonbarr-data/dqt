@@ -1,11 +1,11 @@
 # Ref: Liu et al. (2008) ICDM — Isolation Forest; sklearn implementation
-# score_samples() returns raw anomaly scores; threshold derived from reference percentile so
-# the detector measures "how anomalous vs baseline" rather than always returning contamination%.
+# Uses predict() so sklearn's internally calibrated threshold (set at fit time so that
+# contamination% of training points are labeled outliers) is used — dirty test data
+# returns a strictly higher outlier fraction than clean data from the same distribution.
 from __future__ import annotations
 
 from typing import ClassVar
 
-import numpy as np
 import pandas as pd
 
 from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState
@@ -25,19 +25,11 @@ class IsolationForestDetector(BaseDetector):
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         from sklearn.ensemble import IsolationForest
         X = reference.select_dtypes(include="number").fillna(0.0)
-        # contamination='auto' avoids baking the expected-fraction into the model's
-        # internal threshold — we derive our own threshold from score_samples().
-        model = IsolationForest(contamination="auto", random_state=42, n_estimators=100)
+        model = IsolationForest(contamination=self._contamination, random_state=42, n_estimators=100)
         model.fit(X)
-        ref_scores = model.score_samples(X)
-        # Threshold = contamination-percentile of reference scores.
-        # Values below this on NEW data are flagged; clean data returns ≈contamination%,
-        # anomalous data returns significantly more.
-        threshold = float(np.percentile(ref_scores, self._contamination * 100))
         return {
             "model": model,
             "columns": list(X.columns),
-            "threshold": threshold,
             "contamination": self._contamination,
         }
 
@@ -48,8 +40,8 @@ class IsolationForestDetector(BaseDetector):
         if missing:
             raise ValueError(f"IsolationForest: columns missing in current data: {missing}")
         X = current[cols].fillna(0.0)
-        raw_scores = model.score_samples(X)
-        outlier_frac = float(np.mean(raw_scores < state["threshold"]))
+        predictions = model.predict(X)
+        outlier_frac = float((predictions == -1).mean())
         return DetectorResult(
             score=outlier_frac,
             verdict=self._verdict(outlier_frac),
@@ -58,6 +50,5 @@ class IsolationForestDetector(BaseDetector):
                 "outlier_fraction": outlier_frac,
                 "n_rows": len(X),
                 "n_features": len(cols),
-                "threshold": state["threshold"],
             },
         )
