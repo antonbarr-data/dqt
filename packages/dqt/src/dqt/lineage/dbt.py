@@ -5,12 +5,12 @@ Column-level edges use sqlglot.lineage (optional; degrades to table-level if una
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 
 from dqt.lineage.models import LineageEdge, LineageGraph, LineageNode
+from dqt.utils.logging import get_logger
 
-_log = logging.getLogger(__name__)
+_log = get_logger(__name__)
 
 
 def _column_edges_from_compiled_sql(
@@ -39,6 +39,7 @@ def _column_edges_from_compiled_sql(
     name_to_dep: dict[str, str] = {name.lower(): uid for uid, name in dep_nodes}
 
     results: list[LineageEdge] = []
+    seen: set[tuple[str, str]] = set()
     try:
         col_nodes = sqlglot_lineage(None, compiled_sql)
     except Exception as exc:
@@ -68,6 +69,10 @@ def _column_edges_from_compiled_sql(
             src_col_id = f"{dep_uid}.{src_col}"
             if src_col_id not in known_col_node_ids:
                 continue
+            key = (src_col_id, tgt_col_id)
+            if key in seen:
+                continue
+            seen.add(key)
             results.append(LineageEdge(
                 source=src_col_id,
                 target=tgt_col_id,
@@ -136,8 +141,8 @@ def from_dbt_manifest(manifest_path: str | Path) -> LineageGraph:
     for unique_id, node in all_entries.items():
         if node.get("resource_type", "") != "model":
             continue
-        compiled_sql: str = node.get("compiled_code", "") or node.get("compiled_sql", "")
-        if not compiled_sql.strip():
+        compiled_sql = (node.get("compiled_code") or node.get("compiled_sql") or "").strip()
+        if not compiled_sql:
             continue
         if not node.get("columns"):
             continue

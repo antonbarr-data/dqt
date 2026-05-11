@@ -1,5 +1,9 @@
 import json
 import pathlib
+import sys
+import unittest.mock
+
+import pytest
 
 
 def _write_manifest(tmp_path: pathlib.Path, manifest: dict) -> pathlib.Path:
@@ -8,6 +12,7 @@ def _write_manifest(tmp_path: pathlib.Path, manifest: dict) -> pathlib.Path:
     return p
 
 
+@pytest.mark.unit
 def test_column_level_edges_extracted(tmp_path):
     """from_dbt_manifest should produce column-kind LineageNodes when compiled_code is present."""
     from dqt.lineage.dbt import from_dbt_manifest
@@ -52,7 +57,6 @@ def test_column_level_edges_extracted(tmp_path):
     column_edges = [e for e in graph.edges if e.kind == "column_derived_from"]
     assert len(column_edges) > 0, "Expected column-level edges"
 
-    # The 'amount' column in orders must link back to raw_orders.amount
     amount_edge = next(
         (e for e in column_edges if "amount" in e.target and "orders" in e.target),
         None,
@@ -60,6 +64,7 @@ def test_column_level_edges_extracted(tmp_path):
     assert amount_edge is not None, "Expected column edge for 'amount'"
 
 
+@pytest.mark.unit
 def test_table_level_edges_still_present(tmp_path):
     """Table-level derived_from edges must still be produced alongside column edges."""
     from dqt.lineage.dbt import from_dbt_manifest
@@ -92,6 +97,7 @@ def test_table_level_edges_still_present(tmp_path):
     assert len(table_edges) > 0, "Expected table-level derived_from edges"
 
 
+@pytest.mark.unit
 def test_no_compiled_sql_degrades_to_table_level(tmp_path):
     """Models without compiled_code produce only table-level edges, not column edges."""
     from dqt.lineage.dbt import from_dbt_manifest
@@ -127,6 +133,48 @@ def test_no_compiled_sql_degrades_to_table_level(tmp_path):
     assert len(table_edges) == 1, "One table-level edge expected"
 
 
+@pytest.mark.unit
+def test_sqlglot_import_error_degrades_to_table_level(tmp_path):
+    """When sqlglot.lineage is unavailable, column edges are silently skipped."""
+    from dqt.lineage.dbt import from_dbt_manifest
+
+    manifest = {
+        "nodes": {
+            "model.proj.orders": {
+                "resource_type": "model",
+                "name": "orders",
+                "unique_id": "model.proj.orders",
+                "depends_on": {"nodes": ["source.proj.raw.raw_orders"]},
+                "compiled_code": "SELECT id, amount FROM raw.raw_orders",
+                "columns": {"id": {"name": "id"}, "amount": {"name": "amount"}},
+            }
+        },
+        "sources": {
+            "source.proj.raw.raw_orders": {
+                "resource_type": "source",
+                "name": "raw_orders",
+                "unique_id": "source.proj.raw.raw_orders",
+                "depends_on": {"nodes": []},
+                "columns": {"id": {"name": "id"}, "amount": {"name": "amount"}},
+            }
+        },
+    }
+    p = _write_manifest(tmp_path, manifest)
+
+    with unittest.mock.patch.dict(sys.modules, {"sqlglot.lineage": None}):
+        import importlib
+        import dqt.lineage.dbt as dbt_module
+        importlib.reload(dbt_module)
+        graph = dbt_module.from_dbt_manifest(p)
+
+    column_edges = [e for e in graph.edges if e.kind == "column_derived_from"]
+    assert len(column_edges) == 0, "No column edges expected when sqlglot.lineage absent"
+
+    table_edges = [e for e in graph.edges if e.kind == "derived_from"]
+    assert len(table_edges) == 1, "Table-level edge must still be produced"
+
+
+@pytest.mark.unit
 def test_multiple_upstream_tables(tmp_path):
     """Column edges are produced correctly when a model joins two sources."""
     from dqt.lineage.dbt import from_dbt_manifest
@@ -182,7 +230,6 @@ def test_multiple_upstream_tables(tmp_path):
     column_edges = [e for e in graph.edges if e.kind == "column_derived_from"]
     assert len(column_edges) > 0, "Expected column edges for join model"
 
-    # 'amount' should trace back to source orders.amount
     amount_edge = next(
         (e for e in column_edges if "amount" in e.target),
         None,
