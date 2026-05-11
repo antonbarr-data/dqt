@@ -2,8 +2,17 @@
 from dqt.algorithms.timeseries.bocpd import BOCPDDetector
 from dqt.algorithms.timeseries.cusum import CUSUMDetector
 from dqt.algorithms.timeseries.holt_winters import HoltWintersDetector
+from dqt.algorithms.timeseries.matrix_profile import MatrixProfileDetector
 from dqt.algorithms.timeseries.page_hinkley import PageHinkleyDetector
 from dqt.algorithms.timeseries.prophet_anomaly import ProphetAnomalyDetector
 from dqt.algorithms.timeseries.stl import STLAnomalyDetector
 
-__all__ = ["BOCPDDetector", "CUSUMDetector", "HoltWintersDetector", "PageHinkleyDetector", "ProphetAnomalyDetector", "STLAnomalyDetector"]
+__all__ = [
+    "BOCPDDetector",
+    "CUSUMDetector",
+    "HoltWintersDetector",
+    "MatrixProfileDetector",
+    "PageHinkleyDetector",
+    "ProphetAnomalyDetector",
+    "STLAnomalyDetector",
+]
