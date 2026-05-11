@@ -6,6 +6,7 @@ import Link from "next/link";
 import { getToken } from "@/lib/auth";
 
 const GITHUB_URL = "https://github.com/antonbarr-data/dqt";
+const REGISTRY_URL = "https://raw.githubusercontent.com/antonbarr-data/dqt/main/docs/registry.json";
 
 const LOGO_TOOLTIP = "質 (shitsu) — quality, substance, the inner nature of a thing. The kanji points to what something truly is, not how it appears. dqt is meant to work the same way: concerned with the truth of the data, not its surface. The mark is also a quiet acknowledgment of a tradition I have learned much from — one in which quality and craft are understood to be the same thing. — Anton Barr";
 
@@ -46,21 +47,26 @@ function LogoMark({ size = "nav" }: { size?: "nav" | "footer" }) {
   );
 }
 
-const DETECTORS = [
+const FALLBACK_DETECTORS = [
   // univariate outliers
   "mad_outlier_fraction", "double_mad_outlier_fraction", "zscore_outlier_fraction",
-  "adjusted_boxplot_fraction", "auto_outlier", "isolation_forest_fraction",
-  "iqr_fence", "grubbs", "generalized_esd",
-  // drift
+  "adjusted_boxplot_fraction", "auto_outlier", "iqr_fence", "grubbs", "generalized_esd",
+  // multivariate outliers
+  "isolation_forest_fraction", "mahalanobis_distance", "lof", "one_class_svm", "hbos", "ecod",
+  // drift & distribution shift
   "ks_pvalue", "wasserstein_1", "psi", "kl_divergence", "js_divergence", "chi_square_drift",
-  "outlier_fraction_drift",
-  // time series
-  "stl_residual_zscore",
-  // associations & pattern
-  "cramers_v", "benford_law_fit",
+  "outlier_fraction_drift", "mmd", "adwin",
+  // time series anomalies
+  "stl_residual_zscore", "cusum", "page_hinkley", "holt_winters", "prophet_anomaly", "bocpd", "matrix_profile",
+  // associations & information theory
+  "cramers_v", "mutual_information",
+  // pattern
+  "benford_law_fit",
+  // extension points
+  "callable_check", "remote_check",
 ];
 
-const SIMPLE_CHECKS = [
+const FALLBACK_CHECKS = [
   // nullness & completeness
   "null_fraction", "completeness", "date_part_missing_fraction",
   // uniqueness & volume
@@ -73,6 +79,8 @@ const SIMPLE_CHECKS = [
   "set_membership", "set_exclusion",
   // string & format
   "regex_match", "string_length_range", "string_case_violation", "date_format",
+  // validity
+  "validity",
   // relational
   "column_pair_comparison", "referential_integrity_rate",
   // structural & freshness
@@ -163,10 +171,26 @@ export default function RootPage() {
   const [tab, setTab] = useState<TabKey>("python");
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [detectors, setDetectors] = useState<string[]>(FALLBACK_DETECTORS);
+  const [checks, setChecks] = useState<string[]>(FALLBACK_CHECKS);
 
   useEffect(() => {
     if (getToken()) router.replace("/overview");
   }, [router]);
+
+  useEffect(() => {
+    fetch(REGISTRY_URL)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.detectors) && data.detectors.length > 0) {
+          setDetectors(data.detectors.map((d: { slug: string }) => d.slug));
+        }
+        if (Array.isArray(data.checks) && data.checks.length > 0) {
+          setChecks(data.checks.map((c: { slug: string }) => c.slug));
+        }
+      })
+      .catch(() => { /* keep fallback data */ });
+  }, []);
 
   function copyInstall() {
     navigator.clipboard.writeText("pip install dqtlib").then(() => {
@@ -400,11 +424,11 @@ export default function RootPage() {
       <section className="border-t border-b border-line" style={{ background: "var(--bg-1)" }}>
         <div className="grid grid-cols-2 md:grid-cols-4 mx-auto" style={{ maxWidth: 900 }}>
           {([
-            { value: "19", label: "detector algorithms", color: "var(--accent)", cls: "border-r border-b border-line md:border-b-0" },
-            { value: "25+", label: "declarative checks", color: "var(--accent)", cls: "border-b border-line md:border-b-0 md:border-r" },
+            { value: String(detectors.length), label: "detector algorithms", color: "var(--accent)", cls: "border-r border-b border-line md:border-b-0" },
+            { value: String(checks.length), label: "declarative checks", color: "var(--accent)", cls: "border-b border-line md:border-b-0 md:border-r" },
             { value: "9+", label: "warehouse engines", color: "var(--accent)", cls: "border-r border-line" },
             { value: "MIT", label: "no vendor lock-in", color: "var(--pass)", cls: "" },
-          ] as const).map((s) => (
+          ] as { value: string; label: string; color: string; cls: string }[]).map((s) => (
             <div key={s.label} className={`px-6 py-5 text-center ${s.cls}`}>
               <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 32, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
                 {s.value}
@@ -427,7 +451,7 @@ export default function RootPage() {
               You set a threshold. It fires. Slack lights up. Now you&apos;re bouncing between dbt docs, the warehouse, and your BI tool — trying to figure out which upstream model changed, whether the spike in nulls explains the dashboard regression, and whether this is worth waking the on-call engineer for.
             </p>
             <p style={{ fontSize: 14, color: "var(--fg-0)", lineHeight: 1.75 }}>
-              <strong>dqt was built for the part that comes after the alert.</strong> It reads your dbt manifest, parses your warehouse SQL into a column-level lineage graph, runs 19 statistical detectors, and discovers causal relationships across your metrics — so the next time something moves, you already know what moved it.
+              <strong>dqt was built for the part that comes after the alert.</strong> It reads your dbt manifest, parses your warehouse SQL into a column-level lineage graph, runs {detectors.length} statistical detectors and {checks.length} declarative checks, and discovers causal relationships across your metrics — so the next time something moves, you already know what moved it.
             </p>
           </div>
           <div className="space-y-3">
@@ -549,7 +573,7 @@ export default function RootPage() {
                 badge: "Context7",
                 href: "https://claude.com/plugins/context7",
                 title: "Up-to-date dqt docs",
-                desc: "Connects Claude Code to dqt's live documentation and source — all 38 detector slugs, the exact YAML schema, and adapter protocol. No training-data lag.",
+                desc: `Connects Claude Code to dqt's live documentation and source — all ${detectors.length + checks.length} detector and check slugs, the exact YAML schema, and adapter protocol. No training-data lag.`,
                 bullets: [
                   "Write checks from business rules",
                   "Pick the right detector for your data shape",
@@ -645,10 +669,10 @@ export default function RootPage() {
         <div className="space-y-8">
           <div>
             <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>
-              Statistical &amp; ML algorithms · {DETECTORS.length}
+              Statistical &amp; ML algorithms · {detectors.length}
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-2">
-              {DETECTORS.map((d) => (
+              {detectors.map((d) => (
                 <span
                   key={d}
                   style={{
@@ -667,10 +691,10 @@ export default function RootPage() {
           </div>
           <div>
             <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 12 }}>
-              Declarative checks · {SIMPLE_CHECKS.length}
+              Declarative checks · {checks.length}
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-2">
-              {SIMPLE_CHECKS.map((d) => (
+              {checks.map((d) => (
                 <span
                   key={d}
                   style={{

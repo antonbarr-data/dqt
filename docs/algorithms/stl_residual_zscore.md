@@ -45,17 +45,17 @@ from dqt.algorithms.timeseries.stl import STLAnomalyDetector
 rng = np.random.default_rng(42)
 dates = pd.date_range("2024-01-01", periods=120, freq="D")
 
-# clean weekly-seasonal signal
-trend = np.linspace(100, 110, 120)
-seasonal = 10 * np.sin(2 * np.pi * np.arange(120) / 7)
-noise = rng.normal(0, 1, 120)
-values = trend + seasonal + noise
+# fct_bookings — daily booking counts with a weekly seasonal pattern
+trend = np.linspace(300, 330, 120)
+seasonal = 50 * np.sin(2 * np.pi * np.arange(120) / 7)  # weekend dip
+noise = rng.normal(0, 5, 120)
+daily_bookings = trend + seasonal + noise
 
-ref = pd.DataFrame({"metric": values[:90]}, index=dates[:90])
-curr = pd.DataFrame({"metric": values[90:].copy()}, index=dates[90:])
+ref = pd.DataFrame({"booking_count": daily_bookings[:90]}, index=dates[:90])
+curr = pd.DataFrame({"booking_count": daily_bookings[90:].copy()}, index=dates[90:])
 
-# inject a spike on day 95
-curr.iloc[5, 0] += 40.0
+# inject a spike on day 95 — e.g. a flash sale drove a sudden surge
+curr.iloc[5, 0] += 400.0
 
 det = STLAnomalyDetector(period=7)
 state = det.fit(ref)
@@ -65,6 +65,10 @@ print(result.plain_english)  # "Max STL residual Z-score 18.43 (1 anomalous poin
 print(result.score)          # ~18.4
 print(result.details["anomaly_count"])  # 1
 ```
+
+## Learn more
+
+- 📺 [Robust Anomaly Detection + Seasonal-Trend Decomposition: Time Series Talk](https://www.youtube.com/watch?v=1NXryMoU7Ho) — demonstrates STL decomposition in Python, explains how the robust flag handles outliers during fitting, and shows residual-based anomaly detection.
 
 ## Reference
 

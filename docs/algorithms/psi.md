@@ -43,8 +43,9 @@ import numpy as np
 from dqt.algorithms.drift.psi import PSIDetector
 
 rng = np.random.default_rng(42)
-ref = pd.DataFrame({"score": rng.normal(0.5, 0.15, 2000)})
-curr_drift = pd.DataFrame({"score": rng.normal(0.65, 0.15, 2000)})  # shifted mean
+# fct_bookings.amount_paid_usd — credit-risk-style stability check on booking amounts
+ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 2000)})
+curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(100, 20, 2000)})  # shifted mean
 
 det = PSIDetector(n_bins=10)
 state = det.fit(ref)
@@ -53,6 +54,10 @@ print(result.verdict)        # warn or fail
 print(result.plain_english)  # "PSI = 0.2347 — significant population shift"
 print(result.score)          # ~0.23
 ```
+
+## Learn more
+
+- 📺 [Population Stability Index (PSI) for Scorecards | Monitor Model Drift in Python](https://www.youtube.com/watch?v=iWJcITAge-c) — shows how PSI is calculated bin-by-bin, explains the 0.1 / 0.2 thresholds, and demonstrates PSI monitoring in Python.
 
 ## Reference
 

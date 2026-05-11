@@ -43,19 +43,22 @@ import numpy as np
 from dqt.algorithms.outliers_multi.isolation_forest import IsolationForestDetector
 
 rng = np.random.default_rng(42)
-# reference — two correlated features, no anomalies
+# fct_gigs — multivariate anomaly detection across price, average rating, and delivery days
 ref = pd.DataFrame({
-    "amount": rng.normal(100, 10, 1000),
-    "latency_ms": rng.normal(200, 20, 1000),
+    "price_usd": rng.normal(50, 15, 1000),
+    "rating_avg": rng.normal(4.2, 0.4, 1000),
+    "delivery_days": rng.normal(3, 1, 1000),
 })
-# current — 8 % of rows are multivariate outliers (extreme in both dims)
+# current — 8% of gigs are anomalous (unusually high price + low rating + long delivery)
 curr_normal = pd.DataFrame({
-    "amount": rng.normal(100, 10, 920),
-    "latency_ms": rng.normal(200, 20, 920),
+    "price_usd": rng.normal(50, 15, 920),
+    "rating_avg": rng.normal(4.2, 0.4, 920),
+    "delivery_days": rng.normal(3, 1, 920),
 })
 curr_anom = pd.DataFrame({
-    "amount": rng.normal(500, 5, 80),
-    "latency_ms": rng.normal(1000, 5, 80),
+    "price_usd": rng.normal(500, 10, 80),
+    "rating_avg": rng.normal(1.5, 0.2, 80),
+    "delivery_days": rng.normal(30, 2, 80),
 })
 curr = pd.concat([curr_normal, curr_anom], ignore_index=True)
 
@@ -66,6 +69,10 @@ print(result.verdict)        # warn or fail
 print(result.plain_english)  # "8.0% of rows flagged as multivariate outliers by Isolation Forest"
 print(result.score)          # ~0.08
 ```
+
+## Learn more
+
+- 📺 [Isolation Forest: A Tree based approach for Outlier Detection (Clearly Explained)](https://www.youtube.com/watch?v=kqAxfOPlr1U) — explains how random splits isolate anomalies faster than normal points and derives the anomaly score from average path length.
 
 ## Reference
 

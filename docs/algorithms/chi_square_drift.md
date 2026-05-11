@@ -45,13 +45,13 @@ import numpy as np
 from dqt.algorithms.drift.chi_square import ChiSquareDriftDetector
 
 rng = np.random.default_rng(42)
-# reference: balanced three-way split
-ref_cats = rng.choice(["A", "B", "C"], size=1000, p=[0.33, 0.34, 0.33])
-ref = pd.DataFrame({"status": ref_cats})
+# fct_reviews.rating — detect shifts in the 1-5 rating distribution on Gigler
+ref_ratings = rng.choice([1, 2, 3, 4, 5], size=1000, p=[0.05, 0.10, 0.20, 0.40, 0.25])
+ref = pd.DataFrame({"rating": ref_ratings.astype(str)})
 
-# current: category C nearly disappears (mass shifts to A)
-curr_cats = rng.choice(["A", "B", "C"], size=1000, p=[0.55, 0.40, 0.05])
-curr_drift = pd.DataFrame({"status": curr_cats})
+# current: ratings deteriorate — 1s and 2s surge, 5s collapse
+curr_ratings = rng.choice([1, 2, 3, 4, 5], size=1000, p=[0.20, 0.25, 0.25, 0.20, 0.10])
+curr_drift = pd.DataFrame({"rating": curr_ratings.astype(str)})
 
 det = ChiSquareDriftDetector()
 state = det.fit(ref)
@@ -60,9 +60,15 @@ print(result.verdict)        # fail
 print(result.plain_english)  # "Chi-square test p=0.0000 — categorical drift detected"
 print(result.score)          # ~1.0
 
-curr_stable = pd.DataFrame({"status": rng.choice(["A", "B", "C"], 1000, p=[0.33, 0.34, 0.33])})
+curr_stable = pd.DataFrame({
+    "rating": rng.choice([1, 2, 3, 4, 5], 1000, p=[0.05, 0.10, 0.20, 0.40, 0.25]).astype(str)
+})
 print(det.score(curr_stable, state).verdict)  # pass
 ```
+
+## Learn more
+
+- 📺 [Chi-Square Test: clearly explained](https://www.youtube.com/watch?v=YoZlIQFcggk) — explains the chi-square goodness-of-fit test, degrees of freedom, and how to read the p-value for categorical frequency comparisons.
 
 ## Reference
 

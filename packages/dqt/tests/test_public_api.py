@@ -14,7 +14,7 @@ def test_public_imports():
     assert hasattr(dqt, "BaselineConfig")
     assert hasattr(dqt, "Runner")
     assert hasattr(dqt, "__version__")
-    assert dqt.__version__ == "0.1.0"
+    assert dqt.__version__ == "0.1.4"
 
 
 def test_all_core_detectors_registered():

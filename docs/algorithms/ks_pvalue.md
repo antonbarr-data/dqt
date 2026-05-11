@@ -45,9 +45,10 @@ import numpy as np
 from dqt.algorithms.drift.ks2sample import KS2SampleDetector
 
 rng = np.random.default_rng(42)
-ref = pd.DataFrame({"value": rng.normal(100, 10, 1000)})
-curr_drift = pd.DataFrame({"value": rng.normal(115, 10, 1000)})  # 1.5σ mean shift
-curr_stable = pd.DataFrame({"value": rng.normal(100, 10, 1000)})
+# fct_bookings.amount_paid_usd — detect booking amount drift between two weekly windows
+ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 1000)})
+curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(100, 20, 1000)})  # mean shift (+$20)
+curr_stable = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 1000)})
 
 det = KS2SampleDetector()
 state = det.fit(ref)
@@ -61,6 +62,10 @@ result_stable = det.score(curr_stable, state)
 print(result_stable.verdict)       # pass
 print(result_stable.score)         # low value, e.g. 0.32
 ```
+
+## Learn more
+
+- 📺 [Kolmogorov-Smirnov Test Explained | Data Science Fundamentals](https://www.youtube.com/watch?v=VpQ6MLoRSfY) — explains the KS statistic as the maximum gap between two empirical CDFs and shows how the p-value is derived.
 
 ## Reference
 

@@ -46,13 +46,14 @@ from dqt.algorithms.pattern.benford import BenfordDetector
 
 rng = np.random.default_rng(42)
 
-# data conforming to Benford's Law: log-uniform spanning several orders of magnitude
-conforming = 10 ** rng.uniform(0, 6, 2000)
-curr_good = pd.DataFrame({"amount": conforming})
+# fct_bookings.amount_paid_usd — fraud detection on Gigler booking payments
+# legitimate payments span a natural range: Benford-conforming
+legitimate = 10 ** rng.uniform(0, 3, 2000)  # $1 – $1000
+curr_good = pd.DataFrame({"amount_paid_usd": legitimate})
 
-# fabricated data: amounts suspiciously clustered around multiples of 1000
-fabricated = rng.choice([1000, 2000, 3000, 5000, 10000], size=2000)
-curr_bad = pd.DataFrame({"amount": fabricated.astype(float)})
+# fabricated payments: amounts suspiciously clustered around round numbers
+fabricated = rng.choice([100.0, 200.0, 500.0, 1000.0, 2000.0], size=2000)
+curr_bad = pd.DataFrame({"amount_paid_usd": fabricated})
 
 det = BenfordDetector()
 state = det.fit(curr_good)  # fit is a no-op; state is empty
@@ -67,6 +68,10 @@ print(result_bad.verdict)         # fail
 print(result_bad.plain_english)   # "Benford's Law chi-square p=0.0000 — deviation detected"
 print(result_bad.score)           # ~1.0
 ```
+
+## Learn more
+
+- 📺 [How to Detect Fraud Using Benford's Law](https://www.youtube.com/watch?v=7uhAn19V1EY) — explains the logarithmic first-digit law, shows how fabricated or manipulated numbers violate it, and demonstrates a forensic accounting workflow.
 
 ## Reference
 

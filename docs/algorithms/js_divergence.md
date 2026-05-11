@@ -43,8 +43,9 @@ import numpy as np
 from dqt.algorithms.drift.divergence import JSDivergenceDetector
 
 rng = np.random.default_rng(42)
-ref = pd.DataFrame({"value": rng.normal(0.0, 1.0, 2000)})
-curr_drift = pd.DataFrame({"value": rng.normal(1.0, 1.0, 2000)})  # 1σ mean shift
+# fct_bookings.amount_paid_usd — symmetric drift score for booking amount distributions
+ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 2000)})
+curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(100, 20, 2000)})  # 1σ mean shift
 
 det = JSDivergenceDetector(n_bins=10)
 state = det.fit(ref)
@@ -54,11 +55,15 @@ print(result.plain_english)  # "JS distance = 0.1742 — drift detected"
 print(result.score)          # ~0.17
 
 # stable window
-curr_stable = pd.DataFrame({"value": rng.normal(0.0, 1.0, 2000)})
+curr_stable = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 2000)})
 result_stable = det.score(curr_stable, state)
 print(result_stable.verdict)  # pass
 print(result_stable.score)    # near 0
 ```
+
+## Learn more
+
+- 📺 [Jensen–Shannon (JS) Divergence for Machine Learning | Relation with KL Divergence | Explained](https://www.youtube.com/watch?v=0wtJNYaTB-8) — derives JS divergence from KL, proves it is symmetric and bounded in [0, 1], and shows practical examples comparing distributions.
 
 ## Reference
 

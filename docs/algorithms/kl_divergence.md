@@ -43,11 +43,12 @@ import numpy as np
 from dqt.algorithms.drift.divergence import KLDivergenceDetector
 
 rng = np.random.default_rng(42)
-ref = pd.DataFrame({"value": rng.normal(0.0, 1.0, 2000)})
-# current: shifted mean and slightly wider — a new mode appears at +4
-curr_shifted = pd.DataFrame({"value": np.concatenate([
-    rng.normal(0.5, 1.0, 1900),
-    rng.normal(4.0, 0.3, 100),   # new mode
+# fct_bookings.amount_paid_usd — detect a new high-value tier emerging in booking amounts
+ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 2000)})
+# current: shifted mean + a new high-value mode (premium package launched)
+curr_shifted = pd.DataFrame({"amount_paid_usd": np.concatenate([
+    rng.normal(85, 20, 1900),
+    rng.normal(500, 10, 100),   # new premium tier
 ])})
 
 det = KLDivergenceDetector(n_bins=10)
@@ -57,6 +58,10 @@ print(result.verdict)        # warn or fail
 print(result.plain_english)  # "KL divergence = 0.1823 — drift detected"
 print(result.score)          # ~0.18
 ```
+
+## Learn more
+
+- 📺 [Intuitively Understanding the KL Divergence](https://www.youtube.com/watch?v=SxGYPqCgJWM) — builds geometric intuition for KL divergence, explains its asymmetry, and contrasts it with symmetric alternatives like JS divergence.
 
 ## Reference
 

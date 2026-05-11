@@ -28,7 +28,8 @@ class MADOutlierDetector(BaseDetector):
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         col = current.iloc[:, 0].dropna().to_numpy(dtype=float)
-        mod_z = _MAD_CONSISTENCY * np.abs(col - state["median"]) / state["mad"]
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            mod_z = _MAD_CONSISTENCY * np.abs(col - state["median"]) / state["mad"]
         mod_z = np.where(np.isfinite(mod_z), mod_z, np.finfo(float).max)
         outlier_frac = float(np.mean(mod_z > self._threshold))
         return DetectorResult(

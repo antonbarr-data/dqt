@@ -42,14 +42,16 @@ import pandas as pd
 from dqt import Check, Runner, MemoryStore
 from dqt.adapters.duckdb import DuckDBAdapter
 
-# Normally distributed data with one spike
-df = pd.DataFrame({"amount": [100, 102, 98, 101, 99, 103, 500]})  # 500 is the spike
+# fct_gigs.price_usd — spike detection on near-normally distributed gig prices
+df = pd.DataFrame({
+    "price_usd": [25, 30, 28, 32, 27, 29, 31, 26, 30, 500]  # 500 is the spike
+})
 adapter = DuckDBAdapter.from_dataframe(df)
 
 check = Check(
     schema_name="main",
-    table_name="data",
-    column_name="amount",
+    table_name="fct_gigs",
+    column_name="price_usd",
     detector_slug="zscore_outlier_fraction",
 )
 result = Runner(MemoryStore()).run(check, adapter)
@@ -57,6 +59,10 @@ print(result.verdict)         # pass / warn / fail
 print(result.plain_english)   # human-readable explanation
 print(result.score)           # raw score
 ```
+
+## Learn more
+
+- 📺 [How to Detect Outliers with Z Score | Clearly Explained](https://www.youtube.com/watch?v=Qv2vCviL4iU) — step-by-step walkthrough of the Z-score formula, the three-sigma rule, and when it fails on non-normal data.
 
 ## Reference
 

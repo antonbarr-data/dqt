@@ -42,14 +42,16 @@ import pandas as pd
 from dqt import Check, Runner, MemoryStore
 from dqt.adapters.duckdb import DuckDBAdapter
 
-# Sample data with an outlier
-df = pd.DataFrame({"amount": [100, 102, 98, 101, 99, 103, 500]})  # 500 is the spike
+# fct_gigs.price_usd — detect pricing anomalies on the Gigler marketplace
+df = pd.DataFrame({
+    "price_usd": [25, 30, 28, 32, 27, 29, 31, 26, 30, 999]  # 999 is the spike
+})
 adapter = DuckDBAdapter.from_dataframe(df)
 
 check = Check(
     schema_name="main",
-    table_name="data",
-    column_name="amount",
+    table_name="fct_gigs",
+    column_name="price_usd",
     detector_slug="mad_outlier_fraction",
 )
 result = Runner(MemoryStore()).run(check, adapter)
@@ -57,6 +59,10 @@ print(result.verdict)         # pass / warn / fail
 print(result.plain_english)   # human-readable explanation
 print(result.score)           # raw score
 ```
+
+## Learn more
+
+- 📺 [How Is MAD Used To Detect Outliers? — The Friendly Statistician](https://www.youtube.com/watch?v=8WbvTy6XwG4) — walks through the modified Z-score formula using MAD and shows why it outperforms standard deviation for heavy-tailed data.
 
 ## Reference
 

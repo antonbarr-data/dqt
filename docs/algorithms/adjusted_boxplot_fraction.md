@@ -41,14 +41,16 @@ import pandas as pd
 from dqt import Check, Runner, MemoryStore
 from dqt.adapters.duckdb import DuckDBAdapter
 
-# Right-skewed latency data with a spike
-df = pd.DataFrame({"latency_ms": [10, 12, 9, 11, 10, 13, 15, 11, 12, 400]})
+# fct_gigs.price_usd — right-skewed prices where the standard IQR fence over-flags the tail
+df = pd.DataFrame({
+    "price_usd": [10, 12, 9, 11, 10, 13, 15, 11, 12, 400]  # 400 is the spike
+})
 adapter = DuckDBAdapter.from_dataframe(df)
 
 check = Check(
     schema_name="main",
-    table_name="data",
-    column_name="latency_ms",
+    table_name="fct_gigs",
+    column_name="price_usd",
     detector_slug="adjusted_boxplot_fraction",
 )
 result = Runner(MemoryStore()).run(check, adapter)
@@ -56,6 +58,10 @@ print(result.verdict)         # pass / warn / fail
 print(result.plain_english)   # human-readable explanation
 print(result.score)           # raw score
 ```
+
+## Learn more
+
+<!-- TODO: no simple YouTube explanation found -->
 
 ## Reference
 

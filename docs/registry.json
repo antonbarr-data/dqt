@@ -1,0 +1,522 @@
+{
+  "version": "0.1.4",
+  "total": 64,
+  "n_detectors": 35,
+  "n_checks": 29,
+  "detectors": [
+    {
+      "slug": "adjusted_boxplot_fraction",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction (adj. boxplot)",
+      "hint": "Fraction outside medcouple-adjusted Tukey fences; Hubert & Vandervieren 2008",
+      "kind": "sample"
+    },
+    {
+      "slug": "adwin",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "ADWIN drift signal",
+      "hint": "1.0=drift detected in current window, 0.0=stable",
+      "kind": "sample"
+    },
+    {
+      "slug": "auto_outlier",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "auto_outlier",
+      "hint": "",
+      "kind": "sample"
+    },
+    {
+      "slug": "benford_law_fit",
+      "group": "pattern",
+      "group_label": "Pattern Checks",
+      "label": "Benford's Law fit (1\u2212p)",
+      "hint": "1 \u2212 p-value from chi-square vs expected first-digit frequencies",
+      "kind": "sample"
+    },
+    {
+      "slug": "bocpd",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "Changepoint probability",
+      "hint": "Max posterior probability of a changepoint in the current window",
+      "kind": "sample"
+    },
+    {
+      "slug": "callable_check",
+      "group": "custom",
+      "group_label": "Extension Points",
+      "label": "Custom callable score",
+      "hint": "Score returned by user-supplied callable; thresholds configurable via warn_threshold/fail_threshold on the Check",
+      "kind": "sample"
+    },
+    {
+      "slug": "chi_square_drift",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "Chi-square drift (1\u2212p)",
+      "hint": "1 \u2212 p-value from chi-square test for categorical drift; warn p<0.05, fail p<0.01",
+      "kind": "sample"
+    },
+    {
+      "slug": "cramers_v",
+      "group": "info",
+      "group_label": "Information Theory",
+      "label": "Cram\u00e9r's V (drift)",
+      "hint": "V from 2\u00d7k contingency table; 0=no drift, 1=maximum categorical drift",
+      "kind": "sample"
+    },
+    {
+      "slug": "cusum",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "CUSUM alarm level",
+      "hint": "Normalised CUSUM statistic; >1.0 moderate shift, >2.0 large shift",
+      "kind": "sample"
+    },
+    {
+      "slug": "double_mad_outlier_fraction",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction (double-MAD)",
+      "hint": "Fraction flagged by asymmetric double-MAD; robust on skewed distributions",
+      "kind": "sample"
+    },
+    {
+      "slug": "ecod",
+      "group": "outliers_multi",
+      "group_label": "Multivariate Outliers",
+      "label": "Outlier fraction (ECOD)",
+      "hint": "Fraction of rows with ECOD score above reference 95th percentile",
+      "kind": "sample"
+    },
+    {
+      "slug": "generalized_esd",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction (GESD)",
+      "hint": "Fraction of outliers found by Generalized ESD (Rosner 1983)",
+      "kind": "sample"
+    },
+    {
+      "slug": "grubbs",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Grubbs outlier (1\u2212p)",
+      "hint": "1 \u2212 p-value from Grubbs test; warn p<0.05, fail p<0.01",
+      "kind": "sample"
+    },
+    {
+      "slug": "hbos",
+      "group": "outliers_multi",
+      "group_label": "Multivariate Outliers",
+      "label": "Outlier fraction (HBOS)",
+      "hint": "Fraction of rows with HBOS score above reference 95th percentile",
+      "kind": "sample"
+    },
+    {
+      "slug": "holt_winters",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "Anomaly fraction (HW)",
+      "hint": "Fraction of current values outside Holt-Winters prediction interval",
+      "kind": "sample"
+    },
+    {
+      "slug": "iqr_fence",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction (IQR)",
+      "hint": "Fraction of values outside Tukey IQR fences; k=1.5 by default",
+      "kind": "sample"
+    },
+    {
+      "slug": "isolation_forest_fraction",
+      "group": "outliers_multi",
+      "group_label": "Multivariate Outliers",
+      "label": "Outlier fraction (IF)",
+      "hint": "Fraction of rows classified as anomalies by Isolation Forest",
+      "kind": "sample"
+    },
+    {
+      "slug": "js_divergence",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "Jensen-Shannon distance",
+      "hint": "JS distance (bounded [0,1]); 0=identical, 1=maximally different",
+      "kind": "sample"
+    },
+    {
+      "slug": "kl_divergence",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "KL divergence",
+      "hint": "Kullback\u2013Leibler divergence (binned); 0=identical distributions",
+      "kind": "sample"
+    },
+    {
+      "slug": "ks_pvalue",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "KS drift (1\u2212p)",
+      "hint": "1 \u2212 p-value from two-sample KS test; warn p<0.05, fail p<0.01",
+      "kind": "sample"
+    },
+    {
+      "slug": "lof",
+      "group": "outliers_multi",
+      "group_label": "Multivariate Outliers",
+      "label": "Outlier fraction (LOF)",
+      "hint": "Fraction of rows with LOF > threshold; warn 5%, fail 10%",
+      "kind": "sample"
+    },
+    {
+      "slug": "mad_outlier_fraction",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction (MAD)",
+      "hint": "Fraction of values with |modified Z| > 3.5",
+      "kind": "sample"
+    },
+    {
+      "slug": "mahalanobis_distance",
+      "group": "outliers_multi",
+      "group_label": "Multivariate Outliers",
+      "label": "Outlier fraction (Mahal.)",
+      "hint": "Fraction of rows outside chi-square critical ellipsoid at p=0.01",
+      "kind": "sample"
+    },
+    {
+      "slug": "matrix_profile",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "Discord fraction (MP)",
+      "hint": "Fraction of subsequences whose nearest-neighbour distance exceeds reference 95th percentile",
+      "kind": "sample"
+    },
+    {
+      "slug": "mmd",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "MMD drift",
+      "hint": "Maximum Mean Discrepancy; 0=identical, 1=maximally different",
+      "kind": "sample"
+    },
+    {
+      "slug": "mutual_information",
+      "group": "info",
+      "group_label": "Information Theory",
+      "label": "Mutual information (norm.)",
+      "hint": "Normalized MI between periods; higher=more similar; warn<0.50, fail<0.30",
+      "kind": "sample"
+    },
+    {
+      "slug": "one_class_svm",
+      "group": "outliers_multi",
+      "group_label": "Multivariate Outliers",
+      "label": "Outlier fraction (OC-SVM)",
+      "hint": "Fraction of rows classified as outliers by One-Class SVM",
+      "kind": "sample"
+    },
+    {
+      "slug": "outlier_fraction_drift",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction drift",
+      "hint": "Deviation of current outlier fraction from historical baseline range",
+      "kind": "sample"
+    },
+    {
+      "slug": "page_hinkley",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "Page-Hinkley alarm",
+      "hint": "Normalised PH statistic; alarm when PH\u2212min(PH) exceeds threshold",
+      "kind": "sample"
+    },
+    {
+      "slug": "prophet_anomaly",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "Anomaly fraction (Prophet)",
+      "hint": "Fraction of current values outside Prophet uncertainty interval",
+      "kind": "sample"
+    },
+    {
+      "slug": "psi",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "Population Stability Index",
+      "hint": "PSI<0.1 stable, 0.1\u20130.2 moderate shift, >0.2 significant population shift",
+      "kind": "sample"
+    },
+    {
+      "slug": "remote_check",
+      "group": "custom",
+      "group_label": "Extension Points",
+      "label": "Remote endpoint score",
+      "hint": "Score returned by external HTTP endpoint; must return {\"score\": float}",
+      "kind": "sample"
+    },
+    {
+      "slug": "stl_residual_zscore",
+      "group": "timeseries",
+      "group_label": "Time Series Anomalies",
+      "label": "STL residual Z-score",
+      "hint": "Max absolute Z-score of STL residuals over the current window",
+      "kind": "sample"
+    },
+    {
+      "slug": "wasserstein_1",
+      "group": "drift",
+      "group_label": "Distribution Drift",
+      "label": "Wasserstein-1 (norm.)",
+      "hint": "Earth-mover distance normalized by reference std; 0.2=moderate shift, 0.5=large",
+      "kind": "sample"
+    },
+    {
+      "slug": "zscore_outlier_fraction",
+      "group": "outliers_uni",
+      "group_label": "Univariate Outliers",
+      "label": "Outlier fraction (Z-score)",
+      "hint": "Fraction of values with |Z| > threshold; valid only under normality",
+      "kind": "sample"
+    }
+  ],
+  "checks": [
+    {
+      "slug": "cardinality_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Cardinality in bounds",
+      "hint": "1.0 when COUNT(DISTINCT col) outside [min, max]",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "column_pair_comparison",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "column_pair_comparison",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "completeness",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "completeness",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "composite_uniqueness",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "composite_uniqueness",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "date_format",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "date_format",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "date_part_missing_fraction",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Date-part completeness",
+      "hint": "Fraction of expected date buckets with no data",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "freshness_seconds_behind",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Data freshness",
+      "hint": "Seconds since the most recent row timestamp",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "max_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Max in bounds",
+      "hint": "1.0 when MAX(col) outside [min, max]; 0.0 otherwise",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "median_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Median in bounds",
+      "hint": "1.0 when median outside [min, max]",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "min_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Min in bounds",
+      "hint": "1.0 when MIN(col) outside [min, max]; 0.0 otherwise",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "monotonicity",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "monotonicity",
+      "hint": "",
+      "kind": "sample"
+    },
+    {
+      "slug": "null_fraction",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Null fraction",
+      "hint": "Fraction of rows where the column is NULL",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "numeric_mean",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "numeric_mean",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "quantile_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Quantile in bounds",
+      "hint": "1.0 when specified quantile outside [min, max]",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "referential_integrity_rate",
+      "group": "referential",
+      "group_label": "Referential Integrity",
+      "label": "Referential integrity",
+      "hint": "Fraction of FK values present in parent table",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "regex_match",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "regex_match",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "row_count_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Row count in range",
+      "hint": "1.0 if row count in the date window is outside [min_rows, max_rows]; 0.0 if within range",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "schema_change",
+      "group": "schema",
+      "group_label": "Schema Checks",
+      "label": "Schema change",
+      "hint": "1.0 if schema changed, 0.0 if unchanged",
+      "kind": "sample"
+    },
+    {
+      "slug": "set_exclusion",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "set_exclusion",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "set_membership",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "set_membership",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "sql_assertion_violation",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "SQL assertion violation",
+      "hint": "Fraction of rows failing the custom SQL condition",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "stddev_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Stddev in bounds",
+      "hint": "1.0 when STDDEV outside [min, max]",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "string_case_violation",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "String case violation",
+      "hint": "Fraction of rows with wrong case",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "string_length_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "string_length_range",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "sum_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "Sum in bounds",
+      "hint": "1.0 when SUM outside [min, max]",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "uniqueness",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "uniqueness",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "validity",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "validity",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "value_in_range",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "value_in_range",
+      "hint": "",
+      "kind": "aggregate"
+    },
+    {
+      "slug": "volume",
+      "group": "basic",
+      "group_label": "Data Quality Basics",
+      "label": "volume",
+      "hint": "",
+      "kind": "aggregate"
+    }
+  ]
+}

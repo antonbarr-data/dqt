@@ -1045,7 +1045,6 @@ dependencies = [
     { name = "arq" },
     { name = "asyncpg" },
     { name = "cryptography" },
-    { name = "dqtlib", extra = ["postgres"] },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "gunicorn" },
@@ -1066,7 +1065,6 @@ requires-dist = [
     { name = "arq", specifier = ">=0.26" },
     { name = "asyncpg", specifier = ">=0.29" },
     { name = "cryptography", specifier = ">=42.0" },
-    { name = "dqtlib", extras = ["postgres"], editable = "packages/dqt" },
     { name = "email-validator", specifier = ">=2.1" },
     { name = "fastapi", specifier = ">=0.111" },
     { name = "gunicorn", specifier = ">=22.0" },
@@ -1134,7 +1132,7 @@ dev = [
 
 [[package]]
 name = "dqtlib"
-version = "0.1.2"
+version = "0.1.4"
 source = { editable = "packages/dqt" }
 dependencies = [
     { name = "diptest" },

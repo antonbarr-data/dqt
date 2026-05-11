@@ -41,14 +41,16 @@ import pandas as pd
 from dqt import Check, Runner, MemoryStore
 from dqt.adapters.duckdb import DuckDBAdapter
 
-# Right-skewed revenue column with a high-end outlier
-df = pd.DataFrame({"revenue": [50, 52, 49, 55, 48, 60, 54, 51, 53, 5000]})
+# fct_gigs.price_usd — right-skewed gig prices with a high-end anomaly
+df = pd.DataFrame({
+    "price_usd": [25, 30, 28, 32, 27, 29, 31, 26, 30, 5000]  # 5000 is the spike
+})
 adapter = DuckDBAdapter.from_dataframe(df)
 
 check = Check(
     schema_name="main",
-    table_name="data",
-    column_name="revenue",
+    table_name="fct_gigs",
+    column_name="price_usd",
     detector_slug="double_mad_outlier_fraction",
 )
 result = Runner(MemoryStore()).run(check, adapter)
@@ -56,6 +58,10 @@ print(result.verdict)         # pass / warn / fail
 print(result.plain_english)   # human-readable explanation
 print(result.score)           # raw score
 ```
+
+## Learn more
+
+- 📺 [How Is MAD Used To Detect Outliers? — The Friendly Statistician](https://www.youtube.com/watch?v=8WbvTy6XwG4) — covers MAD-based outlier detection including the double-MAD extension for asymmetric distributions.
 
 ## Reference
 

@@ -125,3 +125,48 @@ def _classify(
     if skewness < -0.5:
         return DistributionType.SKEWED_NEGATIVE
     return DistributionType.UNKNOWN
+
+
+def profile_dataframe(df: "pd.DataFrame") -> dict:
+    """
+    Run distribution profiling on every numeric column in df.
+
+    Returns a dict mapping column name → profile dict, plus summary stats.
+
+    Example (Gigler marketplace data)::
+
+        import pandas as pd, numpy as np
+        from dqt.algorithms.distribution.profiler import profile_dataframe
+
+        rng = np.random.default_rng(42)
+        df = pd.DataFrame({
+            "gig_price": rng.lognormal(4, 0.8, 1000),
+            "rating": np.clip(rng.normal(4.2, 0.5, 1000), 1, 5),
+            "response_time_h": rng.exponential(2, 1000),
+        })
+        report = profile_dataframe(df)
+        for col, info in report["columns"].items():
+            print(col, "→", info["distribution_type"])
+    """
+    import pandas as pd  # noqa: PLC0415 — lazy import keeps top-level pandas optional
+
+    result: dict = {"columns": {}, "n_rows": len(df), "n_numeric_columns": 0}
+    numeric_cols = df.select_dtypes(include="number").columns
+    result["n_numeric_columns"] = len(numeric_cols)
+    for col in numeric_cols:
+        values = df[col].dropna().to_numpy(dtype=float)
+        if len(values) < 3:
+            result["columns"][col] = {"error": "too few values", "n": len(values)}
+            continue
+        profile = classify_distribution(values)
+        result["columns"][col] = {
+            "distribution_type": profile.distribution_type.value,
+            "skewness": round(profile.skewness, 4),
+            "excess_kurtosis": round(profile.excess_kurtosis, 4),
+            "medcouple": round(profile.medcouple, 4),
+            "is_normal": profile.is_normal,
+            "is_uniform": profile.is_uniform,
+            "is_multimodal": profile.is_multimodal,
+            "n": profile.sample_size,
+        }
+    return result

@@ -45,13 +45,14 @@ import numpy as np
 from dqt.algorithms.info.cramers_v import CramersVDetector
 
 rng = np.random.default_rng(42)
-# reference: roughly balanced across 4 categories
-ref_cats = rng.choice(["A", "B", "C", "D"], size=2000, p=[0.25, 0.25, 0.25, 0.25])
-ref = pd.DataFrame({"category": ref_cats})
+# dim_sellers.tier vs fct_reviews.rating — measure drift in seller tier distribution
+# (here: tier is the categorical column being monitored)
+ref_tiers = rng.choice(["bronze", "silver", "gold"], size=2000, p=[0.60, 0.30, 0.10])
+ref = pd.DataFrame({"tier": ref_tiers})
 
-# current: D collapses, A takes its share
-curr_cats = rng.choice(["A", "B", "C", "D"], size=2000, p=[0.50, 0.25, 0.20, 0.05])
-curr_drift = pd.DataFrame({"category": curr_cats})
+# current: gold sellers surge (tier upgrade campaign ran last month)
+curr_tiers = rng.choice(["bronze", "silver", "gold"], size=2000, p=[0.40, 0.35, 0.25])
+curr_drift = pd.DataFrame({"tier": curr_tiers})
 
 det = CramersVDetector()
 state = det.fit(ref)
@@ -60,12 +61,16 @@ print(result.verdict)        # warn or fail
 print(result.plain_english)  # "Cramér's V = 0.2341 — categorical drift"
 print(result.score)          # ~0.23
 
-# stable window — same distribution as reference
+# stable window — same tier distribution as reference
 curr_stable = pd.DataFrame({
-    "category": rng.choice(["A", "B", "C", "D"], 2000, p=[0.25, 0.25, 0.25, 0.25])
+    "tier": rng.choice(["bronze", "silver", "gold"], 2000, p=[0.60, 0.30, 0.10])
 })
 print(det.score(curr_stable, state).verdict)  # pass
 ```
+
+## Learn more
+
+- 📺 [How to Calculate Cramer's V](https://www.youtube.com/watch?v=ckX8w7lWtGQ) — shows step-by-step how to build the contingency table, compute chi-square, and normalise to obtain Cramér's V as a bounded effect size.
 
 ## Reference
 

@@ -44,14 +44,16 @@ import pandas as pd
 from dqt import Check, Runner, MemoryStore
 from dqt.adapters.duckdb import DuckDBAdapter
 
-# Sample data with an outlier
-df = pd.DataFrame({"amount": [100, 102, 98, 101, 99, 103, 500]})  # 500 is the spike
+# fct_gigs.price_usd — small-sample check for a single anomalous gig price
+df = pd.DataFrame({
+    "price_usd": [25, 30, 28, 32, 27, 29, 31, 26, 30, 500]  # 500 is the spike
+})
 adapter = DuckDBAdapter.from_dataframe(df)
 
 check = Check(
     schema_name="main",
-    table_name="data",
-    column_name="amount",
+    table_name="fct_gigs",
+    column_name="price_usd",
     detector_slug="grubbs",
 )
 result = Runner(MemoryStore()).run(check, adapter)
@@ -59,6 +61,10 @@ print(result.verdict)         # pass / warn / fail
 print(result.plain_english)   # human-readable explanation
 print(result.score)           # 1 - p-value
 ```
+
+## Learn more
+
+- 📺 [Grubbs Outlier Test — Introduced and Demonstrated](https://www.youtube.com/watch?v=xernlERoj-w) — introduces the Grubbs statistic, shows how the t-distribution critical value is derived, and demonstrates detection with a worked example.
 
 ## Reference
 

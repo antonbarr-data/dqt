@@ -56,14 +56,16 @@ import pandas as pd
 from dqt import Check, Runner, MemoryStore
 from dqt.adapters.duckdb import DuckDBAdapter
 
-# Sample data with an outlier — distribution shape need not be known in advance
-df = pd.DataFrame({"amount": [100, 102, 98, 101, 99, 103, 500]})  # 500 is the spike
+# fct_gigs.price_usd — distribution shape unknown; auto_outlier selects the right method
+df = pd.DataFrame({
+    "price_usd": [25, 30, 28, 32, 27, 29, 31, 26, 30, 999]  # 999 is the spike
+})
 adapter = DuckDBAdapter.from_dataframe(df)
 
 check = Check(
     schema_name="main",
-    table_name="data",
-    column_name="amount",
+    table_name="fct_gigs",
+    column_name="price_usd",
     detector_slug="auto_outlier",
 )
 result = Runner(MemoryStore()).run(check, adapter)
@@ -73,6 +75,10 @@ print(result.score)                                # raw score
 print(result.details["auto_selected_method"])      # which detector was chosen
 print(result.details["distribution_type"])         # classified distribution type
 ```
+
+## Learn more
+
+<!-- TODO: no simple YouTube explanation found -->
 
 ## Reference
 
