@@ -75,13 +75,11 @@ def test_ks_stat_scale_verdict():
     assert compute_verdict(0.995, "ks_pvalue") == Verdict.fail
 
 
-def test_ks_plain_english_includes_sample_size():
-    from dqt.algorithms.drift.ks2sample import KS2SampleDetector
+def test_ks_plain_english_includes_sample_size(detector):
     rng = np.random.default_rng(42)
     ref = pd.DataFrame({"value": rng.normal(0, 1, 600)})
     curr = pd.DataFrame({"value": rng.normal(0, 1, 400)})
-    det = KS2SampleDetector()
-    state = det.fit(ref)
-    result = det.score(curr, state)
+    state = detector.fit(ref)
+    result = detector.score(curr, state)
     assert "n_ref=600" in result.plain_english
     assert "n_curr=400" in result.plain_english
