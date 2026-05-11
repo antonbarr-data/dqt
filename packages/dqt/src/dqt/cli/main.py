@@ -45,8 +45,58 @@ def _cmd_list_detectors(_args: argparse.Namespace) -> None:
             print(f"  {slug}")
 
 
+def _resolve_adapter(connection: str):
+    """Instantiate the correct WarehouseAdapter from a connection string."""
+    if connection.startswith("file://"):
+        from dqt.adapters.local import LocalFileAdapter
+        return LocalFileAdapter(connection[len("file://"):])
+    if connection.startswith("postgresql://") or connection.startswith("postgres://"):
+        from dqt.adapters.postgres.adapter import PostgresAdapter
+        return PostgresAdapter(connection)
+    raise ValueError(
+        f"Unsupported connection scheme: '{connection}'. "
+        "Supported: file://<path>, postgresql://<...>"
+    )
+
+
+def _results_to_json(results) -> str:
+    import json
+    return json.dumps({
+        "results": [
+            {
+                "check_id": str(r.check_id),
+                "detector_slug": r.detector_slug,
+                "verdict": r.verdict.value,
+                "score": r.score,
+                "plain_english": r.plain_english,
+            }
+            for r in results
+        ]
+    }, indent=2)
+
+
+def _results_to_junit(results) -> str:
+    from xml.etree.ElementTree import Element, SubElement, tostring
+    suites = Element("testsuites")
+    suite = SubElement(suites, "testsuite", name="dqt", tests=str(len(results)))
+    for r in results:
+        tc = SubElement(suite, "testcase", name=r.detector_slug,
+                        classname=str(r.check_id), time="0")
+        if r.verdict.value == "fail":
+            failure = SubElement(tc, "failure", message=r.plain_english)
+            failure.text = r.plain_english
+        elif r.verdict.value == "warn":
+            SubElement(tc, "system-out").text = r.plain_english
+    try:
+        from xml.etree.ElementTree import indent as et_indent
+        et_indent(suites)
+    except (ImportError, TypeError):
+        pass
+    return '<?xml version="1.0"?>\n' + tostring(suites, encoding="unicode")
+
+
 def _cmd_run(args: argparse.Namespace) -> None:
-    """Load a YAML check file and print what would run (adapter required to execute)."""
+    """Load a YAML check file. With --connection, execute checks against the adapter."""
     from dqt.checks.loader import load_checks_file, CheckValidationError
 
     try:
@@ -62,17 +112,44 @@ def _cmd_run(args: argparse.Namespace) -> None:
         print("No checks defined in file.")
         return
 
-    for check in checks:
-        print(
-            f"run: {check.detector_slug}  "
-            f"[{check.schema_name}.{check.table_name}"
-            + (f".{check.column_name}" if check.column_name else "")
-            + "]"
-        )
+    if not getattr(args, "connection", None):
+        for check in checks:
+            print(
+                f"run: {check.detector_slug}  "
+                f"[{check.schema_name}.{check.table_name}"
+                + (f".{check.column_name}" if check.column_name else "")
+                + "]"
+            )
+        print("\nNote: pass --connection <url> to execute checks.")
+        return
 
-    print(
-        "\nNote: adapter required to run — use the Python API with a WarehouseAdapter."
-    )
+    adapter = _resolve_adapter(args.connection)
+    from dqt.store.memory import MemoryStore
+    from dqt.runner.runner import Runner
+    runner = Runner(MemoryStore())
+
+    results = []
+    any_fail = False
+    for check in checks:
+        try:
+            result = runner.run(check, adapter)
+            results.append(result)
+            if result.verdict.value == "fail":
+                any_fail = True
+        except Exception as exc:
+            print(f"error running {check.detector_slug}: {exc}", file=sys.stderr)
+            any_fail = True
+
+    output_fmt = getattr(args, "output", "text")
+    if output_fmt == "json":
+        print(_results_to_json(results))
+    elif output_fmt == "junit":
+        print(_results_to_junit(results))
+    else:
+        for r in results:
+            print(f"[{r.verdict.value.upper():4s}] {r.detector_slug}: {r.plain_english}")
+
+    sys.exit(1 if any_fail else 0)
 
 
 def _cmd_fit(args: argparse.Namespace) -> None:
@@ -146,8 +223,12 @@ def main() -> None:
     sub.add_parser("list-detectors", help="List all registered detector slugs by group")
 
     # run <yaml_file>
-    p_run = sub.add_parser("run", help="Validate a check YAML file and print what would run")
+    p_run = sub.add_parser("run", help="Run checks; pass --connection to execute against an adapter")
     p_run.add_argument("yaml_file", help="Path to the YAML check file")
+    p_run.add_argument("--connection", default=None,
+                       help="Connection string, e.g. file:///path/to/data.csv or postgresql://...")
+    p_run.add_argument("--output", choices=["text", "json", "junit"], default="text",
+                       help="Output format (default: text)")
 
     # fit <yaml_file>
     p_fit = sub.add_parser("fit", help="Validate a check YAML file and print fit targets")
