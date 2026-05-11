@@ -189,3 +189,21 @@ def test_runner_filters_passed_to_adapter():
     runner.fit(check, adapter)
     call_kwargs = adapter.sample.call_args
     assert call_kwargs.kwargs.get("filters") is not None
+
+
+def test_power_warning_injected_below_min_n(fake_adapter):
+    """When N < min_recommended_n, plain_english includes a power warning."""
+    from dqt.runner.runner import Runner
+
+    # wasserstein_1 has min_recommended_n=500; fake_adapter returns 10 rows
+    check = Check(
+        schema_name="s", table_name="t", column_name="val",
+        detector_slug="wasserstein_1",
+    )
+    store = MemoryStore()
+    runner = Runner(store)
+    result = runner.run(check, fake_adapter)
+    assert "[low-power:" in result.plain_english, (
+        f"Expected low-power prefix, got: {result.plain_english!r}"
+    )
+    assert "N=10" in result.plain_english

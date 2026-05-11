@@ -61,6 +61,9 @@ class BaseDetector:
     slug: ClassVar[str]
     group: ClassVar[str]
     kind: ClassVar[str] = "sample"
+    # Minimum N for reliable results. Runner prepends a low-power warning when
+    # len(current_df) < min_recommended_n.
+    min_recommended_n: ClassVar[int] = 30
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         raise NotImplementedError
@@ -70,6 +73,16 @@ class BaseDetector:
 
     def _verdict(self, score: float) -> Verdict:
         return compute_verdict(score, self.slug)
+
+    def suggest_threshold(
+        self,
+        reference_df: "pd.DataFrame",
+        target_fpr: float = 0.001,
+        n_bootstrap: int = 200,
+    ) -> dict:
+        """Bootstrap-calibrate a score threshold for target false-positive rate on clean data."""
+        from dqt.algorithms._calibration import suggest_threshold as _suggest
+        return _suggest(self, reference_df, target_fpr=target_fpr, n_bootstrap=n_bootstrap)
 
 
 class BaseAggregateDetector(BaseDetector):

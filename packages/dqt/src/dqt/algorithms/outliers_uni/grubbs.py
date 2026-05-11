@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from typing import ClassVar
+
 from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState, Verdict
 from dqt.algorithms._registry import registry
 
@@ -34,6 +36,7 @@ class GrubbsDetector(BaseDetector):
     """Grubbs' test for a single outlier. Score = 1 − p-value; warn p<0.05, fail p<0.01."""
     slug = "grubbs"
     group = "outliers_uni"
+    min_recommended_n: ClassVar[int] = 25
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         return {}
@@ -88,6 +91,7 @@ class GeneralizedESDDetector(BaseDetector):
     """Rosner Generalized ESD test for up to max_outliers outliers. Score = outlier fraction."""
     slug = "generalized_esd"
     group = "outliers_uni"
+    min_recommended_n: ClassVar[int] = 50
 
     def __init__(self, max_outliers: int = 0, alpha: float = 0.05) -> None:
         self._max_outliers = max_outliers  # 0 = auto: max(10, 10% of n)

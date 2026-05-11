@@ -3,6 +3,8 @@
 # the detector measures "how anomalous vs baseline" rather than always returning contamination%.
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pandas as pd
 
@@ -15,6 +17,7 @@ class IsolationForestDetector(BaseDetector):
     """Isolation Forest multivariate outlier detection. Score = fraction of rows flagged anomalous."""
     slug = "isolation_forest_fraction"
     group = "outliers_multi"
+    min_recommended_n: ClassVar[int] = 200
 
     def __init__(self, contamination: float = 0.05) -> None:
         self._contamination = contamination

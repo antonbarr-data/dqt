@@ -52,6 +52,12 @@ class Runner:
         # Pass the same detector instance to _fetch so aggregate detectors can store
         # the column name during get_aggregations() and use it in score().
         curr_df = self._fetch(check, adapter, detector=detector)
+        n_rows = len(curr_df)
+        _power_prefix = (
+            f"[low-power: N={n_rows} < recommended {detector.min_recommended_n}] "
+            if n_rows < detector.min_recommended_n
+            else ""
+        )
         result = detector.score(curr_df, state)
         if check.warn_threshold is not None or check.fail_threshold is not None:
             from dqt.algorithms._base import compute_verdict
@@ -77,7 +83,7 @@ class Runner:
             finished_at=finished_at,
             verdict=result.verdict,
             score=result.score,
-            plain_english=result.plain_english,
+            plain_english=_power_prefix + result.plain_english,
             details=result.details,
             diagnostic_sql=diagnostic_sql,
         )

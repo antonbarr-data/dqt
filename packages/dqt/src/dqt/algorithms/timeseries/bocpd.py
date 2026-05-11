@@ -5,6 +5,8 @@
 # Pure numpy + scipy — no ruptures or other external deps.
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -105,6 +107,7 @@ class BOCPDDetector(BaseDetector):
     """Bayesian Online Changepoint Detection. Score = max posterior changepoint probability in current window."""
     slug = "bocpd"
     group = "timeseries"
+    min_recommended_n: ClassVar[int] = 100
 
     def __init__(self, hazard_lambda: float = 50.0) -> None:
         self._hazard_lambda = hazard_lambda

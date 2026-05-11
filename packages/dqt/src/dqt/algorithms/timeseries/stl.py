@@ -1,6 +1,8 @@
 # Ref: Cleveland et al. (1990) JASA — Seasonal-Trend decomposition using Loess (STL)
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pandas as pd
 
@@ -13,6 +15,7 @@ class STLAnomalyDetector(BaseDetector):
     """Detects anomalies via STL residuals. Score = max absolute Z-score of residuals."""
     slug = "stl_residual_zscore"
     group = "timeseries"
+    min_recommended_n: ClassVar[int] = 100
 
     def __init__(self, period: int = 7) -> None:
         self._period = period

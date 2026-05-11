@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from typing import ClassVar
+
 from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState, Verdict
 from dqt.algorithms._registry import registry
 
@@ -18,6 +20,7 @@ class Wasserstein1Detector(BaseDetector):
     """Wasserstein-1 (earth-mover) distance for distribution drift. Score normalised by reference std."""
     slug = "wasserstein_1"
     group = "drift"
+    min_recommended_n: ClassVar[int] = 500
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         col = reference.iloc[:, 0].dropna().to_numpy(dtype=float)

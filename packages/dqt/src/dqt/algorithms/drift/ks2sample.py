@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from typing import ClassVar
+
 from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState, Verdict
 from dqt.algorithms._registry import registry
 
@@ -14,6 +16,7 @@ class KS2SampleDetector(BaseDetector):
     """Two-sample KS test for distribution drift. Score = 1 − p-value; warn p<0.05, fail p<0.01."""
     slug = "ks_pvalue"
     group = "drift"
+    min_recommended_n: ClassVar[int] = 500
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         return {"reference": reference.iloc[:, 0].dropna().to_numpy(dtype=float)}
