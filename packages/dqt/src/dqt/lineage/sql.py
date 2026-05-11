@@ -12,8 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 def _qualified(table) -> str:
-    """Return a stable dotted name for a sqlglot Table expression."""
-    parts = [p for p in (table.args.get("db"), table.name) if p]
+    """Return a stable dotted name for a sqlglot Table expression.
+
+    Uses sqlglot string properties (.catalog, .db, .name) which always return
+    plain strings, avoiding the TypeError caused by raw Identifier nodes.
+    """
+    parts = [p for p in (table.catalog, table.db, table.name) if p]
     return ".".join(parts) if parts else str(table)
 
 
