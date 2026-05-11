@@ -12,7 +12,7 @@ from dqt.algorithms._base import (
     compute_verdict,
 )
 from dqt.adapters._protocol import AggExpr, ColumnMeta, HealthCheckResult, WarehouseAdapter
-from dqt.store._protocol import Incident, ResultsStore, RunResult
+from dqt.store._protocol import CausalEdgeReview, Incident, ResultsStore, RunResult
 from dqt.store.memory import MemoryStore
 from dqt.checks.models import BaselineConfig, Check, CheckFilter, CheckScope
 from dqt.runner.runner import Runner
@@ -43,6 +43,7 @@ __all__ = [
     "ResultsStore",
     "RunResult",
     "Incident",
+    "CausalEdgeReview",
     "MemoryStore",
     "Check",
     "CheckScope",

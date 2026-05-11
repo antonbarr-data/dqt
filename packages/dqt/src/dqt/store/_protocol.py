@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
 from dqt.algorithms._base import Verdict
@@ -56,9 +56,25 @@ class Incident:
     resolved_at: datetime | None = None
 
 
+@dataclass
+class CausalEdgeReview:
+    """Human review decision for a proposed causal edge."""
+    edge_id: UUID
+    cause: str
+    effect: str
+    decision: Literal["accept", "reject", "defer"]
+    reviewer: str
+    reviewed_at: datetime
+    reason: str = ""
+    review_id: UUID = field(default_factory=uuid4)
+
+
 @runtime_checkable
 class ResultsStore(Protocol):
     def save_run(self, run: RunResult) -> None: ...
     def list_runs(self, check_id: UUID, limit: int = 100) -> list[RunResult]: ...
     def save_incident(self, incident: Incident) -> None: ...
     def list_incidents(self, check_id: UUID, status: str | None = None) -> list[Incident]: ...
+    def save_causal_review(self, review: CausalEdgeReview) -> None: ...
+    def list_causal_reviews(self, edge_id: UUID) -> list[CausalEdgeReview]: ...
+    def causal_edge_precision(self, edge_id: UUID) -> float: ...
