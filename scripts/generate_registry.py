@@ -16,6 +16,15 @@ from dqt.algorithms._base import BaseAggregateDetector
 from dqt.algorithms._registry import registry
 from dqt.algorithms._scales import STAT_SCALES
 
+def _count_adapters() -> tuple[int, list[str]]:
+    """Count adapter subdirectories (each = one warehouse engine)."""
+    adapters_root = Path(__file__).parent.parent / "packages" / "dqt" / "src" / "dqt" / "adapters"
+    engines = sorted(
+        d.name for d in adapters_root.iterdir()
+        if d.is_dir() and not d.name.startswith("_")
+    )
+    return len(engines), engines
+
 _DETECTOR_GROUPS = {"outliers_uni", "outliers_multi", "drift", "timeseries", "info", "pattern", "custom"}
 _CHECK_GROUPS = {"basic", "schema", "referential"}
 
@@ -58,11 +67,14 @@ def main() -> None:
             # unknown group — include as check
             checks.append(entry)
 
+    n_adapters, adapter_names = _count_adapters()
     output = {
         "version": dqt.__version__,
         "total": len(slugs),
         "n_detectors": len(detectors),
         "n_checks": len(checks),
+        "n_adapters": n_adapters,
+        "adapters": adapter_names,
         "detectors": detectors,
         "checks": checks,
     }
@@ -70,7 +82,7 @@ def main() -> None:
     out_path = Path(__file__).parent.parent / "docs" / "registry.json"
     out_path.write_text(json.dumps(output, indent=2) + "\n", encoding="utf-8")
     print(f"Generated {out_path}")
-    print(f"  dqt v{dqt.__version__}: {len(detectors)} detectors, {len(checks)} checks ({len(slugs)} total)")
+    print(f"  dqt v{dqt.__version__}: {len(detectors)} detectors, {len(checks)} checks ({len(slugs)} total), {n_adapters} adapters ({', '.join(adapter_names)})")
 
 
 if __name__ == "__main__":

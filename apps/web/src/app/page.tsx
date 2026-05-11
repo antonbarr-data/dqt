@@ -173,6 +173,7 @@ export default function RootPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [detectors, setDetectors] = useState<string[]>(FALLBACK_DETECTORS);
   const [checks, setChecks] = useState<string[]>(FALLBACK_CHECKS);
+  const [nAdapters, setNAdapters] = useState<number>(2);
 
   useEffect(() => {
     if (getToken()) router.replace("/overview");
@@ -187,6 +188,9 @@ export default function RootPage() {
         }
         if (Array.isArray(data.checks) && data.checks.length > 0) {
           setChecks(data.checks.map((c: { slug: string }) => c.slug));
+        }
+        if (typeof data.n_adapters === "number" && data.n_adapters > 0) {
+          setNAdapters(data.n_adapters);
         }
       })
       .catch(() => { /* keep fallback data */ });
@@ -424,17 +428,17 @@ export default function RootPage() {
       <section className="border-t border-b border-line" style={{ background: "var(--bg-1)" }}>
         <div className="grid grid-cols-2 md:grid-cols-4 mx-auto" style={{ maxWidth: 900 }}>
           {([
-            { value: String(detectors.length), label: "detector algorithms", color: "var(--accent)", cls: "border-r border-b border-line md:border-b-0" },
-            { value: String(checks.length), label: "declarative checks", color: "var(--accent)", cls: "border-b border-line md:border-b-0 md:border-r" },
-            { value: "9+", label: "warehouse engines", color: "var(--accent)", cls: "border-r border-line" },
-            { value: "MIT", label: "no vendor lock-in", color: "var(--pass)", cls: "" },
-          ] as { value: string; label: string; color: string; cls: string }[]).map((s) => (
-            <div key={s.label} className={`px-6 py-5 text-center ${s.cls}`}>
+            { value: String(detectors.length), label: "detector algorithms", color: "var(--accent)", cls: "border-r border-b border-line md:border-b-0", href: `${GITHUB_URL}/tree/main/packages/dqt/src/dqt/algorithms` },
+            { value: String(checks.length), label: "declarative checks", color: "var(--accent)", cls: "border-b border-line md:border-b-0 md:border-r", href: `${GITHUB_URL}/tree/main/packages/dqt/src/dqt/algorithms/basic` },
+            { value: String(nAdapters), label: "warehouse engines", color: "var(--accent)", cls: "border-r border-line", href: `${GITHUB_URL}/tree/main/packages/dqt/src/dqt/adapters` },
+            { value: "MIT", label: "no vendor lock-in", color: "var(--pass)", cls: "", href: `${GITHUB_URL}/blob/main/LICENSE` },
+          ] as { value: string; label: string; color: string; cls: string; href: string }[]).map((s) => (
+            <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className={`px-6 py-5 text-center block transition-opacity hover:opacity-70 ${s.cls}`} style={{ textDecoration: "none" }}>
               <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 32, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
                 {s.value}
               </p>
               <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 4 }}>{s.label}</p>
-            </div>
+            </a>
           ))}
         </div>
       </section>

@@ -3,6 +3,11 @@
   "total": 64,
   "n_detectors": 35,
   "n_checks": 29,
+  "n_adapters": 2,
+  "adapters": [
+    "local",
+    "postgres"
+  ],
   "detectors": [
     {
       "slug": "adjusted_boxplot_fraction",
