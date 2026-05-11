@@ -36,7 +36,7 @@ class KS2SampleDetector(BaseDetector):
             score=score,
             verdict=self._verdict(score),
             plain_english=(
-                f"KS test p={p_value:.4f} — "
+                f"KS p={p_value:.4f} (n_ref={len(state['reference'])}, n_curr={len(curr)}) — "
                 f"{'drift detected' if score > 0.95 else 'no significant drift'}"
             ),
             details={"ks_statistic": float(ks_stat), "p_value": float(p_value)},
