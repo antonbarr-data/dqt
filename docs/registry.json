@@ -3,8 +3,10 @@
   "total": 64,
   "n_detectors": 35,
   "n_checks": 29,
-  "n_adapters": 2,
+  "n_adapters": 4,
   "adapters": [
+    "bigquery",
+    "clickhouse",
     "local",
     "postgres"
   ],
