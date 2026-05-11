@@ -162,6 +162,7 @@ export default function RootPage() {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("python");
   const [copied, setCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (getToken()) router.replace("/overview");
@@ -198,16 +199,20 @@ export default function RootPage() {
 
       {/* ── nav ── */}
       <nav
-        className="flex items-center justify-between px-8 border-b border-line sticky top-0 z-10"
+        className="flex items-center justify-between px-6 border-b border-line sticky top-0 z-20"
         style={{ height: 52, background: "var(--bg-1)" }}
       >
         <LogoMark size="nav" />
-        <div className="flex items-center gap-8">
+
+        {/* desktop links */}
+        <div className="hidden md:flex items-center gap-8">
           <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Code</a>
           <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* desktop CTAs */}
+        <div className="hidden md:flex items-center gap-2">
           <a
             href={GITHUB_URL}
             target="_blank"
@@ -225,10 +230,59 @@ export default function RootPage() {
             Sign in
           </Link>
         </div>
+
+        {/* mobile hamburger */}
+        <button
+          className="md:hidden flex flex-col justify-center items-center gap-1 p-2"
+          onClick={() => setMenuOpen(o => !o)}
+          aria-label="Toggle menu"
+          style={{ color: "var(--fg-0)", background: "none", border: "none", cursor: "pointer" }}
+        >
+          {menuOpen ? (
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <line x1="4" y1="4" x2="16" y2="16" /><line x1="16" y1="4" x2="4" y2="16" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <line x1="3" y1="6" x2="17" y2="6" /><line x1="3" y1="10" x2="17" y2="10" /><line x1="3" y1="14" x2="17" y2="14" />
+            </svg>
+          )}
+        </button>
       </nav>
 
+      {/* mobile menu drawer */}
+      {menuOpen && (
+        <div
+          className="md:hidden flex flex-col border-b border-line sticky top-[52px] z-10"
+          style={{ background: "var(--bg-1)" }}
+        >
+          <a href="#why" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Why dqt</a>
+          <a href="#code" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Code</a>
+          <a href="#compare" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
+          <div className="flex gap-2 px-6 py-4">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="t-small border border-line px-3 py-1.5"
+              style={{ color: "var(--fg-0)" }}
+            >
+              GitHub ↗
+            </a>
+            <Link
+              href="/login"
+              onClick={() => setMenuOpen(false)}
+              className="t-small border px-3 py-1.5"
+              style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 600 }}
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* ── hero ── */}
-      <section className="px-8 pt-10 pb-8 max-w-5xl mx-auto">
+      <section className="px-4 md:px-8 pt-10 pb-8 max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-5">
           <span
             className="px-2.5 py-1 border t-small"
@@ -344,15 +398,15 @@ export default function RootPage() {
 
       {/* ── stats band ── */}
       <section className="border-t border-b border-line" style={{ background: "var(--bg-1)" }}>
-        <div className="grid mx-auto" style={{ maxWidth: 900, gridTemplateColumns: "repeat(4, 1fr)" }}>
-          {[
-            { value: "19", label: "detector algorithms", color: "var(--accent)" },
-            { value: "25+", label: "declarative checks", color: "var(--accent)" },
-            { value: "9+", label: "warehouse engines", color: "var(--accent)" },
-            { value: "MIT", label: "no vendor lock-in", color: "var(--pass)" },
-          ].map((s, i) => (
-            <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
-              <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 36, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 mx-auto" style={{ maxWidth: 900 }}>
+          {([
+            { value: "19", label: "detector algorithms", color: "var(--accent)", cls: "border-r border-b border-line md:border-b-0" },
+            { value: "25+", label: "declarative checks", color: "var(--accent)", cls: "border-b border-line md:border-b-0 md:border-r" },
+            { value: "9+", label: "warehouse engines", color: "var(--accent)", cls: "border-r border-line" },
+            { value: "MIT", label: "no vendor lock-in", color: "var(--pass)", cls: "" },
+          ] as const).map((s) => (
+            <div key={s.label} className={`px-6 py-5 text-center ${s.cls}`}>
+              <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 32, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
                 {s.value}
               </p>
               <p style={{ fontSize: 10, color: "var(--fg-2)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 4 }}>{s.label}</p>
