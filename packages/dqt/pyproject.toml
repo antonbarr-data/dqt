@@ -31,6 +31,8 @@ dependencies = [
 postgres   = ["psycopg2-binary>=2.9", "ibis-framework[postgres]>=9.0"]
 clickhouse = ["clickhouse-connect>=0.7"]
 bigquery   = ["google-cloud-bigquery>=3.19", "db-dtypes>=1.2"]
+snowflake  = ["snowflake-connector-python>=3.9"]
+databricks = ["databricks-sql-connector>=3.1"]
 causal     = ["tigramite>=0.7", "dowhy>=0.11", "causal-learn>=0.1"]
 forecast   = ["prophet>=1.1", "stumpy>=1.4"]
 deep       = ["torch>=2.3", "pyod[deep]>=1.1"]

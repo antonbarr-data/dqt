@@ -3,12 +3,14 @@
   "total": 64,
   "n_detectors": 35,
   "n_checks": 29,
-  "n_adapters": 4,
+  "n_adapters": 6,
   "adapters": [
     "bigquery",
     "clickhouse",
+    "databricks",
     "local",
-    "postgres"
+    "postgres",
+    "snowflake"
   ],
   "detectors": [
     {
