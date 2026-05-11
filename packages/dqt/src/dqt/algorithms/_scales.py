@@ -84,5 +84,7 @@ STAT_SCALES: dict[str, StatScale] = {
         StatScale("adwin",                1.0,  0.50, 0.50, "lower_is_better", "ADWIN drift signal",           "1.0=drift detected in current window, 0.0=stable"),
         StatScale("bocpd",                1.0,  0.50, 0.80, "lower_is_better", "Changepoint probability",      "Max posterior probability of a changepoint in the current window"),
         StatScale("matrix_profile",       0.50, 0.05, 0.10, "lower_is_better", "Discord fraction (MP)",        "Fraction of subsequences whose nearest-neighbour distance exceeds reference 95th percentile"),
+        StatScale("callable_check",  1.0,  0.5, 0.75, "lower_is_better", "Custom callable score", "Score returned by user-supplied callable; thresholds configurable via warn_threshold/fail_threshold on the Check"),
+        StatScale("remote_check",    1.0,  0.5, 0.75, "lower_is_better", "Remote endpoint score",   "Score returned by external HTTP endpoint; must return {\"score\": float}"),
     ]
 }
