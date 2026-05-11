@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+# grubbs excluded: it's a within-sample outlier test (scores relative to current mean/std),
+# not a reference-comparison test, so a shifted distribution won't trigger it.
 SLUGS_TO_TEST = [
     "wasserstein_1", "ks_pvalue", "iqr_fence",
     "mad_outlier_fraction", "adwin",
