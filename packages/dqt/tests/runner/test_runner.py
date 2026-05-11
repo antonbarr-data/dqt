@@ -207,3 +207,34 @@ def test_power_warning_injected_below_min_n(fake_adapter):
         f"Expected low-power prefix, got: {result.plain_english!r}"
     )
     assert "N=10" in result.plain_english
+
+
+def test_degenerate_distribution_skips_outlier_detection():
+    """Runner emits degenerate_distribution_detected for >90% null columns."""
+    from dqt.runner.runner import Runner
+
+    class _SparseAdapter:
+        def sample(self, schema, table, n=100_000, **kwargs):
+            vals = [float("nan")] * 95 + list(np.random.default_rng(0).normal(0, 1, 5))
+            return pd.DataFrame({"val": vals})
+        def aggregate(self, schema, table, exprs):
+            return {e.name: 0.0 for e in exprs}
+        def list_schemas(self):
+            return ["s"]
+        def list_tables(self, schema):
+            return ["t"]
+        def describe_columns(self, schema, table):
+            return []
+        def health_check(self):
+            from dqt.adapters._protocol import HealthCheckResult
+            return HealthCheckResult(steps=[])
+
+    check = Check(
+        schema_name="s", table_name="t", column_name="val",
+        detector_slug="iqr_fence",
+    )
+    store = MemoryStore()
+    runner = Runner(store)
+    result = runner.run(check, _SparseAdapter())
+    assert "degenerate" in result.plain_english.lower()
+    assert result.verdict == Verdict.warn

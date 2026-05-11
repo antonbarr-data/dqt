@@ -58,6 +58,52 @@ class Runner:
             if n_rows < detector.min_recommended_n
             else ""
         )
+
+        # Degenerate-distribution guard: >90% null or <5 unique non-null values
+        # means sparsity is the quality signal — outlier detectors would produce
+        # meaningless results on such data.
+        if check.column_name and detector.kind == "sample":
+            _col_data = curr_df.iloc[:, 0] if not curr_df.empty else pd.Series([], dtype=float)
+            _non_null_frac = float(_col_data.notna().mean()) if len(_col_data) > 0 else 0.0
+            _n_unique = int(_col_data.nunique(dropna=True))
+            if _non_null_frac < 0.1 or _n_unique < 5:
+                finished_at = datetime.now(timezone.utc)
+                run_result = RunResult(
+                    check_id=check.id,
+                    detector_slug=check.detector_slug,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    verdict=Verdict.warn,
+                    score=0.0,
+                    plain_english=(
+                        f"degenerate_distribution_detected: "
+                        f"{_non_null_frac:.0%} non-null, {_n_unique} unique values — "
+                        "sparsity is the quality signal; outlier detection skipped"
+                    ),
+                    details={
+                        "degenerate": True,
+                        "non_null_fraction": _non_null_frac,
+                        "n_unique": _n_unique,
+                    },
+                )
+                self._store.save_run(run_result)
+                self._store.save_incident(Incident(
+                    check_id=check.id,
+                    run_id=run_result.run_id,
+                    detector_slug=check.detector_slug,
+                    severity=Verdict.warn,
+                    opened_at=finished_at,
+                    score=0.0,
+                ))
+                _log.info(
+                    "run_degenerate",
+                    check_id=str(check.id),
+                    slug=check.detector_slug,
+                    non_null_frac=_non_null_frac,
+                    n_unique=_n_unique,
+                )
+                return run_result
+
         result = detector.score(curr_df, state)
         if check.warn_threshold is not None or check.fail_threshold is not None:
             from dqt.algorithms._base import compute_verdict
