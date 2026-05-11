@@ -15,7 +15,7 @@ class IQRFenceDetector(BaseDetector):
     slug = "iqr_fence"
     group = "outliers_uni"
 
-    def __init__(self, k: float = 1.5) -> None:
+    def __init__(self, k: float = 3.0) -> None:
         self._k = k
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

@@ -1,0 +1,166 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]: dqt
+    - generic [ref=e6]:
+      - generic [ref=e7]: Warehouse
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - text: Sources
+      - generic [ref=e12]:
+        - img [ref=e13]
+        - text: Datasets
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - text: Lineage
+    - generic [ref=e23]:
+      - generic [ref=e24]: Semantic Layer
+      - generic [ref=e25]:
+        - img [ref=e26]
+        - text: Metrics
+      - generic [ref=e28]:
+        - img [ref=e29]
+        - text: Causality
+    - generic [ref=e32]:
+      - generic [ref=e33]: Watch
+      - generic [ref=e34]:
+        - img [ref=e35]
+        - text: Incidents
+        - generic [ref=e37]: "12"
+      - generic [ref=e38]:
+        - img [ref=e39]
+        - text: Tests
+    - generic [ref=e41]:
+      - generic [ref=e42]: Govern
+      - generic [ref=e43]:
+        - img [ref=e44]
+        - text: Catalog
+    - generic [ref=e50]: Jamie Lin · on-call · ends 18:30
+  - generic [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - link "Incidents" [ref=e54] [cursor=pointer]:
+          - /url: "#"
+        - generic [ref=e55]: /
+        - generic [ref=e56]: INC-0047
+      - generic [ref=e58]: AB
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - generic [ref=e62]: FAIL
+          - generic [ref=e63]:
+            - generic [ref=e64]: Outlier spike in gigler_transactions.amount_usd
+            - generic [ref=e65]: INC-0047 · Opened 2 min ago · Assigned to Jamie Lin · Modified Z-score (MAD)
+        - generic [ref=e66]:
+          - generic [ref=e67]:
+            - generic [ref=e68]: MAD Score
+            - generic [ref=e69]: "0.847"
+            - generic [ref=e70]: threshold 0.01
+          - generic [ref=e71]:
+            - generic [ref=e72]: Outliers detected
+            - generic [ref=e73]: "312"
+            - generic [ref=e74]: of 7,240 rows (4.3%)
+          - generic [ref=e75]:
+            - generic [ref=e76]: Baseline period
+            - generic [ref=e77]: 14d
+            - generic [ref=e78]: 2025-01-01 → 2025-04-13
+          - generic [ref=e79]:
+            - generic [ref=e80]: Column type
+            - generic [ref=e81]: FLOAT
+            - generic [ref=e82]: "classification: financial"
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]: Distribution — amount_usd
+            - generic [ref=e87]:
+              - generic [ref=e88]: Baseline (14d)
+              - generic [ref=e90]: Current
+          - img [ref=e93]:
+            - generic [ref=e120]: outlier cluster
+            - generic [ref=e121]: $0
+            - generic [ref=e122]: $500
+            - generic [ref=e123]: $1,000
+            - generic [ref=e124]: $1,500
+        - generic [ref=e125]:
+          - generic [ref=e127]: Statistical Evidence
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - generic [ref=e130]: Modified Z-score (MAD)
+              - generic [ref=e135]: "0.847"
+              - generic [ref=e136]: FAIL
+            - generic [ref=e137]:
+              - generic [ref=e138]: KS two-sample drift
+              - generic [ref=e141]: "0.620"
+              - generic [ref=e142]: FAIL
+            - generic [ref=e143]:
+              - generic [ref=e144]: PSI (Population Stability)
+              - generic [ref=e147]: "0.380"
+              - generic [ref=e148]: WARN
+            - generic [ref=e149]:
+              - generic [ref=e150]: Wasserstein-1 distance
+              - generic [ref=e153]: "0.220"
+              - generic [ref=e154]: PASS
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - generic [ref=e157]: Causal Trace
+            - generic [ref=e158]: via confirmed DAG
+          - generic [ref=e159]:
+            - generic [ref=e160]:
+              - generic [ref=e161]:
+                - generic [ref=e162]: Root driver
+                - generic [ref=e163]:
+                  - text: marketing_campaigns
+                  - text: .spend_usd
+              - generic [ref=e164]:
+                - img [ref=e165]
+                - generic [ref=e167]:
+                  - text: lag 2w
+                  - text: r=0.60
+              - generic [ref=e168]:
+                - generic [ref=e169]: Metric
+                - generic [ref=e170]:
+                  - text: weekly_acquisition
+                  - text: _spend
+              - generic [ref=e171]:
+                - img [ref=e172]
+                - generic [ref=e174]:
+                  - text: lag 0w
+                  - text: r=0.71
+              - generic [ref=e175]:
+                - generic [ref=e176]: Affected
+                - generic [ref=e177]:
+                  - text: gigler_transactions
+                  - text: .amount_usd
+            - generic [ref=e178]: "Shapley attribution: marketing_campaigns.spend_usd → 62% of variance · seasonal_pattern → 28% · residual → 10%"
+      - generic [ref=e179]:
+        - generic [ref=e180]:
+          - generic [ref=e181]: AI Explanation
+          - generic [ref=e182]:
+            - paragraph [ref=e183]: The spike in amount_usd originates from an upstream marketing spend surge [spend_usd ↑18%] two weeks prior. The confirmed causal DAG assigns 62% of the variance to this channel.
+            - paragraph [ref=e184]: "The outlier cluster ($950–$1,400) corresponds to high-value freelancer contracts triggered by the Q2 acquisition campaign. Modified Z-score (MAD) flagged 312 rows — the IQR-based detector did not, suggesting this is a one-sided tail event rather than symmetric drift. [INC-0032: similar pattern, Q1]"
+            - paragraph [ref=e185]: "Recommended action: confirm with the marketing team whether the campaign budget was intentionally increased. If yes, re-fit the baseline to include this regime."
+        - generic [ref=e186]:
+          - generic [ref=e187]: Check Definition
+          - generic [ref=e188]:
+            - text: "check: modified_zscore_mad"
+            - text: "dataset: gigler_transactions"
+            - text: "column: amount_usd"
+            - text: "threshold:"
+            - text: "warn: 0.001"
+            - text: "fail: 0.01"
+            - text: "baseline: 14d"
+        - generic [ref=e189]:
+          - generic [ref=e190]: Activity
+          - generic [ref=e191]:
+            - generic [ref=e192]: 2m
+            - generic [ref=e193]: Incident opened automatically by runner
+          - generic [ref=e194]:
+            - generic [ref=e195]: 2m
+            - generic [ref=e196]: Assigned to Jamie Lin (on-call rotation)
+          - generic [ref=e197]:
+            - generic [ref=e198]: 1m
+            - generic [ref=e199]: AI explanation generated — 3 evidence sources
+          - generic [ref=e200]:
+            - generic [ref=e201]: 1m
+            - generic [ref=e202]: Causal trace resolved via confirmed DAG (2 hops)
+          - generic [ref=e203]:
+            - generic [ref=e204]: 0m
+            - generic [ref=e205]: "Slack notification sent to #data-incidents"

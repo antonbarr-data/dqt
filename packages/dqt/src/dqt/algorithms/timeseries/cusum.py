@@ -19,7 +19,7 @@ class CUSUMDetector(BaseDetector):
     slug = "cusum"
     group = "timeseries"
 
-    def __init__(self, k: float = 0.5, h: float = 50.0) -> None:
+    def __init__(self, k: float = 0.5, h: float = 5.0) -> None:
         self._k = k
         self._h = h
 

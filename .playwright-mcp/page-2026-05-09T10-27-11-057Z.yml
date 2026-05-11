@@ -1,0 +1,146 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]: dqt
+    - generic [ref=e6]:
+      - generic [ref=e7]: Warehouse
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - text: Sources
+      - generic [ref=e12]:
+        - img [ref=e13]
+        - text: Datasets
+      - generic [ref=e16]:
+        - img [ref=e17]
+        - text: Lineage
+    - generic [ref=e23]:
+      - generic [ref=e24]: Semantic Layer
+      - generic [ref=e25]:
+        - img [ref=e26]
+        - text: Metrics
+      - generic [ref=e28]:
+        - img [ref=e29]
+        - text: Causality
+    - generic [ref=e32]:
+      - generic [ref=e33]: Watch
+      - generic [ref=e34]:
+        - img [ref=e35]
+        - text: Incidents
+        - generic [ref=e37]: "12"
+      - generic [ref=e38]:
+        - img [ref=e39]
+        - text: Tests
+    - generic [ref=e41]:
+      - generic [ref=e42]: Govern
+      - generic [ref=e43]:
+        - img [ref=e44]
+        - text: Catalog
+    - generic [ref=e50]: Jamie Lin · on-call · ends 18:30
+  - generic [ref=e51]:
+    - generic [ref=e52]:
+      - generic [ref=e53]: Causality DAG
+      - generic [ref=e54]:
+        - generic [ref=e55]: "Last refreshed: 3h ago"
+        - generic [ref=e56] [cursor=pointer]: Refresh DAG
+        - generic [ref=e57] [cursor=pointer]: HITL Review (2)
+        - generic [ref=e58]: AB
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - generic [ref=e62]: Metric graph · 5 nodes · 3 edges confirmed
+          - generic [ref=e63]:
+            - generic [ref=e64]: confirmed
+            - generic [ref=e66]: fragile (E-val <1.5)
+            - generic [ref=e68]: proposed
+        - img [ref=e71]:
+          - generic [ref=e75]: lag 2w
+          - generic [ref=e76]: r = 0.603
+          - generic [ref=e82]: lag 0w
+          - generic [ref=e83]: r = 0.714
+          - generic [ref=e86]: E-val 1.2
+          - generic [ref=e88]: DATASET
+          - generic [ref=e89]: marketing_
+          - generic [ref=e90]: campaigns
+          - generic [ref=e92]: COLUMN
+          - generic [ref=e93]: spend_usd
+          - generic [ref=e94]: marketing_campaigns
+          - generic [ref=e97]: METRIC · selected
+          - generic [ref=e98]: weekly_acquisition
+          - generic [ref=e99]: _spend
+          - generic [ref=e100]: $42.8k
+          - generic [ref=e101]: wk-avg
+          - generic [ref=e103]: METRIC
+          - generic [ref=e104]: weekly_transaction
+          - generic [ref=e105]: _volume
+          - generic [ref=e107]: METRIC · fragile
+          - generic [ref=e108]: fct_orders.gmv
+          - generic [ref=e109]: E-value = 1.2
+        - generic [ref=e110]:
+          - generic [ref=e111]: KL Divergence matrix — weekly snapshots
+          - img [ref=e112]:
+            - generic [ref=e113]: acq_spend
+            - generic [ref=e114]: tx_volume
+            - generic [ref=e115]: orders_gmv
+            - generic [ref=e116]: sessions
+            - generic [ref=e117]: acq_spend
+            - generic [ref=e118]: tx_volume
+            - generic [ref=e119]: orders_gmv
+            - generic [ref=e122]: "0.72"
+            - generic [ref=e124]: "0.34"
+            - generic [ref=e126]: "0.11"
+            - generic [ref=e128]: "0.72"
+            - generic [ref=e131]: "0.48"
+            - generic [ref=e133]: "0.22"
+            - generic [ref=e135]: "0.34"
+            - generic [ref=e137]: "0.48"
+            - generic [ref=e140]: "0.09"
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - generic [ref=e143]: Shapley Attribution — weekly_acquisition_spend
+          - generic [ref=e144]:
+            - generic [ref=e145]: marketing_campaigns.spend_usd
+            - generic [ref=e148]: 62%
+          - generic [ref=e149]:
+            - generic [ref=e150]: seasonal_pattern
+            - generic [ref=e153]: 28%
+          - generic [ref=e154]:
+            - generic [ref=e155]: residual
+            - generic [ref=e158]: 10%
+        - generic [ref=e159]:
+          - generic [ref=e160]: Confirmed Edges
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e163]: spend_usd → acq_spend
+              - generic [ref=e164]: confirmed
+            - generic [ref=e165]:
+              - generic [ref=e166]: "lag: 2w"
+              - generic [ref=e167]: "r: 0.603"
+              - generic [ref=e168]: "E-val: 2.8"
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - generic [ref=e171]: acq_spend → tx_volume
+              - generic [ref=e172]: confirmed
+            - generic [ref=e173]:
+              - generic [ref=e174]: "lag: 0w"
+              - generic [ref=e175]: "r: 0.714"
+              - generic [ref=e176]: "E-val: 3.1"
+          - generic [ref=e177]:
+            - generic [ref=e178]:
+              - generic [ref=e179]: acq_spend → orders.gmv
+              - generic [ref=e180]: fragile
+            - generic [ref=e181]:
+              - generic [ref=e182]: "lag: 1w"
+              - generic [ref=e183]: "r: 0.41"
+              - generic [ref=e184]: "E-val: 1.2 ⚠"
+        - generic [ref=e185]:
+          - generic [ref=e186]: AI Causal Summary
+          - generic [ref=e187]:
+            - paragraph [ref=e188]: Marketing acquisition spend causes transaction volume with a 2-week lag [Granger F=14.2, p<0.001] and explains 62% of variance via Shapley decomposition.
+            - paragraph [ref=e189]: The edge to fct_orders.gmv is fragile (E-value 1.2) — a confounder with sensitivity ≥1.2 would nullify this relationship. Recommend additional data collection before acting on it. [PCMCI+ run 2026-05-08]
+        - generic [ref=e190]:
+          - generic [ref=e191]: HITL Queue
+          - generic [ref=e192]:
+            - generic [ref=e193]: "Proposed: tx_volume → gmv"
+            - generic [ref=e194]: stability score 0.43 · needs review
+            - generic [ref=e195]:
+              - generic [ref=e196] [cursor=pointer]: Confirm
+              - generic [ref=e197] [cursor=pointer]: Reject

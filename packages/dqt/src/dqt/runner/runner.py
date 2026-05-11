@@ -137,9 +137,16 @@ class Runner:
 
         # sampling_pct takes priority over sample_n when set
         if check.sampling_pct is not None:
-            return adapter.sample(
+            df = adapter.sample(
                 check.schema_name, check.table_name, check.sample_n,
                 sampling_pct=check.sampling_pct, **kwargs
             )
+        else:
+            df = adapter.sample(check.schema_name, check.table_name, check.sample_n, **kwargs)
 
-        return adapter.sample(check.schema_name, check.table_name, check.sample_n, **kwargs)
+        # Project to the target column so every sample-kind detector reliably receives
+        # a single-column DataFrame regardless of table width.  Without this, detectors
+        # using iloc[:, 0] silently score whichever column happens to be first.
+        if check.column_name and check.column_name in df.columns:
+            return df[[check.column_name]]
+        return df

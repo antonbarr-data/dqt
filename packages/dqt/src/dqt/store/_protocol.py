@@ -9,6 +9,23 @@ from dqt.algorithms._base import Verdict
 
 
 @dataclass
+class ReproducibilityBundle:
+    """Everything needed to reproduce a run result offline or in a different environment."""
+    check_id: UUID
+    run_id: UUID
+    detector_slug: str
+    detector_params: dict[str, Any]
+    schema_name: str
+    table_name: str
+    column_name: str | None
+    sample_n: int
+    # Serialised detector state (fit output) — JSON-serialisable dict
+    detector_state_json: dict[str, Any] = field(default_factory=dict)
+    # Reproducibility notes (e.g. "state contains sklearn model — re-fit required")
+    notes: str = ""
+
+
+@dataclass
 class RunResult:
     check_id: UUID
     detector_slug: str
@@ -21,6 +38,8 @@ class RunResult:
     run_id: UUID = field(default_factory=uuid4)
     # SQL the on-call team can run to inspect failing rows directly in the warehouse
     diagnostic_sql: str | None = None
+    # Bundle for offline reproduction / audit
+    reproducibility: ReproducibilityBundle | None = None
 
 
 @dataclass

@@ -42,10 +42,17 @@ class STLAnomalyDetector(BaseDetector):
         resid = result.resid
         z_scores = np.abs((resid - state["resid_mean"]) / state["resid_std"])
         max_z = float(np.max(z_scores)) if len(z_scores) > 0 else 0.0
-        n_anomalies = int(np.sum(z_scores > 3.0))
+        anomaly_mask = z_scores > 3.0
+        n_anomalies = int(np.sum(anomaly_mask))
+        anomaly_indices = [int(i) for i in np.where(anomaly_mask)[0]]
         return DetectorResult(
             score=max_z,
             verdict=self._verdict(max_z),
             plain_english=f"Max STL residual Z-score {max_z:.2f} ({n_anomalies} anomalous point{'s' if n_anomalies != 1 else ''})",
-            details={"max_z_score": max_z, "anomaly_count": n_anomalies, "period": state["period"]},
+            details={
+                "max_z_score": max_z,
+                "anomaly_count": n_anomalies,
+                "anomaly_indices": anomaly_indices,
+                "period": state["period"],
+            },
         )

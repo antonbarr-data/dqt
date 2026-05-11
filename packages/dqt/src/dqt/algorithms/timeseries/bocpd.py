@@ -106,7 +106,7 @@ class BOCPDDetector(BaseDetector):
     slug = "bocpd"
     group = "timeseries"
 
-    def __init__(self, hazard_lambda: float = 250.0) -> None:
+    def __init__(self, hazard_lambda: float = 50.0) -> None:
         self._hazard_lambda = hazard_lambda
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

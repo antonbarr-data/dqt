@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field
 class BaselineConfig(BaseModel):
     window_days: int = 14
     min_rows: int = 1_000
+    strategy: Literal["rolling", "seasonal", "fixed"] = "rolling"
+    # rolling: use the most recent window_days of data as the reference
+    # seasonal: align to the same calendar period in the previous cycle (e.g. same week last year)
+    # fixed: use a fixed date range anchored at anchor_date; never slides forward
+    anchor_date: str | None = None  # ISO date string; required when strategy="fixed"
+    seasonality_period_days: int = 7  # used when strategy="seasonal"; 7=weekly, 365=yearly
 
 
 class CheckScope(BaseModel):

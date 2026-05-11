@@ -105,7 +105,9 @@ class GeneralizedESDDetector(BaseDetector):
                 plain_english="Insufficient data for GESD test (need >= 6 values).",
                 details={"n_outliers": 0, "n": n},
             )
-        max_k = self._max_outliers if self._max_outliers > 0 else max(10, n // 10)
+        # Cap at 100: GESD is O(n*k) and designed for small datasets.
+        # For large n the fraction threshold (1%) governs; absolute count > 100 is irrelevant.
+        max_k = self._max_outliers if self._max_outliers > 0 else min(max(10, n // 10), 100)
         n_out = _gesd_n_outliers(col, max_outliers=max_k, alpha=self._alpha)
         frac = n_out / n
         return DetectorResult(

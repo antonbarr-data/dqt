@@ -1,0 +1,185 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]: dqt
+    - generic [ref=e6]:
+      - generic [ref=e7]: Warehouse
+      - generic [ref=e8] [cursor=pointer]:
+        - img [ref=e9]
+        - text: Sources
+      - generic [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+        - text: Datasets
+      - generic [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+        - text: Lineage
+    - generic [ref=e23]:
+      - generic [ref=e24]: Semantic Layer
+      - generic [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+        - text: Metrics
+      - generic [ref=e28] [cursor=pointer]:
+        - img [ref=e29]
+        - text: Causality
+    - generic [ref=e32]:
+      - generic [ref=e33]: Watch
+      - generic [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+        - text: Incidents
+        - generic [ref=e37]: "12"
+      - generic [ref=e38] [cursor=pointer]:
+        - img [ref=e39]
+        - text: Tests
+        - generic [ref=e41]: "3"
+    - generic [ref=e42]:
+      - generic [ref=e43]: Govern
+      - generic [ref=e44] [cursor=pointer]:
+        - img [ref=e45]
+        - text: Catalog
+      - generic [ref=e48] [cursor=pointer]:
+        - img [ref=e49]
+        - text: Policies
+    - generic [ref=e54]: Jamie Lin · on-call · ends 18:30
+  - generic [ref=e55]:
+    - generic [ref=e56]:
+      - generic [ref=e57]: Overview
+      - generic [ref=e58]: ⌘K Search datasets, metrics, incidents…
+      - generic [ref=e59]: AB
+    - generic [ref=e60]:
+      - generic [ref=e61]:
+        - generic [ref=e62]:
+          - generic [ref=e63]: Open Incidents
+          - generic [ref=e64]: "12"
+          - generic [ref=e65]: 3 critical · 9 warning
+        - generic [ref=e66]:
+          - generic [ref=e67]: Mean Detect Time
+          - generic [ref=e68]: 3.2h
+          - generic [ref=e69]: ↓ 0.8h vs last week
+        - generic [ref=e70]:
+          - generic [ref=e71]: Mean Resolve Time
+          - generic [ref=e72]: 14.8h
+          - generic [ref=e73]: ↑ 1.2h vs last week
+        - generic [ref=e74]:
+          - generic [ref=e75]: Auto-Explained
+          - generic [ref=e76]: 87%
+          - generic [ref=e77]: AI explanation coverage
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - generic [ref=e81]: Datasets
+            - generic [ref=e82] [cursor=pointer]: Add dataset
+          - table [ref=e84]:
+            - rowgroup [ref=e85]:
+              - row "Dataset Domain Columns Checks Coverage Last run Status Trend 30d" [ref=e86]:
+                - columnheader "Dataset" [ref=e87]
+                - columnheader "Domain" [ref=e88]
+                - columnheader "Columns" [ref=e89]
+                - columnheader "Checks" [ref=e90]
+                - columnheader "Coverage" [ref=e91]
+                - columnheader "Last run" [ref=e92]
+                - columnheader "Status" [ref=e93]
+                - columnheader "Trend 30d" [ref=e94]
+            - rowgroup [ref=e95]:
+              - row "gigler_transactions marketplace marketplace 42 12 78% 2 min ago 2 fail" [ref=e96]:
+                - cell "gigler_transactions marketplace" [ref=e97]:
+                  - generic [ref=e98]: gigler_transactions
+                  - generic [ref=e99]: marketplace
+                - cell "marketplace" [ref=e100]
+                - cell "42" [ref=e101]
+                - cell "12" [ref=e102]
+                - cell "78%" [ref=e103]:
+                  - generic [ref=e107]: 78%
+                - cell "2 min ago" [ref=e108]
+                - cell "2 fail" [ref=e109]:
+                  - generic [ref=e110]: 2 fail
+                - cell [ref=e112]:
+                  - img [ref=e113]
+              - row "marketing_campaigns marketing marketing 28 8 62% 4 min ago 1 warn" [ref=e115]:
+                - cell "marketing_campaigns marketing" [ref=e116]:
+                  - generic [ref=e117]: marketing_campaigns
+                  - generic [ref=e118]: marketing
+                - cell "marketing" [ref=e119]
+                - cell "28" [ref=e120]
+                - cell "8" [ref=e121]
+                - cell "62%" [ref=e122]:
+                  - generic [ref=e126]: 62%
+                - cell "4 min ago" [ref=e127]
+                - cell "1 warn" [ref=e128]:
+                  - generic [ref=e129]: 1 warn
+                - cell [ref=e131]:
+                  - img [ref=e132]
+              - row "fct_orders finance finance 61 18 91% 12 min ago pass" [ref=e134]:
+                - cell "fct_orders finance" [ref=e135]:
+                  - generic [ref=e136]: fct_orders
+                  - generic [ref=e137]: finance
+                - cell "finance" [ref=e138]
+                - cell "61" [ref=e139]
+                - cell "18" [ref=e140]
+                - cell "91%" [ref=e141]:
+                  - generic [ref=e145]: 91%
+                - cell "12 min ago" [ref=e146]
+                - cell "pass" [ref=e147]:
+                  - generic [ref=e148]: pass
+                - cell [ref=e150]:
+                  - img [ref=e151]
+              - row "dim_users users users 24 6 45% 1h ago pass" [ref=e153]:
+                - cell "dim_users users" [ref=e154]:
+                  - generic [ref=e155]: dim_users
+                  - generic [ref=e156]: users
+                - cell "users" [ref=e157]
+                - cell "24" [ref=e158]
+                - cell "6" [ref=e159]
+                - cell "45%" [ref=e160]:
+                  - generic [ref=e164]: 45%
+                - cell "1h ago" [ref=e165]
+                - cell "pass" [ref=e166]:
+                  - generic [ref=e167]: pass
+                - cell [ref=e169]:
+                  - img [ref=e170]
+              - row "fct_sessions product product 38 10 83% 8 min ago pass" [ref=e172]:
+                - cell "fct_sessions product" [ref=e173]:
+                  - generic [ref=e174]: fct_sessions
+                  - generic [ref=e175]: product
+                - cell "product" [ref=e176]
+                - cell "38" [ref=e177]
+                - cell "10" [ref=e178]
+                - cell "83%" [ref=e179]:
+                  - generic [ref=e183]: 83%
+                - cell "8 min ago" [ref=e184]
+                - cell "pass" [ref=e185]:
+                  - generic [ref=e186]: pass
+                - cell [ref=e188]:
+                  - img [ref=e189]
+        - generic [ref=e191]:
+          - generic [ref=e193]: Activity
+          - generic [ref=e194]:
+            - generic [ref=e195]: Recent
+            - generic [ref=e196]:
+              - generic [ref=e197]: ✕
+              - generic [ref=e198]:
+                - generic [ref=e199]: Outlier spike — gigler_transactions.amount_usd
+                - generic [ref=e200]: INC-0047 · MAD score 0.847 · 2 min ago
+            - generic [ref=e201]:
+              - generic [ref=e202]: ✕
+              - generic [ref=e203]:
+                - generic [ref=e204]: Distribution drift — gigler_transactions.category
+                - generic [ref=e205]: INC-0046 · PSI 0.32 · 14 min ago
+            - generic [ref=e206]:
+              - generic [ref=e207]: "!"
+              - generic [ref=e208]:
+                - generic [ref=e209]: Outlier fraction drift — marketing_campaigns.spend_usd
+                - generic [ref=e210]: INC-0045 · fraction drift 0.012 · 38 min ago
+            - generic [ref=e211]:
+              - generic [ref=e212]: ✓
+              - generic [ref=e213]:
+                - generic [ref=e214]: Auto-resolved — fct_orders.gmv
+                - generic [ref=e215]: INC-0044 · 3 consecutive passes · 1h ago
+            - generic [ref=e216]:
+              - generic [ref=e217]: "!"
+              - generic [ref=e218]:
+                - generic [ref=e219]: Freshness SLA breach — fct_sessions
+                - generic [ref=e220]: INC-0043 · 2.4h late · 2h ago
+            - generic [ref=e221]:
+              - generic [ref=e222]: ✓
+              - generic [ref=e223]:
+                - generic [ref=e224]: Causal DAG refreshed — weekly_transaction_volume
+                - generic [ref=e225]: 3 edges confirmed · lag-2 r=0.60 · 3h ago

@@ -68,27 +68,29 @@ print(result.plain_english)
 # "Completeness is 99.8% (baseline 99.8%)"
 ```
 
-## Drift detection with KS test
+## Drift detection with Wasserstein-1
 
-`ks_pvalue` runs a two-sample Kolmogorov–Smirnov test between the reference distribution and the current window. The score is `1 − p-value`; warn at p < 0.05, fail at p < 0.01.
+`wasserstein_1` measures the earth-mover distance between distributions, normalised by the reference standard deviation. It is the right tool when you care about **how much** the distribution shifted (magnitude), not just whether it did. KS (`ks_pvalue`) is complementary — it answers "did anything change at all?" but gives no sense of scale; Wasserstein-1 gives you the shift in interpretable units (σ).
 
 ```python
 import numpy as np
 
-# Simulate reference and current DataFrames
+# Simulate reference and current DataFrames — 30% mean shift on a revenue column
 ref_df  = pd.DataFrame({"amount": np.random.normal(100, 10, 10_000)})
-curr_df = pd.DataFrame({"amount": np.random.normal(130, 10, 10_000)})  # shifted mean
+curr_df = pd.DataFrame({"amount": np.random.normal(130, 10, 10_000)})  # +30% mean shift
 
-from dqt.algorithms.drift.ks2sample import KS2SampleDetector
+from dqt.algorithms.drift.wasserstein import Wasserstein1Detector
 
-detector = KS2SampleDetector()
+detector = Wasserstein1Detector()
 state   = detector.fit(ref_df)
 result  = detector.score(curr_df, state)
 
-print(result.verdict)        # Verdict.fail  (large shift detected)
-print(result.plain_english)  # "KS test p=0.0000 — drift detected"
-print(result.details)        # {"ks_statistic": 0.299, "p_value": 0.0}
+print(result.verdict)        # Verdict.fail  (shift >> warn threshold of 0.2σ)
+print(result.plain_english)  # "Wasserstein-1 distance = 3.00σ — large shift"
+print(result.details)        # {"wasserstein_distance": 30.0, "ref_std": 10.0, "normalized": 3.0}
 ```
+
+Use `ks_pvalue` when you need a significance test (p-value) or when the shift is in the tails rather than the mean. Use `wasserstein_1` when you need an interpretable magnitude on continuous numeric columns.
 
 ## Outlier detection (MAD)
 

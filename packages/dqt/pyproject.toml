@@ -1,6 +1,6 @@
 [project]
 name = "dqtlib"
-version = "0.2.0"
+version = "0.3.0"
 description = "Data quality, observability, semantic, and causality library"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -39,6 +39,10 @@ deep       = ["torch>=2.3", "pyod[deep]>=1.1"]
 explain    = ["shap>=0.45", "pgmpy>=0.1"]
 files      = ["openpyxl>=3.0", "pyarrow>=14.0"]
 reports    = ["matplotlib>=3.8"]
+lineage    = ["sqlglot>=23.0"]
+
+[project.scripts]
+dqt = "dqt.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
