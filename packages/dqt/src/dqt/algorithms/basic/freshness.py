@@ -32,17 +32,23 @@ class FreshnessDetector(BaseAggregateDetector):
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         latest = current.iloc[0]["latest_ts"]
+
+        # Coerce strings and other parseable types to datetime before the attribute check.
+        # DuckDB's aggregate() on CSV files may return ISO strings instead of datetimes.
+        if not hasattr(latest, "timestamp"):
+            try:
+                latest = pd.to_datetime(latest)
+            except Exception:
+                return DetectorResult(
+                    score=float("inf"),
+                    verdict=Verdict.fail,
+                    plain_english="Latest timestamp could not be parsed",
+                    details={"seconds_behind": float("inf"), "warn_threshold": self._warn, "fail_threshold": self._fail},
+                )
+
         if hasattr(latest, "tzinfo") and latest.tzinfo is None:
             latest = latest.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-
-        if not hasattr(latest, "timestamp"):
-            return DetectorResult(
-                score=float("inf"),
-                verdict=Verdict.fail,
-                plain_english="Latest timestamp could not be parsed",
-                details={"seconds_behind": float("inf"), "warn_threshold": self._warn, "fail_threshold": self._fail},
-            )
 
         seconds_behind = (now - latest).total_seconds()
 
