@@ -673,8 +673,11 @@ export default function RootPage() {
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-2">
               {detectors.map((d) => (
-                <span
+                <a
                   key={d}
+                  href={`${GITHUB_URL}/blob/main/docs/algorithms/${d}.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     fontSize: 11,
                     color: "var(--fg-0)",
@@ -682,10 +685,12 @@ export default function RootPage() {
                     background: "var(--bg-2)",
                     border: "1px solid var(--line)",
                     padding: "2px 8px",
+                    textDecoration: "none",
                   }}
+                  className="transition-colors hover:border-accent hover:text-accent"
                 >
                   {d}
-                </span>
+                </a>
               ))}
             </div>
           </div>
@@ -695,8 +700,11 @@ export default function RootPage() {
             </p>
             <div className="flex flex-wrap gap-x-3 gap-y-2">
               {checks.map((d) => (
-                <span
+                <a
                   key={d}
+                  href={`${GITHUB_URL}/blob/main/docs/algorithms/${d}.md`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   style={{
                     fontSize: 11,
                     color: "var(--fg-1)",
@@ -704,10 +712,12 @@ export default function RootPage() {
                     background: "var(--bg-1)",
                     border: "1px solid var(--line)",
                     padding: "2px 8px",
+                    textDecoration: "none",
                   }}
+                  className="transition-colors hover:border-accent hover:text-accent"
                 >
                   {d}
-                </span>
+                </a>
               ))}
             </div>
           </div>
