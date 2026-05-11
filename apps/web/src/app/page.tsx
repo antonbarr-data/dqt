@@ -49,20 +49,15 @@ function LogoMark({ size = "nav" }: { size?: "nav" | "footer" }) {
 const DETECTORS = [
   // univariate outliers
   "mad_outlier_fraction", "double_mad_outlier_fraction", "zscore_outlier_fraction",
-  "adjusted_boxplot_fraction", "auto_outlier_fraction", "isolation_forest_fraction",
-  "grubbs", "generalized_esd", "iqr_fence",
-  // distribution & drift
-  "ks_pvalue", "wasserstein_1", "psi", "kl_divergence", "js_divergence",
-  "mmd", "adwin", "chi_square_drift",
+  "adjusted_boxplot_fraction", "auto_outlier", "isolation_forest_fraction",
+  "iqr_fence", "grubbs", "generalized_esd",
+  // drift
+  "ks_pvalue", "wasserstein_1", "psi", "kl_divergence", "js_divergence", "chi_square_drift",
+  "outlier_fraction_drift",
   // time series
-  "stl_residual_zscore", "bocpd", "cusum", "page_hinkley",
-  "matrix_profile", "holt_winters", "prophet_anomaly",
-  // multivariate
-  "mahalanobis_distance", "lof", "one_class_svm", "hbos", "ecod",
-  // associations & information
-  "cramers_v", "mutual_information",
-  // pattern
-  "benford_law_fit",
+  "stl_residual_zscore",
+  // associations & pattern
+  "cramers_v", "benford_law_fit",
 ];
 
 const SIMPLE_CHECKS = [
@@ -349,15 +344,14 @@ export default function RootPage() {
 
       {/* ── stats band ── */}
       <section className="border-t border-b border-line" style={{ background: "var(--bg-1)" }}>
-        <div className="grid mx-auto" style={{ maxWidth: 1100, gridTemplateColumns: "repeat(5, 1fr)" }}>
+        <div className="grid mx-auto" style={{ maxWidth: 900, gridTemplateColumns: "repeat(4, 1fr)" }}>
           {[
-            { value: "30+", label: "detector algorithms", color: "var(--accent)" },
-            { value: "30+", label: "declarative checks", color: "var(--accent)" },
+            { value: "19", label: "detector algorithms", color: "var(--accent)" },
+            { value: "25+", label: "declarative checks", color: "var(--accent)" },
             { value: "9+", label: "warehouse engines", color: "var(--accent)" },
-            { value: "100k", label: "rows sampled per check run", color: "var(--warn)" },
             { value: "MIT", label: "no vendor lock-in", color: "var(--pass)" },
           ].map((s, i) => (
-            <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 4 ? "1px solid var(--line)" : "none" }}>
+            <div key={s.label} className="px-8 py-5 text-center" style={{ borderRight: i < 3 ? "1px solid var(--line)" : "none" }}>
               <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 36, fontWeight: 300, color: s.color, letterSpacing: "-0.03em" }}>
                 {s.value}
               </p>
@@ -379,7 +373,7 @@ export default function RootPage() {
               You set a threshold. It fires. Slack lights up. Now you&apos;re bouncing between dbt docs, the warehouse, and your BI tool — trying to figure out which upstream model changed, whether the spike in nulls explains the dashboard regression, and whether this is worth waking the on-call engineer for.
             </p>
             <p style={{ fontSize: 14, color: "var(--fg-0)", lineHeight: 1.75 }}>
-              <strong>dqt was built for the part that comes after the alert.</strong> It reads your dbt manifest, parses your warehouse SQL into a column-level lineage graph, runs 30+ statistical detectors, and discovers causal relationships across your metrics — so the next time something moves, you already know what moved it.
+              <strong>dqt was built for the part that comes after the alert.</strong> It reads your dbt manifest, parses your warehouse SQL into a column-level lineage graph, runs 19 statistical detectors, and discovers causal relationships across your metrics — so the next time something moves, you already know what moved it.
             </p>
           </div>
           <div className="space-y-3">
