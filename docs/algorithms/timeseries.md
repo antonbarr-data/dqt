@@ -29,11 +29,11 @@ Bayesian Online Changepoint Detection. Maintains a posterior over run-length (ti
 
 **Fails when:** Gradual drift (use Wasserstein-1 or ADWIN). Very short series (<30 points).
 
-**hazard_lambda default:** 50 (expected run length = 50 time steps between changepoints). Increase for slower-changing data.
+**hazard_lambda default:** 20 (expected run length = 20 time steps between changepoints). Increase for slower-changing data.
 
 ```python
 from dqt.algorithms.timeseries.bocpd import BOCPDDetector
-det = BOCPDDetector(hazard_lambda=50)    # daily data: 50 steps ≈ 7 weeks between changes
+det = BOCPDDetector(hazard_lambda=20)    # daily data: 20 steps ≈ 3 weeks between changes
 # det = BOCPDDetector(hazard_lambda=200) # hourly data: 200 steps ≈ 8 days between changes
 ```
 

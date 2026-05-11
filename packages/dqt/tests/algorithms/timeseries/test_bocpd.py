@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from dqt.algorithms._base import Verdict
+from dqt.algorithms.timeseries.bocpd import BOCPDDetector
 
 
 @pytest.fixture()
@@ -57,3 +58,36 @@ def test_bocpd_details_present(detector, timeseries_df):
     assert "max_changepoint_prob" in result.details
     assert "ref_mean" in result.details
     assert "ref_std" in result.details
+
+
+@pytest.mark.unit
+def test_bocpd_detects_level_shift():
+    """BOCPD must detect a +30% level shift in the current window."""
+    rng = np.random.default_rng(42)
+    baseline = rng.normal(100.0, 5.0, 100)
+    shifted = rng.normal(130.0, 5.0, 50)
+
+    ref = pd.DataFrame({"value": baseline})
+    curr = pd.DataFrame({"value": shifted})
+
+    det = BOCPDDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+
+    assert result.score >= 0.50, (
+        f"Expected changepoint prob >= 0.50 on +30% shift, got {result.score:.4f}"
+    )
+
+
+@pytest.mark.unit
+def test_bocpd_stable_data_passes():
+    """BOCPD must not trigger on stable data."""
+    rng = np.random.default_rng(0)
+    ref = pd.DataFrame({"value": rng.normal(50.0, 3.0, 100)})
+    curr = pd.DataFrame({"value": rng.normal(50.0, 3.0, 50)})
+
+    det = BOCPDDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+
+    assert result.score < 0.50, f"Expected pass on stable data, got {result.score:.4f}"

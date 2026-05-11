@@ -50,6 +50,8 @@ class ADWINDetector(BaseDetector):
         delta = state["delta"]
         drift_detected = False
         n_checked = 0
+        detected_mean0 = float("nan")
+        detected_mean1 = float("nan")
         # Check the ref|curr boundary using Hoeffding's bound.
         # Also check geometric sub-cuts within ref and within curr to catch
         # partial distribution changes, but only on the same side of the boundary.
@@ -78,16 +80,19 @@ class ADWINDetector(BaseDetector):
             n_checked += 1
             if mean_diff > eps:
                 drift_detected = True
+                detected_mean0 = mean0
+                detected_mean1 = mean1
                 break
         score = 1.0 if drift_detected else 0.0
         curr_mean = float(np.mean(curr))
+        if drift_detected:
+            means_str = f"window_before={detected_mean0:.4f}, window_after={detected_mean1:.4f}"
+        else:
+            means_str = f"ref_mean={state['ref_mean']:.4f}, curr_mean={curr_mean:.4f}"
         return DetectorResult(
             score=score,
             verdict=self._verdict(score),
-            plain_english=(
-                f"ADWIN: {'drift detected' if drift_detected else 'stable'} "
-                f"(ref_mean={state['ref_mean']:.4f}, curr_mean={curr_mean:.4f})"
-            ),
+            plain_english=f"ADWIN: {'drift detected' if drift_detected else 'stable'} ({means_str})",
             details={
                 "drift_detected": drift_detected,
                 "ref_mean": state["ref_mean"],

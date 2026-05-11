@@ -109,7 +109,7 @@ class BOCPDDetector(BaseDetector):
     group = "timeseries"
     min_recommended_n: ClassVar[int] = 100
 
-    def __init__(self, hazard_lambda: float = 50.0) -> None:
+    def __init__(self, hazard_lambda: float = 20.0) -> None:
         self._hazard_lambda = hazard_lambda
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

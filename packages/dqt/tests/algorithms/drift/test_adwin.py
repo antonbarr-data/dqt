@@ -48,3 +48,28 @@ def test_adwin_details_present(detector, normal_df):
     assert "ref_mean" in result.details
     assert "curr_mean" in result.details
     assert "n_windows_checked" in result.details
+
+
+@pytest.mark.unit
+def test_adwin_plain_english_shows_different_means_on_drift():
+    """When drift detected, plain_english must show different window_before and window_after."""
+    import re
+    from dqt.algorithms.drift.adwin import ADWINDetector
+
+    rng = np.random.default_rng(42)
+    ref = pd.DataFrame({"value": rng.normal(100.0, 5.0, 200)})
+    curr = pd.DataFrame({"value": rng.normal(150.0, 5.0, 200)})
+
+    det = ADWINDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+
+    assert result.score == 1.0, "Expected drift detected"
+    assert "window_before=" in result.plain_english
+    assert "window_after=" in result.plain_english
+    # Extract the two numeric values from the parenthesised section
+    nums = re.findall(r"[-\d.]+", result.plain_english.split("(")[1])
+    assert len(nums) == 2
+    assert float(nums[0]) != float(nums[1]), (
+        f"window_before and window_after should differ: {result.plain_english}"
+    )
