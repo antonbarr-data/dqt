@@ -4,6 +4,8 @@
 # Datakin, and OpenMetadata without requiring the openlineage-python SDK.
 from __future__ import annotations
 
+import json
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -98,8 +100,6 @@ class OpenLineageEmitter:
         )
         self._emitted.append(event)
         if self.transport:
-            import json
-            import urllib.request
             body = json.dumps(event).encode()
             req = urllib.request.Request(
                 self.transport, data=body,

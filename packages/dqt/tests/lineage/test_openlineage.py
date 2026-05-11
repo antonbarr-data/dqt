@@ -40,17 +40,19 @@ def test_emit_start_and_complete():
 
 @pytest.mark.unit
 def test_emit_fail_event():
-    """FAIL event includes error message."""
+    """FAIL event includes error message and is appended to _emitted."""
     from dqt.lineage.openlineage import OpenLineageEmitter, RunState
 
     emitter = OpenLineageEmitter(producer="dqt/test", transport=None)
-    event = emitter.build_event(
+    error_msg = "12% of values outside IQR fences — verdict: fail"
+    event = emitter.emit(
         state=RunState.FAIL,
         job_name="analytics.orders.iqr_fence",
         run_id=str(uuid4()),
         event_time=datetime.now(timezone.utc),
-        error_message="12% of values outside IQR fences — verdict: fail",
+        error_message=error_msg,
     )
     assert event["eventType"] == "FAIL"
     assert "errorMessage" in event.get("run", {}).get("facets", {})
-    assert event["run"]["facets"]["errorMessage"]["message"] == "12% of values outside IQR fences — verdict: fail"
+    assert event["run"]["facets"]["errorMessage"]["message"] == error_msg
+    assert len(emitter._emitted) == 1
