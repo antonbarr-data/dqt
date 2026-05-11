@@ -25,6 +25,16 @@ For each non-null FK value in the child column, checks whether it exists in `par
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.referential.referential import ReferentialIntegrityDetector
+
+det = ReferentialIntegrityDetector(
+    parent_table="public.customers",  # fully-qualified table name of the parent
+                                      # (e.g. "public.fct_gigs").
+    parent_col="id",                  # the primary key column in the parent table
+                                      # (default "id").
+    # score = orphan fraction (fraction of child rows with no matching parent key).
+    # 0.0 = perfect integrity.
+)
 
 check = Check(
     schema_name="public",
@@ -41,6 +51,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_be_in_set` (with parent lookup)
 - Soda: `referential_integrity` (enterprise)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/referential/referential.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/referential/referential.py)
 
 ## Source
 

@@ -24,6 +24,15 @@ For each non-null value, checks whether `col = UPPER(col)` (upper), `col = LOWER
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.string_case import StringCaseViolationDetector
+
+det = StringCaseViolationDetector(
+    case="upper",
+    # "lower" for snake_case column values (status, category).
+    # "upper" for codes and identifiers (ISO codes, ENUM values).
+    # "title" for display names.
+    # score = fraction of non-null values violating the rule.
+)
 
 check = Check(
     schema_name="public",
@@ -40,6 +49,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_match_regex` (with case regex)
 - Soda: no direct equivalent
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/string_case.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/string_case.py)
 
 ## Source
 

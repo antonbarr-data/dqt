@@ -52,6 +52,11 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="double_mad_outlier_fraction",
+    detector_params={
+        "threshold": 3.5,  # same scale as symmetric MAD; 3.5 works well for most skewed
+                           # columns; lower only the relevant side's threshold when one tail
+                           # matters more (e.g. only care about high prices → lower to 2.5)
+    },
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -62,6 +67,10 @@ print(result.score)           # raw score
 ## Learn more
 
 - 📺 [How Is MAD Used To Detect Outliers? — The Friendly Statistician](https://www.youtube.com/watch?v=8WbvTy6XwG4) — covers MAD-based outlier detection including the double-MAD extension for asymmetric distributions.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/mad.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/mad.py)
 
 ## Reference
 

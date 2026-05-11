@@ -53,6 +53,12 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="zscore_outlier_fraction",
+    detector_params={
+        "threshold": 3.0,  # classic three-sigma rule (flags ~0.3% of normal data); only
+                           # valid when the column is approximately normal — do NOT use on
+                           # price/amount columns; lower to 2.5 for stricter alerting on
+                           # tightly controlled lab/sensor measurements
+    },
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -63,6 +69,10 @@ print(result.score)           # raw score
 ## Learn more
 
 - 📺 [How to Detect Outliers with Z Score | Clearly Explained](https://www.youtube.com/watch?v=Qv2vCviL4iU) — step-by-step walkthrough of the Z-score formula, the three-sigma rule, and when it fails on non-normal data.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/zscore.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/zscore.py)
 
 ## Reference
 

@@ -24,6 +24,10 @@ Computes `1 - (null_count / total_count)`. A score of 1.0 means all values are p
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.completeness import CompletenessDetector
+
+# CompletenessDetector()
+#   no params — inverse of null_fraction; score = fraction of non-null values (1.0 = fully complete)
 
 check = Check(
     schema_name="public",
@@ -40,6 +44,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_not_be_null`
 - Soda: `missing_percent` (inverse)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/completeness.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/completeness.py)
 
 ## Source
 

@@ -55,7 +55,9 @@ curr_good = pd.DataFrame({"amount_paid_usd": legitimate})
 fabricated = rng.choice([100.0, 200.0, 500.0, 1000.0, 2000.0], size=2000)
 curr_bad = pd.DataFrame({"amount_paid_usd": fabricated})
 
-det = BenfordDetector()
+det = BenfordDetector()  # no params; requires at least ~100 non-zero values;
+                          # works best on naturally-occurring amounts, IDs, or counts
+                          # that span multiple orders of magnitude
 state = det.fit(curr_good)  # fit is a no-op; state is empty
 
 result_good = det.score(curr_good, state)
@@ -72,6 +74,10 @@ print(result_bad.score)           # ~1.0
 ## Learn more
 
 - 📺 [How to Detect Fraud Using Benford's Law](https://www.youtube.com/watch?v=7uhAn19V1EY) — explains the logarithmic first-digit law, shows how fabricated or manipulated numbers violate it, and demonstrates a forensic accounting workflow.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/pattern/benford.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/pattern/benford.py)
 
 ## Reference
 

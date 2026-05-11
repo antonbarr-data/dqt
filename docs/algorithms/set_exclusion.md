@@ -24,6 +24,14 @@ Evaluates `col IN (forbidden_values)` for each row and returns the fraction of v
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.value_checks import SetExclusionDetector
+
+det = SetExclusionDetector(
+    forbidden_values=["banned", "spam"],
+    # list values that must never appear; useful for sentinel values
+    # that should be filtered upstream (e.g. "NULL" as a string, "test", "DELETE").
+    # score = fraction of non-null values that ARE in the forbidden set.
+)
 
 check = Check(
     schema_name="public",
@@ -40,6 +48,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_not_be_in_set`
 - Soda: `invalid_values`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/value_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/value_checks.py)
 
 ## Source
 

@@ -52,6 +52,11 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="adjusted_boxplot_fraction",
+    detector_params={
+        "h": 1.5,  # same semantics as IQR k, corrected for skewness; 1.5 is the right
+                   # default for skewed warehouse columns; rarely needs changing — the
+                   # medcouple correction already adapts to the column's asymmetry
+    },
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -62,6 +67,10 @@ print(result.score)           # raw score
 ## Learn more
 
 <!-- TODO: no simple YouTube explanation found -->
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/adjusted_boxplot.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/adjusted_boxplot.py)
 
 ## Reference
 

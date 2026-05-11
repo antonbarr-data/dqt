@@ -30,6 +30,15 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.volume import RowCountInRangeDetector
+
+# RowCountInRangeDetector(
+#     date_col="created_at",        # partitioning or load timestamp column
+#     start_date="2024-01-01",      # SLA window start (inclusive), ISO format
+#     end_date="2024-12-31",        # SLA window end (inclusive), ISO format
+#     min_rows=0,                   # minimum acceptable load (e.g. 1000 rows/day for a production table)
+#     max_rows=2**31,               # ceiling to catch runaway duplicate loads
+# )
 
 check = Check(
     schema_name="public",
@@ -51,6 +60,10 @@ check = Check(
 
 - Great Expectations: `expect_table_row_count_to_be_between`
 - Soda: `row_count` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/volume.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/volume.py)
 
 ## Source
 

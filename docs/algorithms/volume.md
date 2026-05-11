@@ -24,6 +24,11 @@ Counts rows in the current window, compares to the baseline count fitted from th
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.volume import VolumeDetector
+
+# VolumeDetector()
+#   no params — scores total row count against a learned baseline;
+#   use row_count_in_range for hard absolute bounds
 
 check = Check(
     schema_name="public",
@@ -40,6 +45,10 @@ check = Check(
 - Great Expectations: `expect_table_row_count_to_be_between`
 - Soda: `row_count` (with anomaly detection)
 - Elementary: `volume_anomaly`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/volume.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/volume.py)
 
 ## Source
 

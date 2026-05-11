@@ -26,6 +26,12 @@ The warn and fail thresholds are both 0.5, so any schema change (score = 1.0) is
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.schema.schema_checks import SchemaChangeDetector
+
+det = SchemaChangeDetector()
+# no params; fit() records the current schema (col_name → data_type mapping).
+# score() compares against the snapshot and returns score=0 (pass) or score=1 (fail)
+# with details listing added, removed, and type-changed columns.
 
 check = Check(
     schema_name="public",
@@ -43,6 +49,10 @@ check = Check(
 - Great Expectations: `expect_table_columns_to_match_ordered_list` (partial)
 - Soda: `schema` checks
 - Elementary: `schema_changes`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/schema/schema_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/schema/schema_checks.py)
 
 ## Source
 

@@ -63,7 +63,9 @@ curr_drift  = pd.DataFrame({"price_usd": rng.lognormal(mean=4.2, sigma=0.5, size
 # Current window with no real change
 curr_stable = pd.DataFrame({"price_usd": rng.lognormal(mean=3.5, sigma=0.5, size=n)})
 
-det = MMDDetector()
+det = MMDDetector()  # no params; uses RBF kernel with median heuristic bandwidth;
+                     # kernel-based test powerful when distributions overlap significantly
+                     # and histogram-based tests miss the shift
 state = det.fit(ref)
 
 result_drift = det.score(curr_drift, state)
@@ -79,6 +81,10 @@ print(result_stable.score)         # near 0.0
 ## Learn more
 
 - 📺 [Maximum Mean Discrepancy: How to Compare High-Dimensional Data](https://www.youtube.com/watch?v=KuzEm1VhJYE) — explains MMD as a statistical framework for determining whether two datasets come from different distributions, with intuitive kernel diagrams.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/mmd.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/mmd.py)
 
 ## Reference
 

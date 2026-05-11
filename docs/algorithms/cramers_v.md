@@ -54,7 +54,8 @@ ref = pd.DataFrame({"tier": ref_tiers})
 curr_tiers = rng.choice(["bronze", "silver", "gold"], size=2000, p=[0.40, 0.35, 0.25])
 curr_drift = pd.DataFrame({"tier": curr_tiers})
 
-det = CramersVDetector()
+det = CramersVDetector()  # no params; always pass col_a and col_b as keyword arguments
+                           # to Check or directly to the detector
 state = det.fit(ref)
 result = det.score(curr_drift, state)
 print(result.verdict)        # warn or fail
@@ -71,6 +72,10 @@ print(det.score(curr_stable, state).verdict)  # pass
 ## Learn more
 
 - 📺 [How to Calculate Cramer's V](https://www.youtube.com/watch?v=ckX8w7lWtGQ) — shows step-by-step how to build the contingency table, compute chi-square, and normalise to obtain Cramér's V as a bounded effect size.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/info/cramers_v.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/info/cramers_v.py)
 
 ## Reference
 

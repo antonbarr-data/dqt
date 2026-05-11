@@ -53,7 +53,13 @@ dropped = rng.poisson(lam=290, size=30).astype(float)   # ~17% drop in volume
 ref = pd.DataFrame({"bookings": baseline}, index=dates[:90])
 curr = pd.DataFrame({"bookings": dropped}, index=dates[90:])
 
-det = CUSUMDetector(k=0.5, h=50.0)
+det = CUSUMDetector(
+    k=0.5,    # allowable slack in units of σ; 0.5σ means shifts smaller than half a standard
+              # deviation are tolerated; lower to 0.25 for very sensitive monitoring, raise to 1.0
+              # to ignore small fluctuations
+    h=50.0,   # decision threshold (cumulative sum must exceed h to trigger); 50.0 is moderate —
+              # lower to 20–30 for earlier detection of small shifts, raise to 100+ for noisy series
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -67,10 +73,13 @@ print(result.details)        # {"cusum_hi": 0.0, "cusum_lo": -67.12, "ref_mean":
 
 - 📺 [Time-Weighted Control Charts Explained | CUSUM & EWMA for Precision Monitoring — YouTube](https://www.youtube.com/watch?v=55gGq0DsZ8s) — explains how CUSUM accumulates small process shifts that Shewhart charts miss, with worked examples.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/cusum.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/cusum.py)
+
 ## Reference
 
 - Page, E. S. (1954). Continuous inspection schemes. *Biometrika*, 41(1–2), 100–115.
-- `packages/dqt/src/dqt/algorithms/timeseries/cusum.py`
 
 ## Tests
 

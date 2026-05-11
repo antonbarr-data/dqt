@@ -52,7 +52,12 @@ regime_b = rng.normal(loc=95.0, scale=6.0, size=30)   # new premium tier strateg
 ref = pd.DataFrame({"median_price_usd": regime_a}, index=dates[:90])
 curr = pd.DataFrame({"median_price_usd": regime_b}, index=dates[90:])
 
-det = BOCPDDetector(hazard_lambda=250.0)
+det = BOCPDDetector(
+    hazard_lambda=250.0,  # expected run length between change points in time steps; 250 means
+                          # "expect a change roughly every 250 observations"; lower to 50–100 for
+                          # series where structural breaks are frequent; raise to 500+ for stable
+                          # series to avoid spurious change points
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -66,10 +71,13 @@ print(result.details["max_changepoint_prob"])  # 0.93...
 
 - 📺 [Bayesian Online Change-Point Detection — Schroders Tech Sessions](https://www.youtube.com/watch?v=cas__TaFk9U) — applied walkthrough of the Adams & MacKay algorithm in a production finance context, covering run-length posteriors and hazard priors.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/bocpd.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/bocpd.py)
+
 ## Reference
 
 - Adams, R. P., & MacKay, D. J. C. (2007). Bayesian online changepoint detection. *arXiv:0710.3742*.
-- `packages/dqt/src/dqt/algorithms/timeseries/bocpd.py`
 
 ## Tests
 

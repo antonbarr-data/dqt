@@ -57,7 +57,11 @@ anomalous = pd.DataFrame({
 })
 curr = pd.concat([ref.sample(1000, random_state=9), anomalous], ignore_index=True)
 
-det = HBOSDetector(n_bins=20)
+det = HBOSDetector(
+    n_bins=20,  # histogram bins per column; 20 is a good default for columns with 1k–100k distinct values;
+                # increase to 50 for high-cardinality continuous columns;
+                # decrease to 10 for low-cardinality or sparse columns
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -69,6 +73,10 @@ print(result.details)        # {"outlier_fraction": 0.005, "score_threshold": ..
 ## Learn more
 
 - 📺 [Histogram Based Outlier Score HBOS](https://www.youtube.com/watch?v=gE1LDHB3ImQ) — walks through the histogram construction and log-inverse scoring formula with worked examples.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_multi/hbos.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_multi/hbos.py)
 
 ## Reference
 

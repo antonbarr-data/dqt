@@ -53,7 +53,8 @@ ref = pd.DataFrame({"rating": ref_ratings.astype(str)})
 curr_ratings = rng.choice([1, 2, 3, 4, 5], size=1000, p=[0.20, 0.25, 0.25, 0.20, 0.10])
 curr_drift = pd.DataFrame({"rating": curr_ratings.astype(str)})
 
-det = ChiSquareDriftDetector()
+det = ChiSquareDriftDetector()  # no params; operates directly on category counts, no binning needed;
+                                # best for string columns (status, tier, category) or low-cardinality integers
 state = det.fit(ref)
 result = det.score(curr_drift, state)
 print(result.verdict)        # fail
@@ -69,6 +70,10 @@ print(det.score(curr_stable, state).verdict)  # pass
 ## Learn more
 
 - 📺 [Chi-Square Test: clearly explained](https://www.youtube.com/watch?v=YoZlIQFcggk) — explains the chi-square goodness-of-fit test, degrees of freedom, and how to read the p-value for categorical frequency comparisons.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/chi_square.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/chi_square.py)
 
 ## Reference
 

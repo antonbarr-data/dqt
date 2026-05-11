@@ -47,7 +47,10 @@ rng = np.random.default_rng(42)
 ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 2000)})
 curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(100, 20, 2000)})  # 1σ mean shift
 
-det = JSDivergenceDetector(n_bins=10)
+det = JSDivergenceDetector(
+    n_bins=10,  # same binning as KL but symmetric and bounded [0, 1];
+                # 10 bins is standard; score of 0.1 = noticeable shift; 0.3+ = major shift
+)
 state = det.fit(ref)
 result = det.score(curr_drift, state)
 print(result.verdict)        # warn or fail
@@ -64,6 +67,10 @@ print(result_stable.score)    # near 0
 ## Learn more
 
 - 📺 [Jensen–Shannon (JS) Divergence for Machine Learning | Relation with KL Divergence | Explained](https://www.youtube.com/watch?v=0wtJNYaTB-8) — derives JS divergence from KL, proves it is symmetric and bounded in [0, 1], and shows practical examples comparing distributions.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/divergence.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/divergence.py)
 
 ## Reference
 

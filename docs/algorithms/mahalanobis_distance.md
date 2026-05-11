@@ -60,7 +60,11 @@ suspicious = pd.DataFrame({
 })
 curr = pd.concat([ref.sample(500, random_state=1), suspicious], ignore_index=True)
 
-det = MahalanobisDetector(p_threshold=0.001)
+det = MahalanobisDetector(
+    p_threshold=0.001,  # chi-square tail probability; 0.001 flags the most extreme 0.1% of rows;
+                        # raise to 0.01 for more sensitive alerting;
+                        # only valid when columns are approximately multivariate normal
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -72,6 +76,10 @@ print(result.details)        # {"outlier_fraction": 0.089, "chi2_threshold": ...
 ## Learn more
 
 - 📺 [Mahalanobis Distance — intuitive understanding through graphs and tables](https://www.youtube.com/watch?v=3IdvoI8O9hU) — builds from Euclidean distance to the full multi-dimensional ellipsoid with clear visual examples.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_multi/mahalanobis.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_multi/mahalanobis.py)
 
 ## Reference
 

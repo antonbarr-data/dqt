@@ -28,6 +28,15 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import QuantileInRangeDetector
+
+# QuantileInRangeDetector(
+#     quantile=0.95,          # 0.95 (p95) is the most common choice for one-sided upper-tail checks;
+#                             # use 0.99 for stricter tail monitoring;
+#                             # use 0.50 for a robust median check
+#     min_val=0.0,            # lower bound (rarely needed for tail checks)
+#     max_val=float("inf"),   # maximum acceptable value at that quantile
+# )
 
 check = Check(
     schema_name="public",
@@ -44,6 +53,10 @@ check = Check(
 
 - Great Expectations: `expect_column_quantile_values_to_be_between`
 - Soda: `percentile` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

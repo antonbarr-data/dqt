@@ -57,7 +57,12 @@ curr = pd.DataFrame({"booking_count": daily_bookings[90:].copy()}, index=dates[9
 # inject a spike on day 95 — e.g. a flash sale drove a sudden surge
 curr.iloc[5, 0] += 400.0
 
-det = STLAnomalyDetector(period=7)
+det = STLResidualZScoreDetector(
+    period=7,      # seasonality period in time steps; 7 for daily data with weekly cycle (most common
+                   # for warehouse metrics); use 24 for hourly data with daily cycle; use 365 for
+                   # daily data with annual cycle; getting period wrong will misattribute seasonal
+                   # patterns as anomalies
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 print(result.verdict)        # fail (spike >> 5σ)
@@ -70,10 +75,13 @@ print(result.details["anomaly_count"])  # 1
 
 - 📺 [Robust Anomaly Detection + Seasonal-Trend Decomposition: Time Series Talk](https://www.youtube.com/watch?v=1NXryMoU7Ho) — demonstrates STL decomposition in Python, explains how the robust flag handles outliers during fitting, and shows residual-based anomaly detection.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/stl.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/stl.py)
+
 ## Reference
 
 - Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. (1990). STL: A seasonal-trend decomposition procedure based on Loess. *Journal of Official Statistics*, 6(1), 3–73.
-- `packages/dqt/src/dqt/algorithms/timeseries/stl.py`
 
 ## Tests
 

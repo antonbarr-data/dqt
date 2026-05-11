@@ -25,6 +25,15 @@ Evaluates `LENGTH(col::text) < min_len OR LENGTH(col::text) > max_len` for each 
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.value_checks import StringLengthRangeDetector
+
+det = StringLengthRangeDetector(
+    min_len=3,   # set min_len=1 to reject empty strings;
+                 # for email addresses use min_len=6 (RFC 5321 lower bound).
+    max_len=32,  # for email addresses use max_len=254 (RFC 5321 limit);
+                 # for short codes (ISO country codes) use max_len=3.
+    # score = fraction of non-null values with length outside [min_len, max_len].
+)
 
 check = Check(
     schema_name="public",
@@ -41,6 +50,10 @@ check = Check(
 
 - Great Expectations: `expect_column_value_lengths_to_be_between`
 - Soda: `min_length` / `max_length`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/value_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/value_checks.py)
 
 ## Source
 

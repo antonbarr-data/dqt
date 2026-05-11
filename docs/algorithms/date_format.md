@@ -24,6 +24,16 @@ Converts the declared format string to a structural POSIX regex (e.g. `%Y-%m-%d`
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.value_checks import DateFormatDetector
+
+det = DateFormatDetector(
+    date_format="%Y-%m-%d",
+    # use Python strftime format strings.
+    # "%Y-%m-%d" for ISO dates (most common).
+    # "%Y-%m-%dT%H:%M:%S" for ISO datetimes.
+    # "%d/%m/%Y" for EU format.
+    # score = fraction of non-null values that do NOT parse against the format.
+)
 
 check = Check(
     schema_name="public",
@@ -40,6 +50,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_match_strftime_format`
 - Soda: `valid_format` (date variant)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/value_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/value_checks.py)
 
 ## Source
 

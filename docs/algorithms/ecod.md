@@ -59,7 +59,8 @@ fraudulent = pd.DataFrame({
 })
 curr = pd.concat([ref.sample(500, random_state=5), fraudulent], ignore_index=True)
 
-det = ECODDetector()
+det = ECODDetector()  # no tunable params; non-parametric empirical CDF method;
+                      # the recommended default for high-dimensional tabular data
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -71,6 +72,10 @@ print(result.details)        # {"outlier_fraction": 0.056, "score_threshold": ..
 ## Learn more
 
 <!-- TODO: no simple YouTube explanation found -->
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_multi/ecod.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_multi/ecod.py)
 
 ## Reference
 

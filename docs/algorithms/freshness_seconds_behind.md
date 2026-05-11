@@ -28,6 +28,17 @@ The global scale is shown in the UI gauge but the actual verdict uses the instan
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.freshness import FreshnessDetector
+
+det = FreshnessDetector(
+    col="updated_at",       # the timestamp column to check.
+    warn_seconds=3600,      # 3600 (1 hour) for hourly pipelines.
+                            # for daily pipelines use warn_seconds=86400.
+                            # for near-real-time use warn_seconds=300 (5 min).
+    fail_seconds=86400,     # 86400 (24 hours) for daily pipelines.
+                            # for daily pipelines use fail_seconds=172800 (2 days).
+                            # for near-real-time use fail_seconds=900 (15 min).
+)
 
 check = Check(
     schema_name="public",
@@ -44,6 +55,10 @@ check = Check(
 - Great Expectations: `expect_column_max_to_be_between` (with datetime bounds)
 - Soda: `freshness`
 - Elementary: `freshness`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/freshness.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/freshness.py)
 
 ## Source
 

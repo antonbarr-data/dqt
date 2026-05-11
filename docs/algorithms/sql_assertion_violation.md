@@ -24,6 +24,17 @@ Evaluates `NOT (condition)` for each row and returns the fraction of violations.
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.sql_assertion import SQLAssertionViolationDetector
+
+det = SQLAssertionViolationDetector(
+    condition="amount > 0 AND status IS NOT NULL AND customer_id IS NOT NULL",
+    # condition is a SQL WHERE clause evaluated per row.
+    # every row that satisfies the condition is counted as a violation
+    # (score = violation fraction).
+    # use "amount > list_price * 1.05" to catch overbillings.
+    # can reference multiple columns.
+    # condition must be valid SQL for your warehouse engine.
+)
 
 check = Check(
     schema_name="public",
@@ -40,6 +51,10 @@ check = Check(
 - Great Expectations: `expect_column_pair_values_to_be_equal` (partial); use `SqlAlchemyDataset` for custom SQL
 - Soda: `failed_rows` (with custom SQL)
 - Dataplex: `SqlAssertion` rule
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/sql_assertion.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/sql_assertion.py)
 
 ## Source
 

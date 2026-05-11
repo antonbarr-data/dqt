@@ -26,6 +26,14 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.monotonicity import MonotonicityDetector
+
+det = MonotonicityDetector(
+    direction="increasing",
+    # "increasing" for counters, IDs, cumulative sums.
+    # "decreasing" for countdown timers or deprecating inventories.
+    # score = fraction of consecutive pairs that violate the direction.
+)
 
 check = Check(
     schema_name="public",
@@ -42,6 +50,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_be_increasing` / `expect_column_values_to_be_decreasing`
 - Soda: no direct equivalent
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/monotonicity.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/monotonicity.py)
 
 ## Source
 

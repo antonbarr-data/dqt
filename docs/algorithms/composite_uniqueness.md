@@ -24,6 +24,13 @@ Concatenates the specified key columns into a single composite key string (null-
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.column_pairs import CompositeUniquenessDetector
+
+# CompositeUniquenessDetector(
+#     key_columns=["col_a", "col_b"],  # columns that together form the unique key;
+#                                       # list the most selective column first for readability;
+#                                       # at least 2 columns required
+# )
 
 check = Check(
     schema_name="public",
@@ -39,6 +46,10 @@ check = Check(
 
 - Great Expectations: `expect_compound_columns_to_be_unique`
 - Soda: `duplicate_count` (on multi-column group)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/column_pairs.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/column_pairs.py)
 
 ## Source
 

@@ -56,6 +56,8 @@ curr_ok   = pd.DataFrame({"outlier_fraction": [0.021]})
 curr_high = pd.DataFrame({"outlier_fraction": [0.12]})
 
 det = OutlierFractionRangeDetector()
+# OutlierFractionRangeDetector() takes no constructor params; method, k, lower_pct,
+# and upper_pct are passed to fit() — see fit() call below
 state = det.fit(ref, method="iqr", k=1.5)
 
 result_ok = det.score(curr_ok, state)
@@ -70,6 +72,10 @@ print(result_high.plain_english)  # "Outlier fraction 0.120 is outside expected 
 ## Learn more
 
 <!-- TODO: no simple YouTube explanation found -->
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/outlier_fraction_range.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/outlier_fraction_range.py)
 
 ## Reference
 

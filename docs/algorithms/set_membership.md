@@ -24,6 +24,15 @@ Evaluates `col NOT IN (allowed_values)` for each row and returns the fraction of
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.value_checks import SetMembershipDetector
+
+det = SetMembershipDetector(
+    allowed_values=["pending", "paid", "shipped", "cancelled"],
+    # list every valid category value; be exhaustive —
+    # any value not in this list counts as a violation.
+    # use a frozenset for large allowed sets (faster lookup).
+    # score = fraction of non-null values NOT in the set (0 = all match = good).
+)
 
 check = Check(
     schema_name="public",
@@ -40,6 +49,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_be_in_set`
 - Soda: `valid_values`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/value_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/value_checks.py)
 
 ## Source
 

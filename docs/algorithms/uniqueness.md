@@ -24,6 +24,11 @@ Computes `COUNT(DISTINCT col) / COUNT(*)`. A score of 1.0 means every value is u
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.uniqueness import UniquenessDetector
+
+# UniquenessDetector()
+#   no params — score = COUNT(DISTINCT col) / COUNT(*) (1.0 = fully unique)
+#   use composite_uniqueness for multi-column keys
 
 check = Check(
     schema_name="public",
@@ -40,6 +45,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_be_unique`
 - Soda: `duplicate_percent` (inverse)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/uniqueness.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/uniqueness.py)
 
 ## Source
 

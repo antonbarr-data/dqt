@@ -27,6 +27,14 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import StddevInRangeDetector
+
+# StddevInRangeDetector(
+#     min_val=0.0,            # set > 0 to detect suspiciously constant data
+#                             # (stddev = 0 = all-same values = likely pipeline bug)
+#     max_val=float("inf"),   # catch runaway variance (e.g. 1000 on a column normally spread 0–200
+#                             # would catch a suddenly wild distribution)
+# )
 
 check = Check(
     schema_name="public",
@@ -43,6 +51,10 @@ check = Check(
 
 - Great Expectations: `expect_column_stdev_to_be_between`
 - Soda: `stddev` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

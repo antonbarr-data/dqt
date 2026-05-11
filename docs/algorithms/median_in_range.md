@@ -27,6 +27,14 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import MedianInRangeDetector
+
+# MedianInRangeDetector(
+#     min_val=0.0,            # lower bound of plausible median range
+#                             # (e.g. 10 for order amounts — "typical order is at least $10")
+#     max_val=float("inf"),   # upper bound of plausible median range
+#                             # (e.g. 5000 for order amounts — "typical order is at most $5000")
+# )
 
 check = Check(
     schema_name="public",
@@ -43,6 +51,10 @@ check = Check(
 
 - Great Expectations: `expect_column_median_to_be_between`
 - Soda: `percentile` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

@@ -67,6 +67,9 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="auto_outlier",
+    # AutoOutlierDetector() takes no params; the inner detector and its default
+    # parameters are selected automatically based on the distribution profile;
+    # result.details["auto_selected_method"] shows which detector was chosen
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)                              # pass / warn / fail
@@ -79,6 +82,10 @@ print(result.details["distribution_type"])         # classified distribution typ
 ## Learn more
 
 <!-- TODO: no simple YouTube explanation found -->
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/auto_outlier.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/auto_outlier.py)
 
 ## Reference
 

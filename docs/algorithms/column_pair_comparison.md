@@ -26,6 +26,17 @@ Evaluates `NOT (col_a <operator> col_b)` for each row where both columns are non
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.column_pairs import ColumnPairComparisonDetector
+
+det = ColumnPairComparisonDetector(
+    col_a="shipped_at",  # left-hand side column name in the DataFrame.
+    col_b="created_at",  # right-hand side column name in the DataFrame.
+    operator="<=",       # "<=" most common (start ≤ end).
+                         # use ">=" for reverse ordering.
+                         # use "==" to assert two columns are always equal
+                         # (e.g. denormalised copies).
+    # score = fraction of rows where the comparison FAILS.
+)
 
 check = Check(
     schema_name="public",
@@ -41,6 +52,10 @@ check = Check(
 
 - Great Expectations: `expect_column_pair_values_a_to_be_greater_than_b` (and variants)
 - Soda: no direct equivalent
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/column_pairs.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/column_pairs.py)
 
 ## Source
 

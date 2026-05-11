@@ -27,6 +27,12 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import MinInRangeDetector
+
+# MinInRangeDetector(
+#     min_val=0.0,            # hard floor (e.g. 0.01 for amounts, 1 for IDs)
+#     max_val=float("inf"),   # caps the minimum if it should never be too high
+# )
 
 check = Check(
     schema_name="public",
@@ -43,6 +49,10 @@ check = Check(
 
 - Great Expectations: `expect_column_min_to_be_between`
 - Soda: `min` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

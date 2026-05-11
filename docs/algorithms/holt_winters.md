@@ -58,7 +58,14 @@ curr = pd.DataFrame({"sessions": sessions[90:].copy()}, index=dates[90:])
 # inject anomaly: a 4-day outage that suppresses sessions
 curr.iloc[3:7, 0] *= 0.30
 
-det = HoltWintersDetector(period=7, alpha=0.99)
+det = HoltWintersDetector(
+    period=7,     # seasonality period in observations; same convention as STL: 7 for daily data
+                  # with weekly cycle, 24 for hourly data with daily cycle; must be consistent with
+                  # the reference window length (≥ 2 × period)
+    alpha=0.99,   # level smoothing factor; 0.99 means the forecast trusts recent data almost
+                  # entirely (fast adaptation); lower to 0.7–0.9 for smoother forecasts that are
+                  # less reactive to single-day spikes
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -72,11 +79,14 @@ print(result.details["n_anomalies"])  # 4
 
 - 📺 [TSA — Exponential Smoothing — Trend and/or Seasonality (Holt Winters) — YouTube](https://www.youtube.com/watch?v=vQCcD0j-vHQ) — thorough theory walkthrough of additive and multiplicative Holt-Winters with worked R examples.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/holt_winters.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/holt_winters.py)
+
 ## Reference
 
 - Holt, C. C. (1957). Forecasting seasonals and trends by exponentially weighted averages. *ONR Memorandum 52*, Carnegie Institute of Technology. (Reprinted in *International Journal of Forecasting* 20(1), 2004.)
 - Winters, P. R. (1960). Forecasting sales by exponentially weighted moving averages. *Management Science*, 6(3), 324–342.
-- `packages/dqt/src/dqt/algorithms/timeseries/holt_winters.py`
 
 ## Tests
 

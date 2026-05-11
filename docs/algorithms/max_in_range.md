@@ -27,6 +27,12 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import MaxInRangeDetector
+
+# MaxInRangeDetector(
+#     min_val=0.0,            # rarely needed, but useful to assert MAX never goes negative
+#     max_val=float("inf"),   # hard physical or business ceiling (e.g. 100.0 for a percentage column)
+# )
 
 check = Check(
     schema_name="public",
@@ -43,6 +49,10 @@ check = Check(
 
 - Great Expectations: `expect_column_max_to_be_between`
 - Soda: `max` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

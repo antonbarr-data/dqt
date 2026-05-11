@@ -53,7 +53,13 @@ elevated_prices = rng.normal(loc=102.0, scale=8.0, size=30)   # ~20% price incre
 ref = pd.DataFrame({"avg_price_usd": baseline_prices}, index=dates[:90])
 curr = pd.DataFrame({"avg_price_usd": elevated_prices}, index=dates[90:])
 
-det = PageHinkleyDetector(delta=0.005, lambda_=100.0)
+det = PageHinkleyDetector(
+    delta=0.005,    # minimum magnitude of change to detect as a fraction of the reference mean;
+                    # 0.005 = detect shifts ≥0.5% of mean; raise to 0.01–0.02 for noisy series
+                    # to avoid false positives
+    lambda_=100.0,  # detection threshold; 100.0 is moderately sensitive — lower to 50 for faster
+                    # detection of smaller shifts, raise to 200 for fewer alerts on volatile series
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -68,10 +74,13 @@ print(result.details["ref_mean"])       # ~85.0
 
 - 📺 [Change Point Detection Algorithms — The Alan Turing Institute](https://www.youtube.com/watch?v=yidQ5G-jKf0) — overview of online and offline change-point methods including cumulative-sum families; contextualises Page-Hinkley among competing approaches.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/page_hinkley.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/page_hinkley.py)
+
 ## Reference
 
 - Hinkley, D. V. (1971). Inference about the change-point from cumulative sum tests. *Biometrika*, 58(3), 509–523.
-- `packages/dqt/src/dqt/algorithms/timeseries/page_hinkley.py`
 
 ## Tests
 

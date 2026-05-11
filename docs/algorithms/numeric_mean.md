@@ -24,6 +24,11 @@ Computes `AVG(col)` and `STDDEV(col)` on the reference window to establish a bas
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric import NumericMeanDetector
+
+# NumericMeanDetector()
+#   no params — learns reference mean in fit(); flags deviations beyond STAT_SCALES thresholds;
+#   use min_in_range / max_in_range for hard absolute bounds
 
 check = Check(
     schema_name="public",
@@ -41,6 +46,10 @@ check = Check(
 - Great Expectations: `expect_column_mean_to_be_between`
 - Soda: `avg` (with threshold)
 - Elementary: `all_columns_anomalies` (mean variant)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric.py)
 
 ## Source
 

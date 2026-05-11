@@ -51,7 +51,11 @@ curr_shifted = pd.DataFrame({"amount_paid_usd": np.concatenate([
     rng.normal(500, 10, 100),   # new premium tier
 ])})
 
-det = KLDivergenceDetector(n_bins=10)
+det = KLDivergenceDetector(
+    n_bins=10,  # bins for histogram approximation; 10 is a reasonable default;
+                # KL is asymmetric (measures cost of approximating current with reference),
+                # so interpret directionally; increase to 20+ for smoother distributions
+)
 state = det.fit(ref)
 result = det.score(curr_shifted, state)
 print(result.verdict)        # warn or fail
@@ -62,6 +66,10 @@ print(result.score)          # ~0.18
 ## Learn more
 
 - 📺 [Intuitively Understanding the KL Divergence](https://www.youtube.com/watch?v=SxGYPqCgJWM) — builds geometric intuition for KL divergence, explains its asymmetry, and contrasts it with symmetric alternatives like JS divergence.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/divergence.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/divergence.py)
 
 ## Reference
 

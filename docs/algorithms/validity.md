@@ -51,7 +51,13 @@ ref_agg = pd.DataFrame([{"invalid_count": 0, "total_count": 50_000}])
 curr_agg_bad  = pd.DataFrame([{"invalid_count": 800, "total_count": 50_000}])
 curr_agg_ok   = pd.DataFrame([{"invalid_count": 12,  "total_count": 50_000}])
 
-det = ValidityDetector(sql_predicate="status IN ('pending','active','completed','cancelled')")
+det = ValidityDetector(
+    sql_predicate="status IN ('pending','active','completed','cancelled')",
+    # sql_predicate is a SQL WHERE clause fragment evaluated per row.
+    # "price_usd > 0 AND price_usd < 100000" checks both bounds in one check.
+    # "email LIKE '%@%'" for quick email sanity.
+    # score = fraction of rows where the predicate is FALSE.
+)
 state = det.fit(ref_agg)
 
 result_bad = det.score(curr_agg_bad, state)
@@ -67,6 +73,10 @@ print(result_ok.score)     # ~0.9998
 ## Learn more
 
 - 📺 [Data Quality Checks | Data Validation in SQL — Datamites](https://www.youtube.com/watch?v=K1vwArzTsx0) — demonstrates writing SQL-based data quality checks for allowed values, ranges, and referential constraints.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/validity.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/validity.py)
 
 ## Reference
 

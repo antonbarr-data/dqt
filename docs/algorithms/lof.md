@@ -58,7 +58,11 @@ anomalous = pd.DataFrame({
 })
 curr = pd.concat([ref.sample(500, random_state=7), anomalous], ignore_index=True)
 
-det = LOFDetector(n_neighbors=20)
+det = LOFDetector(
+    n_neighbors=20,  # neighbourhood size; 20 is a robust default;
+                     # increase to 50 for large datasets (>100k rows) to get more stable density estimates;
+                     # decrease to 10 for sparse datasets or when clusters are small
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -70,6 +74,10 @@ print(result.details["outlier_fraction"])  # fraction flagged
 ## Learn more
 
 - 📺 [Local Outlier Factor (LOF) for Anomaly Detection — Unsupervised Machine Learning](https://www.youtube.com/watch?v=CiJ95in4KQc) — walks through local reachability density step by step with visual examples of why global thresholds miss density-based outliers.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_multi/lof.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_multi/lof.py)
 
 ## Reference
 

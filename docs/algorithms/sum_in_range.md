@@ -27,6 +27,13 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import SumInRangeDetector
+
+# SumInRangeDetector(
+#     min_val=0.0,            # minimum expected daily/batch sum (e.g. 10000 for a table
+#                             # that should have at least $10k GMV/day)
+#     max_val=float("inf"),   # ceiling to catch duplicate loads that would double the sum
+# )
 
 check = Check(
     schema_name="public",
@@ -43,6 +50,10 @@ check = Check(
 
 - Great Expectations: `expect_column_sum_to_be_between`
 - Soda: `sum` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

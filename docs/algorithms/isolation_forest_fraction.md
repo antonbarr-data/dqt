@@ -62,7 +62,11 @@ curr_anom = pd.DataFrame({
 })
 curr = pd.concat([curr_normal, curr_anom], ignore_index=True)
 
-det = IsolationForestDetector(contamination=0.05)
+det = IsolationForestDetector(
+    contamination=0.05,  # expected outlier fraction; 0.05 (5%) is a safe default for warehouse data;
+                         # lower to 0.01 for clean production tables;
+                         # raise to 0.10 when monitoring raw ingestion where bad rows are common
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 print(result.verdict)        # warn or fail
@@ -73,6 +77,10 @@ print(result.score)          # ~0.08
 ## Learn more
 
 - 📺 [Isolation Forest: A Tree based approach for Outlier Detection (Clearly Explained)](https://www.youtube.com/watch?v=kqAxfOPlr1U) — explains how random splits isolate anomalies faster than normal points and derives the anomaly score from average path length.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_multi/isolation_forest.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_multi/isolation_forest.py)
 
 ## Reference
 

@@ -26,6 +26,15 @@ Within a rolling lookback window, counts the number of expected time buckets (e.
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.date_part import DatePartCompletenessDetector
+
+# DatePartCompletenessDetector(
+#     col="created_at",      # timestamp/date column to bucket
+#     granularity="day",     # "day" for daily (most common); "hour" for hourly pipelines;
+#                            # "week"/"month" for slower cadences
+#     lookback_days=30,      # 30 covers a full month to catch monthly batch gaps;
+#                            # lower to 7 for weekly pipelines
+# )
 
 check = Check(
     schema_name="public",
@@ -42,6 +51,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_not_be_null` (partial — no bucket awareness)
 - Soda: `missing_percent` (partial)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/date_part.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/date_part.py)
 
 ## Source
 

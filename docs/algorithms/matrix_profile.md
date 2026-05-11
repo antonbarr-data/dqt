@@ -59,7 +59,12 @@ curr = pd.DataFrame({"page_views": page_views[24 * 90:].copy()}, index=hours[24 
 # Inject a 48-hour bot surge: flat high traffic, no normal diurnal shape
 curr.iloc[12:60, 0] = 1800 + rng.normal(0, 20, 48)
 
-det = MatrixProfileDetector(window=24)   # 24-hour subsequences
+det = MatrixProfileDetector(
+    window=24,  # subsequence length for the Matrix Profile; 7 captures one week of daily data;
+                # set to the length of the anomalous pattern you expect (e.g. 24 for a full day
+                # in hourly data, 4 for a business week in weekly data); too small misses
+                # multi-step patterns, too large is computationally expensive
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -73,11 +78,14 @@ print(result.details["backend"])  # "stumpy" if installed, else "numpy"
 
 - 📺 [Sean Law — STUMPY: Modern Time Series Analysis with Matrix Profiles | SciPy 2024](https://www.youtube.com/watch?v=0O6dlq6a4rA) — practical introduction to the Matrix Profile concept and the STUMPY library, covering motif and discord detection with real examples.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/matrix_profile.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/matrix_profile.py)
+
 ## Reference
 
 - Yeh, C.-C. M., Zhu, Y., Ulanova, L., Begum, N., Ding, Y., Dau, H. A., Silva, D. F., Mueen, A., & Keogh, E. (2016). Matrix Profile I: All pairs similarity joins for time series: A unifying view that includes motifs, discords and shapelets. *IEEE ICDM 2016*, 1317–1322.
 - Law, S. M. (2019). STUMPY: A powerful and scalable Python library for time series data mining. *Journal of Open Source Software*, 4(39), 1504.
-- `packages/dqt/src/dqt/algorithms/timeseries/matrix_profile.py`
 
 ## Tests
 

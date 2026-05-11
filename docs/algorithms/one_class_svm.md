@@ -58,7 +58,12 @@ anomalous = pd.DataFrame({"price_usd": rng.normal(80, 5, 40),
                            "delivery_days": rng.normal(15, 2, 40)})
 curr = pd.concat([ref.sample(500, random_state=3), anomalous], ignore_index=True)
 
-det = OneClassSVMDetector(nu=0.01, kernel="rbf")
+det = OneClassSVMDetector(
+    nu=0.01,        # upper bound on the outlier fraction AND lower bound on support vectors
+                    # (0.01 = expect 1% outliers); increase to allow a looser boundary
+    kernel="rbf",   # handles non-linear boundaries; use "linear" when columns are already
+                    # well-scaled and separable
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -70,6 +75,10 @@ print(result.details)        # {"outlier_fraction": 0.073, "n_rows": 540}
 ## Learn more
 
 - 📺 [One Class SVM for Anomaly Detection — Unsupervised Machine Learning](https://www.youtube.com/watch?v=0IkFnHpUUjE) — explains the intuition of fitting a boundary around normal data and classifying deviations as anomalies.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_multi/one_class_svm.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_multi/one_class_svm.py)
 
 ## Reference
 

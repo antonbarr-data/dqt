@@ -60,7 +60,12 @@ curr_same = pd.DataFrame({"tier": rng.choice([0, 1, 2], size=500, p=[0.5, 0.3, 0
 # Current period: tier mix shifted (many more gold sellers)
 curr_shift = pd.DataFrame({"tier": rng.choice([0, 1, 2], size=500, p=[0.1, 0.2, 0.7])})
 
-det = MutualInformationDetector(n_bins=3)   # 3 bins = 3 tiers
+det = MutualInformationDetector(
+    n_bins=3,   # 3 bins = 3 tiers (example override);
+                # default 20 is appropriate for columns with hundreds of distinct values;
+                # increase to 50 for wide-range continuous columns (e.g. amounts 0–100,000);
+                # decrease to 10 for narrow ranges or low-cardinality
+)
 state = det.fit(ref_tier)
 
 result_same = det.score(curr_same, state)
@@ -75,6 +80,10 @@ print(result_shift.plain_english)  # "Normalized MI = 0.1832 — drift detected"
 ## Learn more
 
 - 📺 [Mutual Information, Clearly Explained!!! — StatQuest with Josh Starmer](https://www.youtube.com/watch?v=eJIp_mgVLwE) — builds mutual information from entropy fundamentals with clear bar-chart visualisations.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/info/mutual_information.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/info/mutual_information.py)
 
 ## Reference
 

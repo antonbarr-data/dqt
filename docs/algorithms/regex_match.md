@@ -24,6 +24,15 @@ Evaluates `col::text !~ pattern` (Postgres `~` operator, case-sensitive POSIX re
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.value_checks import RegexMatchDetector
+
+det = RegexMatchDetector(
+    pattern=r"^\+?[0-9\-\s]{7,15}$",
+    # Python re pattern; anchor with ^ and $ for full-string matching.
+    # for emails use r"^[^@]+@[^@]+\.[^@]+$"
+    # for UUIDs use r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    # score = fraction of non-null values NOT matching (0 = all match = good).
+)
 
 check = Check(
     schema_name="public",
@@ -40,6 +49,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_match_regex`
 - Soda: `valid_format` / `valid_regex`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/value_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/value_checks.py)
 
 ## Source
 

@@ -53,6 +53,11 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="mad_outlier_fraction",
+    detector_params={
+        "threshold": 3.5,  # Leys et al. recommended default; raise to 4–5 on heavy-tailed
+                           # columns (e.g. payment amounts) to cut false positives; lower to
+                           # 2.5–3.0 for stricter alerting on tightly-controlled columns
+    },
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -63,6 +68,10 @@ print(result.score)           # raw score
 ## Learn more
 
 - 📺 [How Is MAD Used To Detect Outliers? — The Friendly Statistician](https://www.youtube.com/watch?v=8WbvTy6XwG4) — walks through the modified Z-score formula using MAD and shows why it outperforms standard deviation for heavy-tailed data.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/mad.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/mad.py)
 
 ## Reference
 

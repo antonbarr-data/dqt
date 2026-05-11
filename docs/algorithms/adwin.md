@@ -52,7 +52,12 @@ curr_drift  = pd.DataFrame({"bookings_per_day": rng.normal(loc=310.0, scale=35.0
 # Current window: still normal
 curr_stable = pd.DataFrame({"bookings_per_day": rng.normal(loc=455.0, scale=30.0, size=30)})
 
-det = ADWINDetector(delta=0.002)
+det = ADWINDetector(
+    delta=0.002,  # confidence parameter for ADWIN change detection;
+                  # 0.002 is the Bifet & Gavaldà recommended default;
+                  # lower (e.g. 0.001) for fewer false positives in stable streams;
+                  # raise (e.g. 0.01) to detect shifts faster at the cost of more false positives
+)
 state = det.fit(ref)
 
 result_drift = det.score(curr_drift, state)
@@ -68,6 +73,10 @@ print(result_stable.score)         # 0.0
 ## Learn more
 
 - 📺 [Concept Drift Detector in Data Stream Mining](https://www.youtube.com/watch?v=eeDrvcL4WOQ) — covers the class of adaptive windowing detectors including ADWIN and explains the sliding-window intuition behind Hoeffding-bound change detection.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/adwin.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/adwin.py)
 
 ## Reference
 

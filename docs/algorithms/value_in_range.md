@@ -25,6 +25,14 @@ Evaluates `col < min_val OR col > max_val` for each row and returns the fraction
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.value_checks import ValueInRangeDetector
+
+# ValueInRangeDetector(
+#     min_val=float("-inf"),  # lower bound — set to domain floor (e.g. 0.01 for price_usd,
+#                             # 1.0 for rating, 0.0 for percentages); default means unchecked
+#     max_val=float("inf"),   # upper bound — set to domain ceiling (e.g. 50000 for price_usd,
+#                             # 5.0 for rating, 1.0 for percentages); default means unchecked
+# )
 
 check = Check(
     schema_name="public",
@@ -41,6 +49,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_be_between`
 - Soda: `valid_min` / `valid_max`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/value_checks.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/value_checks.py)
 
 ## Source
 

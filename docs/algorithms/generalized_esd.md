@@ -54,6 +54,13 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="generalized_esd",
+    detector_params={
+        "max_outliers": 0,   # 0 = auto (max(10, n // 10)); set to ~1% of expected row
+                             # count (e.g. 10 for 1000 rows) to cap search and reduce
+                             # computation on large datasets
+        "alpha": 0.05,       # significance level; 0.05 is standard; lower to 0.01 to
+                             # reduce false positives in low-noise regulated pipelines
+    },
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -64,6 +71,10 @@ print(result.score)           # raw score (outlier fraction)
 ## Learn more
 
 <!-- TODO: no simple YouTube explanation found -->
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/grubbs.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/grubbs.py)
 
 ## Reference
 

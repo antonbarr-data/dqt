@@ -27,6 +27,14 @@ The warn and fail thresholds are both 0.5, so any violation (score = 1.0) is imm
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.numeric_bounds import CardinalityInRangeDetector
+
+# CardinalityInRangeDetector(
+#     min_val=1,          # for a status column with 5 known values use min_val=5;
+#                         # for an ID column set to expected distinct users
+#     max_val=2**31,      # flag unexpected cardinality explosions (e.g. a date column
+#                         # suddenly having 1M distinct values = likely timestamp instead of date)
+# )
 
 check = Check(
     schema_name="public",
@@ -43,6 +51,10 @@ check = Check(
 
 - Great Expectations: `expect_column_unique_value_count_to_be_between`
 - Soda: `distinct_count` (with threshold)
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py)
 
 ## Source
 

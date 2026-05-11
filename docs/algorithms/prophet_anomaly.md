@@ -60,7 +60,11 @@ curr = pd.DataFrame({"revenue_usd": revenue[150:].copy()}, index=dates[150:])
 # Simulate a 5-day revenue anomaly (e.g. payment processor outage)
 curr.iloc[2:7, 0] *= 0.40
 
-det = ProphetAnomalyDetector(interval_width=0.95)
+det = ProphetAnomalyDetector(
+    interval_width=0.95,  # confidence interval width; 0.95 flags points outside the 95% credible
+                          # interval; lower to 0.80 for stricter alerting (more false positives);
+                          # raise to 0.99 to only flag extreme outliers; requires pip install dqt[forecast]
+)
 state = det.fit(ref)         # ImportError here if prophet is not installed
 result = det.score(curr, state)
 
@@ -73,10 +77,13 @@ print(result.plain_english)  # "5 of 30 values outside Prophet 95% uncertainty i
 
 - 📺 [Time Series Anomaly Detection Using Prophet in Python | Machine Learning — YouTube](https://www.youtube.com/watch?v=viMgmLzYP3g) — step-by-step walkthrough of fitting Prophet and extracting anomalies from its uncertainty bands in Python.
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/timeseries/prophet_anomaly.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/timeseries/prophet_anomaly.py)
+
 ## Reference
 
 - Taylor, S. J., & Letham, B. (2018). Forecasting at scale. *The American Statistician*, 72(1), 37–45.
-- `packages/dqt/src/dqt/algorithms/timeseries/prophet_anomaly.py`
 
 ## Tests
 

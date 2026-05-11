@@ -52,6 +52,11 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="iqr_fence",
+    detector_params={
+        "k": 1.5,  # Tukey multiplier; 1.5 = inner fences (catches ~0.7% of normal data);
+                   # raise to 3.0 to flag "far outliers" only (extreme spikes); lower to
+                   # 1.0 for stricter alerting on columns with tight expected ranges
+    },
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -62,6 +67,10 @@ print(result.score)           # raw score
 ## Learn more
 
 - 📺 [How to Find Outliers: The 1.5 x IQR Rule Explained](https://www.youtube.com/watch?v=KMxL3E8C8Sg) — explains the Tukey IQR fence construction and why the 1.5 multiplier was chosen.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/iqr_fence.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/iqr_fence.py)
 
 ## Reference
 

@@ -47,7 +47,12 @@ rng = np.random.default_rng(42)
 ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 2000)})
 curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(100, 20, 2000)})  # shifted mean
 
-det = PSIDetector(n_bins=10)
+det = PSIDetector(
+    n_bins=10,  # bins to discretise both reference and current distributions;
+                # 10 is standard for PSI in financial risk;
+                # increase to 20 for high-cardinality continuous columns;
+                # decrease to 5 for narrow-range or sparse columns
+)
 state = det.fit(ref)
 result = det.score(curr_drift, state)
 print(result.verdict)        # warn or fail
@@ -58,6 +63,10 @@ print(result.score)          # ~0.23
 ## Learn more
 
 - 📺 [Population Stability Index (PSI) for Scorecards | Monitor Model Drift in Python](https://www.youtube.com/watch?v=iWJcITAge-c) — shows how PSI is calculated bin-by-bin, explains the 0.1 / 0.2 thresholds, and demonstrates PSI monitoring in Python.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/psi.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/psi.py)
 
 ## Reference
 

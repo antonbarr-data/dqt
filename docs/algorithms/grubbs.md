@@ -55,6 +55,9 @@ check = Check(
     table_name="fct_gigs",
     column_name="price_usd",
     detector_slug="grubbs",
+    # GrubbsDetector() takes no params; alpha=0.05 is used internally and is not
+    # user-configurable — only suitable for normally distributed columns with one
+    # extreme outlier; for multiple outliers use generalized_esd instead
 )
 result = Runner(MemoryStore()).run(check, adapter)
 print(result.verdict)         # pass / warn / fail
@@ -65,6 +68,10 @@ print(result.score)           # 1 - p-value
 ## Learn more
 
 - 📺 [Grubbs Outlier Test — Introduced and Demonstrated](https://www.youtube.com/watch?v=xernlERoj-w) — introduces the Grubbs statistic, shows how the t-distribution critical value is derived, and demonstrates detection with a worked example.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/outliers_uni/grubbs.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/outliers_uni/grubbs.py)
 
 ## Reference
 

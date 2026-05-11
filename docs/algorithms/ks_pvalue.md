@@ -50,7 +50,8 @@ ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 1000)})
 curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(100, 20, 1000)})  # mean shift (+$20)
 curr_stable = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 1000)})
 
-det = KS2SampleDetector()
+det = KS2SampleDetector()  # no params; uses two-sided KS test with scipy;
+                           # thresholds are set via STAT_SCALES (warn at p<0.05, fail at p<0.01)
 state = det.fit(ref)
 
 result_drift = det.score(curr_drift, state)
@@ -66,6 +67,10 @@ print(result_stable.score)         # low value, e.g. 0.32
 ## Learn more
 
 - 📺 [Kolmogorov-Smirnov Test Explained | Data Science Fundamentals](https://www.youtube.com/watch?v=VpQ6MLoRSfY) — explains the KS statistic as the maximum gap between two empirical CDFs and shows how the p-value is derived.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/ks2sample.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/ks2sample.py)
 
 ## Reference
 

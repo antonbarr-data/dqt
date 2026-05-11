@@ -73,7 +73,11 @@ curr = pd.DataFrame({
     "delivery_days": np.random.default_rng(6).integers(1, 14, 1000),
 })
 
-det = CallableCheckDetector(fn=price_ratio_anomaly)
+det = CallableCheckDetector(
+    fn=price_ratio_anomaly,  # fn must accept a pd.DataFrame and return a float score in [0, 1]
+                             # (0 = perfect, 1 = fully failed); the fn is called on the current
+                             # DataFrame at score() time; use closures to capture thresholds or models
+)
 state = det.fit(ref)
 result = det.score(curr, state)
 
@@ -87,10 +91,13 @@ print(result.details)        # {"score": 0.28, "ref_score": 0.09}
 
 <!-- TODO: no simple YouTube explanation found — this is a dqt extension mechanism, not a published algorithm -->
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/custom/callable_check.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/custom/callable_check.py)
+
 ## Reference
 
 - Extension point — no external algorithmic reference.
-- `packages/dqt/src/dqt/algorithms/custom/callable_check.py`
 
 ## Tests
 

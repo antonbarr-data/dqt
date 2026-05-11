@@ -49,7 +49,8 @@ rng = np.random.default_rng(42)
 ref = pd.DataFrame({"amount_paid_usd": rng.normal(80, 20, 1000)})
 curr_drift = pd.DataFrame({"amount_paid_usd": rng.normal(110, 20, 1000)})  # 1.5σ mean shift
 
-det = Wasserstein1Detector()
+det = Wasserstein1Detector()  # no params; score is in the same units as the column,
+                              # normalised by reference std; thresholds are set per-check via STAT_SCALES
 state = det.fit(ref)
 result = det.score(curr_drift, state)
 print(result.verdict)        # fail (1.5σ >> 0.5 threshold)
@@ -61,6 +62,10 @@ print(result.details["raw_distance"])  # ~30.0 (in original USD units)
 ## Learn more
 
 - 📺 [The Wasserstein Metric a.k.a Earth Mover's Distance: A Quick and Convenient Introduction](https://www.youtube.com/watch?v=ymWDGzpQdls) — builds intuition for the "moving dirt" interpretation and explains why Wasserstein captures drift magnitude better than KS.
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/drift/wasserstein.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/drift/wasserstein.py)
 
 ## Reference
 

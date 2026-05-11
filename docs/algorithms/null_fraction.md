@@ -24,6 +24,11 @@ Counts the number of NULL values in the column and divides by the total row coun
 
 ```python
 from dqt import Check, Runner, MemoryStore
+from dqt.algorithms.basic.null_fraction import NullFractionDetector
+
+# NullFractionDetector()
+#   no params — thresholds set via STAT_SCALES (warn at >1%, fail at >5% by default)
+#   override per-check in YAML with `fail_if: "> 0.001"` for critical columns
 
 check = Check(
     schema_name="public",
@@ -40,6 +45,10 @@ check = Check(
 
 - Great Expectations: `expect_column_values_to_not_be_null`
 - Soda: `missing_percent`
+
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/basic/null_fraction.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/null_fraction.py)
 
 ## Source
 

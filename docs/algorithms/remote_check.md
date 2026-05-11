@@ -66,23 +66,26 @@ curr = pd.DataFrame({
 })
 
 det = RemoteCheckDetector(
-    endpoint="http://fraud-api.internal/v1/score-bookings",
-    params={"model_version": "2.1", "threshold": 0.8},
-    timeout=15.0,
+    endpoint="http://fraud-api.internal/v1/score-bookings",  # full URL of the REST or GraphQL
+                                                              # service (required)
+    params={"model_version": "2.1", "threshold": 0.8},       # dict of extra query params merged
+                                                              # into the request body
+    timeout=15.0,  # 30s is generous for a scoring endpoint — lower to 5–10s for latency-sensitive
+                   # pipelines; raises RuntimeError on timeout (never silently swallowed)
 )
 state = det.fit(ref)
 # result = det.score(curr, state)   # uncomment when the endpoint is reachable
 
 # GraphQL variant:
 gql_det = RemoteCheckDetector(
-    endpoint="http://fraud-api.internal/graphql",
+    endpoint="http://fraud-api.internal/graphql",  # full URL of the GraphQL service
     graphql_query="""
         query ScoreBookings($rows: JSON!) {
             fraudScore(rows: $rows) { score details }
         }
-    """,
-    graphql_variable="rows",
-    timeout=15.0,
+    """,                          # provide the query string to switch to GraphQL mode; omit for REST
+    graphql_variable="rows",      # name of the variable that receives the serialised rows (default "rows")
+    timeout=15.0,                 # same guidance as above — lower for latency-sensitive pipelines
 )
 ```
 
@@ -90,10 +93,13 @@ gql_det = RemoteCheckDetector(
 
 <!-- TODO: no simple YouTube explanation found — this is a dqt extension mechanism, not a published algorithm -->
 
+## Implementation
+
+[`packages/dqt/src/dqt/algorithms/custom/remote_check.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/custom/remote_check.py)
+
 ## Reference
 
 - Extension point — no external algorithmic reference. HTTP contract documented in `remote_check.py` module docstring.
-- `packages/dqt/src/dqt/algorithms/custom/remote_check.py`
 
 ## Tests
 
