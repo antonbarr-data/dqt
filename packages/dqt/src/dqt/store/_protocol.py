@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
@@ -40,6 +41,61 @@ class RunResult:
     diagnostic_sql: str | None = None
     # Bundle for offline reproduction / audit
     reproducibility: ReproducibilityBundle | None = None
+
+    def to_bundle(self, path: str | Path) -> None:
+        """Write reproducibility artifacts to a directory.
+
+        Creates:
+          result.json      — score, verdict, plain_english, details
+          config.json      — check configuration from ReproducibilityBundle
+          environment.json — dqt version, Python version, platform
+          diagnostic.sql   — failing-rows query (if available)
+        """
+        import json
+        import platform
+        import sys
+
+        out = Path(path)
+        out.mkdir(parents=True, exist_ok=True)
+
+        (out / "result.json").write_text(json.dumps({
+            "check_id": str(self.check_id),
+            "run_id": str(self.run_id),
+            "detector_slug": self.detector_slug,
+            "verdict": self.verdict.value,
+            "score": self.score,
+            "plain_english": self.plain_english,
+            "details": self.details,
+            "started_at": self.started_at.isoformat(),
+            "finished_at": self.finished_at.isoformat(),
+        }, indent=2))
+
+        bundle = self.reproducibility
+        config: dict = {"detector_slug": self.detector_slug}
+        if bundle:
+            config.update({
+                "detector_params": bundle.detector_params,
+                "schema_name": bundle.schema_name,
+                "table_name": bundle.table_name,
+                "column_name": bundle.column_name,
+                "sample_n": bundle.sample_n,
+                "detector_state": bundle.detector_state_json,
+                "notes": bundle.notes,
+            })
+        (out / "config.json").write_text(json.dumps(config, indent=2))
+
+        try:
+            from dqt import __version__ as dqt_version
+        except Exception:
+            dqt_version = "unknown"
+        (out / "environment.json").write_text(json.dumps({
+            "dqt_version": dqt_version,
+            "python_version": sys.version,
+            "platform": platform.platform(),
+        }, indent=2))
+
+        if self.diagnostic_sql:
+            (out / "diagnostic.sql").write_text(self.diagnostic_sql)
 
 
 @dataclass
