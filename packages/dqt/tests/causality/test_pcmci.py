@@ -23,6 +23,7 @@ def test_pcmci_basic_chain():
     assert ("y", "z") in sig, f"Expected y->z, got: {sig}"
 
 
+@pytest.mark.unit
 def test_pcmci_raises_without_tigramite(monkeypatch):
     """ImportError if tigramite not installed."""
     import importlib
