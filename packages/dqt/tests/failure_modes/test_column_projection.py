@@ -15,7 +15,7 @@ SLUGS_TO_TEST = [
 @pytest.mark.parametrize("slug", SLUGS_TO_TEST)
 def test_detector_scores_correct_column(slug):
     """A detector asked to score column 'target' must not silently score column 'noise'."""
-    import dqt  # trigger registry registration
+    import dqt  # noqa: F401 — triggers registry registration
     from dqt.algorithms._registry import registry
 
     rng = np.random.default_rng(0)

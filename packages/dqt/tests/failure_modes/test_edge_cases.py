@@ -1,6 +1,5 @@
 # packages/dqt/tests/failure_modes/test_edge_cases.py
-"""Every detector over edge-case inputs must produce a reasonable result — no crashes,
-no silent success on obviously bad data, and at most a Verdict.warn with a message."""
+"""Every detector over edge-case inputs must not crash and must return a valid Verdict."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -9,12 +8,12 @@ from dqt.algorithms._base import Verdict
 
 
 def _det(slug, **params):
-    import dqt  # noqa: F401 — triggers registration
+    import dqt  # noqa: F401 — triggers registry registration
     from dqt.algorithms._registry import registry
     return registry.get(slug)(**params)
 
 
-@pytest.mark.parametrize("slug", ["iqr_fence", "wasserstein_1", "ks_pvalue"])
+@pytest.mark.parametrize("slug", ["iqr_fence", "wasserstein_1", "ks_pvalue", "grubbs"])
 def test_empty_current_does_not_crash(slug):
     """Passing an empty current DataFrame must not raise, must return a result."""
     rng = np.random.default_rng(0)
@@ -37,7 +36,7 @@ def test_constant_series_does_not_crash(slug):
     assert result is not None
 
 
-@pytest.mark.parametrize("slug", ["iqr_fence", "wasserstein_1", "ks_pvalue"])
+@pytest.mark.parametrize("slug", ["iqr_fence", "wasserstein_1", "ks_pvalue", "grubbs"])
 def test_single_row(slug):
     """Single-row current DataFrame must not crash."""
     rng = np.random.default_rng(0)

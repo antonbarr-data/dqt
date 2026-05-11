@@ -1,9 +1,10 @@
 # packages/dqt/tests/failure_modes/test_type_handling.py
 """Adapters must round-trip timestamps/decimals/nullable-ints correctly for aggregate detectors."""
+from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
-from datetime import timezone
 
 
 def test_freshness_with_pandas_timestamp():
@@ -34,7 +35,6 @@ def test_freshness_with_numpy_datetime64():
 def test_freshness_with_iso_string():
     """ISO-8601 string timestamps (DuckDB CSV path) are handled."""
     from dqt.algorithms.basic.freshness import FreshnessDetector
-    from datetime import datetime
 
     det = FreshnessDetector(warn_seconds=3600, fail_seconds=86400)
     state = det.fit(pd.DataFrame())
