@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.4](v0.5.4.md) | 2026-05-12 | `calibrate_from_history()`: continuous threshold drift detection from stored pass runs |
 | [v0.5.3](v0.5.3.md) | 2026-05-12 | Detector versioning in `RunResult`; runner auto-refits on algorithm version change |
 | [v0.5.2](v0.5.2.md) | 2026-05-12 | Per-detector `estimate_cost()` + `Runner.run_suite(cost_budget_usd=)` + `SuiteResult` |
 | [v0.5.1](v0.5.1.md) | 2026-05-12 | Nightly adapter integration-test CI workflow; ClickHouse/Snowflake/BigQuery/Databricks test files |

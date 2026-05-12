@@ -2,7 +2,7 @@
 """dqt — open-source data quality, observability, and causality library."""
 from __future__ import annotations
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 from dqt.algorithms._base import (
     BaseAggregateDetector,
@@ -12,6 +12,7 @@ from dqt.algorithms._base import (
     Verdict,
     compute_verdict,
 )
+from dqt.algorithms._calibration import ThresholdDriftResult, calibrate_from_history
 from dqt.adapters._protocol import AggExpr, ColumnMeta, HealthCheckResult, WarehouseAdapter
 from dqt.store._protocol import CausalEdgeReview, Incident, ResultsStore, RunResult
 from dqt.store.memory import MemoryStore
@@ -38,6 +39,8 @@ __all__ = [
     "BaseDetector",
     "BaseAggregateDetector",
     "compute_verdict",
+    "ThresholdDriftResult",
+    "calibrate_from_history",
     "AggExpr",
     "ColumnMeta",
     "HealthCheckResult",

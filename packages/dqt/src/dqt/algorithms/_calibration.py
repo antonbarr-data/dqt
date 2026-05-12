@@ -1,11 +1,29 @@
 # packages/dqt/src/dqt/algorithms/_calibration.py
-"""Bootstrap calibration helper for BaseDetector.suggest_threshold()."""
+"""Bootstrap calibration and continuous threshold drift detection."""
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
+
+if TYPE_CHECKING:
+    from dqt.checks.models import Check
+    from dqt.store._protocol import ResultsStore
+
+
+@dataclass
+class ThresholdDriftResult:
+    """Outcome of calibrate_from_history() for one check."""
+    check_id: str
+    detector_slug: str
+    n_pass_runs: int
+    current_threshold: float
+    suggested_threshold: float
+    # |suggested - current| / current; NaN when current_threshold == 0
+    drift_fraction: float
+    is_significant: bool  # drift_fraction > 0.10
 
 
 def suggest_threshold(
@@ -63,3 +81,64 @@ def suggest_threshold(
         "score_p95": float(np.percentile(boot_scores_arr, 95)),
         "score_p99": float(np.percentile(boot_scores_arr, 99)),
     }
+
+
+def calibrate_from_history(
+    check: "Check",
+    store: "ResultsStore",
+    *,
+    target_fpr: float = 0.001,
+    min_samples: int = 50,
+    drift_threshold: float = 0.10,
+) -> ThresholdDriftResult | None:
+    """Derive a suggested warn threshold from stored pass-verdict run history.
+
+    Uses the empirical score distribution of pass-verdict runs to recommend a
+    threshold at the (1 - target_fpr) percentile. Returns None when fewer than
+    min_samples pass runs exist — not enough history to calibrate reliably.
+
+    Args:
+        check: The Check whose history to inspect.
+        store: ResultsStore holding RunResult records.
+        target_fpr: Desired false-positive rate (default 0.001 = 0.1%).
+        min_samples: Minimum pass-verdict runs required (default 50).
+        drift_threshold: Relative change considered significant (default 0.10 = 10%).
+
+    Returns:
+        ThresholdDriftResult with suggested_threshold and is_significant flag,
+        or None if there is insufficient history.
+    """
+    from dqt.algorithms._base import Verdict
+    from dqt.algorithms._scales import STAT_SCALES
+
+    runs = store.list_runs(check.id, limit=10_000)
+    pass_scores = [r.score for r in runs if r.verdict == Verdict.pass_]
+
+    if len(pass_scores) < min_samples:
+        return None
+
+    arr = np.array(pass_scores)
+    suggested = float(np.percentile(arr, (1.0 - target_fpr) * 100))
+
+    # Resolve current threshold: explicit check override takes priority, then STAT_SCALES
+    current = check.warn_threshold
+    if current is None:
+        scale = STAT_SCALES.get(check.detector_slug)
+        current = scale.warn_threshold if scale is not None else 0.0
+
+    if current == 0.0:
+        drift = float("nan")
+        significant = False
+    else:
+        drift = abs(suggested - current) / abs(current)
+        significant = drift > drift_threshold
+
+    return ThresholdDriftResult(
+        check_id=str(check.id),
+        detector_slug=check.detector_slug,
+        n_pass_runs=len(pass_scores),
+        current_threshold=current,
+        suggested_threshold=suggested,
+        drift_fraction=drift,
+        is_significant=significant,
+    )
