@@ -5,6 +5,7 @@
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
+[![Release notes](https://img.shields.io/badge/release%20notes-v0.4.5-blue?style=flat-square)](docs/releases/v0.4.5.md)
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
 
@@ -615,6 +616,7 @@ Full API reference with Gigler sample dataset examples:
 | [Local dashboard](docs/dashboard.md) | Browser UI for check results — install, quickstart, notebook pattern, limitations |
 | [Adapters](docs/api/adapters.md) | LocalAdapter, PostgresAdapter, custom adapter protocol |
 | [Semantic layer & LLM Wiki](docs/semantic-layer.md) | Build your data knowledge graph from Trello tickets, SQL, and BI reports using Karpathy's LLM Wiki pattern + Claude Code |
+| [Release notes](docs/releases/README.md) | Per-version changelog — features, fixes, upgrade notes |
 
 The [Gigler sample dataset](examples/gigler/) ships with the repo — four CSVs (transactions, prices, vendor stats, marketing campaigns) covering 5 quarters. Every doc page uses it for real, runnable examples.
 

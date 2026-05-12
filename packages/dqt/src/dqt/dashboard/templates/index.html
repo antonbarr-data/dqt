@@ -23,6 +23,9 @@
     a:hover { text-decoration: underline; }
     .pass { color: var(--accent); } .warn { color: var(--warn); } .fail { color: var(--fail); }
     .empty { color: #555; padding: 32px 0; text-align: center; }
+    footer { border-top: 1px solid var(--line); padding: 12px 24px; font-size: 11px; color: #555; display: flex; gap: 16px; }
+    footer a { color: #555; }
+    footer a:hover { color: var(--fg); text-decoration: none; }
   </style>
 </head>
 <body>
@@ -55,5 +58,11 @@
     <p class="empty">No check runs yet. Run <code>dqt run</code> to populate the store.</p>
     {% endif %}
   </div>
+  <footer>
+    <span>dqt v0.4.5</span>
+    <a href="https://github.com/antonbarr-data/dqt/blob/main/docs/releases/v0.4.5.md" target="_blank" rel="noopener">what's new</a>
+    <a href="https://github.com/antonbarr-data/dqt" target="_blank" rel="noopener">github</a>
+    <a href="/health">health</a>
+  </footer>
 </body>
 </html>
