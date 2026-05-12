@@ -366,8 +366,8 @@ export default function RootPage() {
         </h1>
 
         <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 580, lineHeight: 1.7 }}>
-          Statistical drift detection, column-level lineage, and causal discovery — for dbt, warehouses, and data lakes.
-          A <span style={{ color: "var(--fg-0)" }}>Python library</span>, <span style={{ color: "var(--fg-0)" }}>CLI</span>, and <span style={{ color: "var(--fg-0)" }}>Web app</span> — all MIT licensed. Not just the Python library, like the others.
+          Statistical drift detection, column-level lineage, and causal discovery for dbt, warehouses, and data lakes.
+          A <span style={{ color: "var(--fg-0)" }}>Python library</span>, <span style={{ color: "var(--fg-0)" }}>CLI</span>, and <span style={{ color: "var(--fg-0)" }}>Web app</span>. All MIT licensed. Not just the Python library, like the others.
         </p>
 
         <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: 12, color: "var(--fg-2)" }}>

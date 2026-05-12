@@ -17,16 +17,16 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "dqt — The data quality tool that tells you what and why",
+  title: "dqt: The data quality tool that tells you what and why",
   description:
-    "Statistical drift detection, column-level lineage, and causal discovery for dbt, warehouses, and data lakes. Python library + CLI + Web app — all MIT licensed. Not just the Python library, like the others.",
+    "Statistical drift detection, column-level lineage, and causal discovery for dbt, warehouses, and data lakes. Python library, CLI, and Web app. All MIT licensed.",
   icons: {
     icon: "/favicon.svg",
   },
   openGraph: {
-    title: "dqt — The data quality tool that tells you what and why",
+    title: "dqt: The data quality tool that tells you what and why",
     description:
-      "Statistical drift detection, column-level lineage, and causal discovery for dbt, warehouses, and data lakes. Python library + CLI + Web app — all MIT licensed.",
+      "Statistical drift detection, column-level lineage, and causal discovery for dbt, warehouses, and data lakes. Python library, CLI, and Web app. All MIT licensed.",
     url: "https://dqt.dev",
     siteName: "dqt",
     locale: "en_US",
@@ -34,9 +34,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "dqt — The data quality tool that tells you what and why",
+    title: "dqt: The data quality tool that tells you what and why",
     description:
-      "Statistical drift detection, column-level lineage, and causal discovery. All MIT licensed — library, CLI, and Web app.",
+      "Statistical drift detection, column-level lineage, and causal discovery. Python library, CLI, and Web app. All MIT licensed.",
   },
 };
 
