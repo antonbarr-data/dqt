@@ -5,7 +5,11 @@
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
-[![Release notes](https://img.shields.io/badge/release%20notes-v0.4.9-blue?style=flat-square)](docs/releases/v0.4.9.md)
+[![Release notes](https://img.shields.io/badge/release%20notes-v0.5.4-blue?style=flat-square)](docs/releases/v0.5.4.md)
+
+<!-- BENCHMARK_STATS_START -->
+**20 detectors** across 4 families · best F1 **0.933** (holt_winters, 30-trial 95% CI [0.933, 0.933]) · benchmarked on 8 synthetic scenarios · [full results](examples/benchmarks/results.csv)
+<!-- BENCHMARK_STATS_END -->
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
 
