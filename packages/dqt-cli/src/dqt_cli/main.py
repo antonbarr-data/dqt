@@ -28,3 +28,7 @@ def version() -> None:
     import dqt
 
     typer.echo(dqt.__version__)
+
+
+if __name__ == "__main__":
+    app()

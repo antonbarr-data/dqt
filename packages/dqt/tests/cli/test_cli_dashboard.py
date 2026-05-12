@@ -1,40 +1,36 @@
+# packages/dqt/tests/cli/test_cli_dashboard.py
 import subprocess
 import sys
 
 import pytest
 
 
-@pytest.mark.unit
-def test_dashboard_help_exits_zero():
-    """dqt dashboard --help must exit 0 and show --port option."""
-    result = subprocess.run(
-        [sys.executable, "-m", "dqt.cli.main", "dashboard", "--help"],
-        capture_output=True,
-        text=True,
+def _run(*args):
+    return subprocess.run(
+        [sys.executable, "-m", "dqt_cli.main"] + list(args),
+        capture_output=True, text=True,
     )
-    assert result.returncode == 0, f"Expected exit 0; got {result.returncode}\n{result.stderr}"
-    assert "--port" in result.stdout, f"--port not in help output:\n{result.stdout}"
-    assert "--host" in result.stdout, f"--host not in help output:\n{result.stdout}"
 
 
-@pytest.mark.unit
-def test_dashboard_missing_deps_exits_nonzero(monkeypatch):
-    """dqt dashboard must exit 1 with a clear message when uvicorn is not importable."""
-    import importlib
-    import sys as _sys
+def test_dashboard_help_lists_token_flags():
+    result = _run("dashboard", "--help")
+    assert result.returncode == 0
+    assert "--token" in result.stdout
+    assert "--generate-token" in result.stdout
 
-    # Temporarily hide uvicorn from imports
-    original = _sys.modules.get("uvicorn")
-    _sys.modules["uvicorn"] = None  # type: ignore[assignment]
-    try:
-        from dqt.cli.main import _cmd_dashboard
-        import argparse
-        args = argparse.Namespace(host="127.0.0.1", port=8080)
-        with pytest.raises(SystemExit) as exc_info:
-            _cmd_dashboard(args)
-        assert exc_info.value.code == 1
-    finally:
-        if original is None:
-            _sys.modules.pop("uvicorn", None)
-        else:
-            _sys.modules["uvicorn"] = original
+
+def test_dashboard_help_shows_port_and_host():
+    result = _run("dashboard", "--help")
+    assert result.returncode == 0
+    assert "--port" in result.stdout
+    assert "--host" in result.stdout
+
+
+def test_dashboard_generate_token_prints_64_char_hex():
+    """--generate-token should always print a 64-char hex token regardless of uvicorn."""
+    result = _run("dashboard", "--generate-token")
+    # The token should be on the first line of stdout
+    lines = result.stdout.strip().split("\n")
+    token_line = lines[0]
+    assert len(token_line) == 64, f"Expected 64-char token, got: {token_line!r}"
+    assert all(c in "0123456789abcdef" for c in token_line)

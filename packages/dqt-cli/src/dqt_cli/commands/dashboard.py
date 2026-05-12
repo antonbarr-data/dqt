@@ -1,12 +1,28 @@
 # packages/dqt-cli/src/dqt_cli/commands/dashboard.py
+import os
+import secrets
+
 import typer
 
 
 def dashboard_command(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
     host: str = typer.Option("127.0.0.1", "--host", help="Host to bind"),
+    token: str = typer.Option(
+        None, "--token", help="Bearer token for dashboard auth (sets DQT_DASHBOARD_TOKEN)"
+    ),
+    generate_token: bool = typer.Option(
+        False, "--generate-token", help="Generate and print a random bearer token, then start the dashboard"
+    ),
 ) -> None:
     """Start the local dqt dashboard (requires dqtlib[dashboard])."""
+    if generate_token:
+        new_token = secrets.token_hex(32)
+        typer.echo(new_token)  # always printed first
+        os.environ["DQT_DASHBOARD_TOKEN"] = new_token
+    elif token:
+        os.environ["DQT_DASHBOARD_TOKEN"] = token
+
     try:
         import uvicorn
     except ImportError:
@@ -21,5 +37,6 @@ def dashboard_command(
 
     store = MemoryStore()
     app = create_app(store=store)
-    typer.echo(f"dqt dashboard -> http://{host}:{port}")
+    auth_note = "  (auth enabled)" if os.environ.get("DQT_DASHBOARD_TOKEN") else "  (no auth)"
+    typer.echo(f"dqt dashboard -> http://{host}:{port}{auth_note}")
     uvicorn.run(app, host=host, port=port)
