@@ -93,3 +93,83 @@ def test_list_incidents_by_status(store, sample_run):
 def test_implements_results_store_protocol(store):
     from dqt.store._protocol import ResultsStore
     assert isinstance(store, ResultsStore)
+
+
+# --- ProofBundle tests ---
+
+def test_save_and_list_proofs():
+    from dqt.store.memory import MemoryStore
+    from dqt.store.proof import ProofBundle
+    from uuid import uuid4
+
+    store = MemoryStore()
+    check_id = uuid4()
+    run_id = uuid4()
+    proof = ProofBundle(
+        run_id=run_id, check_id=check_id,
+        detector_slug="ks_pvalue", detector_version="1",
+        data_hash="a" * 64, row_count=100, commitment="b" * 64,
+    )
+    store.save_proof(proof)
+    proofs = store.list_proofs(check_id)
+    assert len(proofs) == 1
+    assert proofs[0].commitment == "b" * 64
+
+
+def test_list_proofs_empty():
+    from dqt.store.memory import MemoryStore
+    from uuid import uuid4
+    store = MemoryStore()
+    assert store.list_proofs(uuid4()) == []
+
+
+# --- query_runs tests ---
+
+def test_query_runs_by_verdict():
+    from dqt.store.memory import MemoryStore
+    from dqt.store._protocol import RunResult
+    from dqt.algorithms._base import Verdict
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    store = MemoryStore()
+    check_id = uuid4()
+    now = datetime.now(timezone.utc)
+
+    def _run(v):
+        return RunResult(
+            run_id=uuid4(), check_id=check_id, detector_slug="ks_pvalue",
+            detector_version="1", started_at=now, finished_at=now,
+            verdict=v, score=0.5 if v == Verdict.pass_ else 0.99,
+            plain_english="ok", details={},
+        )
+
+    store.save_run(_run(Verdict.pass_))
+    store.save_run(_run(Verdict.pass_))
+    store.save_run(_run(Verdict.fail))
+
+    fails = store.query_runs(check_id=check_id, verdict=Verdict.fail)
+    assert len(fails) == 1
+    passes = store.query_runs(check_id=check_id, verdict=Verdict.pass_)
+    assert len(passes) == 2
+    all_runs = store.query_runs(check_id=check_id)
+    assert len(all_runs) == 3
+
+
+def test_query_runs_no_filters_returns_all():
+    from dqt.store.memory import MemoryStore
+    from dqt.store._protocol import RunResult
+    from dqt.algorithms._base import Verdict
+    from datetime import datetime, timezone
+    from uuid import uuid4
+
+    store = MemoryStore()
+    now = datetime.now(timezone.utc)
+    for _ in range(5):
+        store.save_run(RunResult(
+            run_id=uuid4(), check_id=uuid4(), detector_slug="ks_pvalue",
+            detector_version="1", started_at=now, finished_at=now,
+            verdict=Verdict.pass_, score=0.1, plain_english="ok", details={},
+        ))
+    all_runs = store.query_runs(limit=100)
+    assert len(all_runs) == 5

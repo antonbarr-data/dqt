@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 from uuid import UUID
 
 from dqt.store._protocol import CausalEdgeReview, CausalityReport, Incident, ProfileReport, RunResult
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from dqt.algorithms._base import Verdict
+    from dqt.store.proof import ProofBundle
 
 
 class MemoryStore:
@@ -13,12 +20,34 @@ class MemoryStore:
         self._causal_reviews: list[CausalEdgeReview] = []
         self._profile_reports: list[ProfileReport] = []
         self._causality_reports: list[CausalityReport] = []
+        self._proofs: dict[UUID, list[ProofBundle]] = defaultdict(list)
 
     def save_run(self, run: RunResult) -> None:
         self._runs[run.check_id].append(run)
 
     def list_runs(self, check_id: UUID, limit: int = 100) -> list[RunResult]:
         return self._runs[check_id][-limit:][::-1]
+
+    def query_runs(
+        self,
+        check_id: UUID | None = None,
+        verdict: Verdict | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        limit: int = 100,
+    ) -> list[RunResult]:
+        if check_id is not None:
+            candidates = list(self._runs.get(check_id, []))
+        else:
+            candidates = [r for runs in self._runs.values() for r in runs]
+        if verdict is not None:
+            candidates = [r for r in candidates if r.verdict == verdict]
+        if since is not None:
+            candidates = [r for r in candidates if r.finished_at >= since]
+        if until is not None:
+            candidates = [r for r in candidates if r.finished_at <= until]
+        candidates.sort(key=lambda r: r.finished_at, reverse=True)
+        return candidates[:limit]
 
     def save_incident(self, incident: Incident) -> None:
         self._incidents[incident.check_id].append(incident)
@@ -59,3 +88,9 @@ class MemoryStore:
 
     def list_causality_reports(self) -> list[CausalityReport]:
         return list(self._causality_reports)
+
+    def save_proof(self, proof: ProofBundle) -> None:
+        self._proofs[proof.check_id].append(proof)
+
+    def list_proofs(self, check_id: UUID) -> list[ProofBundle]:
+        return list(self._proofs.get(check_id, []))
