@@ -85,3 +85,29 @@ def test_stl_stat_scale_verdict():
     assert compute_verdict(2.0, "stl_residual_zscore") == Verdict.pass_
     assert compute_verdict(4.0, "stl_residual_zscore") == Verdict.warn
     assert compute_verdict(6.0, "stl_residual_zscore") == Verdict.fail
+
+
+def test_stl_auto_period_detects_weekly():
+    """STL with period=None auto-detects weekly seasonality."""
+    from dqt.algorithms.timeseries.stl import STLAnomalyDetector
+
+    rng = np.random.default_rng(0)
+    n = 98  # 14 complete weeks
+    t = np.arange(n)
+    values = 10.0 + 5.0 * np.sin(2 * np.pi * t / 7) + rng.normal(0, 0.5, n)
+    ref = pd.DataFrame({"value": values})
+
+    det = STLAnomalyDetector(period=None)
+    state = det.fit(ref)
+    assert state["period"] == 7, f"Expected period=7, got {state['period']}"
+
+
+def test_stl_auto_period_fallback():
+    """STL with period=None falls back to a valid period for random noise."""
+    from dqt.algorithms.timeseries.stl import STLAnomalyDetector
+
+    rng = np.random.default_rng(0)
+    ref = pd.DataFrame({"value": rng.normal(0, 1, 50)})
+    det = STLAnomalyDetector(period=None)
+    state = det.fit(ref)
+    assert state["period"] >= 2

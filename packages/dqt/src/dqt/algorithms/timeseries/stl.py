@@ -10,6 +10,28 @@ from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState
 from dqt.algorithms._registry import registry
 
 
+def _auto_period(values: np.ndarray, min_period: int = 2, max_period: int = 365) -> int:
+    """Detect dominant seasonality period via FFT. Falls back to 7 if no dominant period found."""
+    n = len(values)
+    effective_max = max_period if n >= 2 * max_period else min(max_period, n // 4)
+    if effective_max < min_period:
+        return 7
+    fft_vals = np.abs(np.fft.rfft(values - values.mean()))
+    freqs = np.fft.rfftfreq(n)
+    fft_vals[0] = 0.0  # exclude DC
+    with np.errstate(divide="ignore", invalid="ignore"):
+        periods = np.where(freqs > 0, 1.0 / freqs, 0.0)
+    valid = (freqs > 0) & (periods >= min_period) & (periods <= effective_max)
+    if not np.any(valid):
+        return 7
+    fft_valid = np.where(valid, fft_vals, 0.0)
+    dominant_freq = freqs[np.argmax(fft_valid)]
+    if dominant_freq <= 0:
+        return 7
+    period = int(round(1.0 / dominant_freq))
+    return max(min_period, min(period, effective_max))
+
+
 @registry.register
 class STLAnomalyDetector(BaseDetector):
     """Detects anomalies via STL residuals. Score = max absolute Z-score of residuals."""
@@ -17,22 +39,23 @@ class STLAnomalyDetector(BaseDetector):
     group = "timeseries"
     min_recommended_n: ClassVar[int] = 100
 
-    def __init__(self, period: int = 7) -> None:
+    def __init__(self, period: int | None = None) -> None:
         self._period = period
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         from statsmodels.tsa.seasonal import STL
         values = reference.iloc[:, 0].to_numpy(dtype=float)
-        min_len = 2 * self._period + 1
+        period = self._period if self._period is not None else _auto_period(values)
+        min_len = 2 * period + 1
         if len(values) < min_len:
             raise ValueError(f"STL requires at least {min_len} observations, got {len(values)}")
-        result = STL(values, period=self._period, robust=True).fit()
+        result = STL(values, period=period, robust=True).fit()
         resid = result.resid
         resid_std = float(np.std(resid, ddof=1))
         return {
             "resid_mean": float(np.mean(resid)),
             "resid_std": resid_std if resid_std > 0 else 1.0,
-            "period": self._period,
+            "period": period,
         }
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
