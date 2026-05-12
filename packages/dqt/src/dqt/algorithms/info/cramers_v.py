@@ -1,7 +1,9 @@
 # packages/dqt/src/dqt/algorithms/info/cramers_v.py
-# Ref: Cramér (1946) Mathematical Methods of Statistics
-# V = sqrt(χ² / (n · min(r−1, c−1))); for drift: 2-period × K-category contingency table
+# Ref: Cramér (1946) Mathematical Methods of Statistics; Bergsma & Wicher (2013) J. Stat. Planning
+# V = sqrt(χ² / (n · min(r−1, c−1))); bias-corrected per Bergsma-Wicher (2013)
 from __future__ import annotations
+
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd
@@ -11,11 +13,26 @@ from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState, Ve
 from dqt.algorithms._registry import registry
 
 
+def _cramers_v_corrected(chi2: float, n: float, k: int, r: int = 2) -> float:
+    """Bergsma-Wicher bias-corrected Cramér's V. Corrects positive bias in small samples."""
+    if n <= 1:
+        return 0.0
+    phi2 = chi2 / n
+    phi2_corr = max(0.0, phi2 - (k - 1) * (r - 1) / (n - 1))
+    k_corr = k - (k - 1) ** 2 / (n - 1)
+    r_corr = r - (r - 1) ** 2 / (n - 1)
+    denom = min(k_corr, r_corr) - 1
+    if denom <= 0:
+        return 0.0
+    return float(np.sqrt(max(0.0, phi2_corr / denom)))
+
+
 @registry.register
 class CramersVDetector(BaseDetector):
     """Cramér's V categorical drift. Builds 2×K contingency (reference vs current). Score = V."""
     slug = "cramers_v"
     group = "info"
+    version: ClassVar[str] = "2"
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         col = reference.iloc[:, 0].dropna().astype(str)
@@ -28,7 +45,7 @@ class CramersVDetector(BaseDetector):
             return DetectorResult(
                 score=0.0, verdict=Verdict.pass_,
                 plain_english="No data to score.",
-                details={"cramers_v": 0.0},
+                details={"cramers_v": 0.0, "bias_corrected": True},
             )
         categories = state["categories"]
         curr_counts = curr.value_counts().to_dict()
@@ -42,13 +59,13 @@ class CramersVDetector(BaseDetector):
             return DetectorResult(
                 score=0.0, verdict=Verdict.pass_,
                 plain_english="Insufficient data for Cramér's V.",
-                details={"cramers_v": 0.0},
+                details={"cramers_v": 0.0, "bias_corrected": True},
             )
-        v = float(np.sqrt(chi2 / (n * (min(2, k) - 1))))
+        v = _cramers_v_corrected(chi2, n, k, r=2)
         v = min(max(v, 0.0), 1.0)
         return DetectorResult(
             score=v,
             verdict=self._verdict(v),
             plain_english=f"Cramér's V = {v:.4f} — {'categorical drift' if v >= 0.15 else 'stable'}",
-            details={"cramers_v": v, "chi2": float(chi2), "n": float(n)},
+            details={"cramers_v": v, "chi2": float(chi2), "n": float(n), "bias_corrected": True},
         )

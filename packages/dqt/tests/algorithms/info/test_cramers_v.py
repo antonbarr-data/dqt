@@ -51,3 +51,18 @@ def test_cramers_v_stat_scale_verdict():
     assert compute_verdict(0.05, "cramers_v") == Verdict.pass_
     assert compute_verdict(0.20, "cramers_v") == Verdict.warn
     assert compute_verdict(0.40, "cramers_v") == Verdict.fail
+
+
+def test_cramers_v_bias_corrected_on_small_sample():
+    """Bias-corrected V should be near 0 for two independent small samples."""
+    from dqt.algorithms.info.cramers_v import CramersVDetector
+
+    rng = np.random.default_rng(42)
+    ref = pd.DataFrame({"cat": rng.choice(["a", "b", "c"], size=30)})
+    curr = pd.DataFrame({"cat": rng.choice(["a", "b", "c"], size=30)})
+
+    det = CramersVDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+    assert result.score < 0.40, f"Bias-corrected V too high for independent data: {result.score}"
+    assert result.details.get("bias_corrected") is True
