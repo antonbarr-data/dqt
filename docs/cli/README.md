@@ -13,6 +13,11 @@ The CLI requires `dqt` as a dependency and installs it automatically.
 | Command | Description |
 |---|---|
 | `dqt run <manifest>` | Run all checks in a manifest YAML file |
+| `dqt list-detectors` | List all registered detector slugs grouped by family |
+| `dqt wiki sync <raw/> <wiki/>` | Synthesise wiki entries from raw source documents (Anthropic Claude) |
+| `dqt wiki status <raw/> <wiki/>` | Show sync status: which groups are up to date or changed |
+| `dqt report --vault <wiki/>` | Generate a self-contained HTML report from wiki entries |
+| `dqt dashboard` | Start the local browser dashboard |
 | `dqt version` | Print library version |
 | `dqt demo seed` | Seed demo data into the local database |
 | `dqt demo reset` | Reset demo data |

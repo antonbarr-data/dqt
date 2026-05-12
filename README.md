@@ -5,7 +5,7 @@
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
-[![Release notes](https://img.shields.io/badge/release%20notes-v0.4.7-blue?style=flat-square)](docs/releases/v0.4.7.md)
+[![Release notes](https://img.shields.io/badge/release%20notes-v0.4.8-blue?style=flat-square)](docs/releases/v0.4.8.md)
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
 
@@ -278,6 +278,44 @@ The agent operates on Pearl's ladder of causation explicitly:
 3. **Counterfactual** — answer "would this have happened anyway?" using DoWhy refuters
 
 Output is structured `{plain_english, evidence[], confidence, follow_up_questions[]}`. Every assertion cites the statistical evidence that supports it — no hallucinated SQL, no unsupported claims.
+
+---
+
+### LLM Wiki: AI-written knowledge from your data docs
+
+**`dqt wiki sync` + `dqt report`** — point dqt at a folder of raw source documents (semantic YAML, incident tickets, SQL, DQ reports) and get back a structured knowledge wiki synthesised by Anthropic Claude, plus a shareable HTML report.
+
+Inspired by [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f): `raw/` holds atomic, version-controlled source-of-truth documents you own; `wiki/` holds the AI-synthesised knowledge layer. The two layers stay separate. Only groups whose source files have changed are re-processed on subsequent runs.
+
+```bash
+pip install dqt-cli          # anthropic included
+
+export ANTHROPIC_API_KEY=sk-ant-...
+
+# Organise your docs
+mkdir -p raw/semantic raw/tickets raw/code raw/reports
+
+# Synthesise wiki entries (incremental, hash-cached)
+dqt wiki sync raw/ wiki/
+
+# Check what's up to date
+dqt wiki status raw/ wiki/
+
+# Generate a self-contained HTML report
+dqt report --vault wiki/ --out knowledge_report.html
+```
+
+```
+raw/
+  semantic/datasets.yaml        # your metric / dataset definitions
+  tickets/INC-2024-031.md       # incident postmortems, JIRA exports
+  code/roi_bridge.sql           # SQL queries, dbt models
+  reports/Q1_2025_dq_summary.md # DQ reports, profiling outputs
+```
+
+Each wiki entry is a structured markdown article: one-sentence summary, key facts, data quality notes, related assets. Entries are cached by content hash — only changed groups hit the API.
+
+See [docs/wiki.md](docs/wiki.md) for the full guide, Python API, and CI/CD integration example.
 
 ---
 
@@ -575,6 +613,9 @@ The server (`apps/server`) imports the library and adds auth, multi-tenancy, sch
 # Core library + CLI
 pip install dqtlib
 
+# + LLM Wiki synthesis (Anthropic Claude)
+pip install "dqtlib[wiki]"
+
 # + local dashboard (FastAPI + HTMX browser UI)
 pip install "dqtlib[dashboard]"
 
@@ -610,9 +651,10 @@ Full API reference with Gigler sample dataset examples:
 | [Checks & Runner API](docs/api/checks-and-runner.md) | Check model, CheckScope, CheckFilter, BaselineConfig, Runner, MemoryStore |
 | [Results & AI explanations](docs/api/results.md) | RunResult fields, Incident fields, causal discovery results, agent explanation output, MemoryStore queries |
 | [Lineage API](docs/api/lineage.md) | LineageGraph from SQL (sqlglot), dbt manifest ingestion, OpenLineage, graph queries |
+| [LLM Wiki: AI knowledge synthesis](docs/wiki.md) | `dqt wiki sync/status`, `dqt report`, raw/ layout, Python API, CI/CD integration |
 | [Vault: LLM Wiki structure](docs/api/vault.md) | write_vault() output, raw/ frontmatter schema, wiki/ generated files, custom node types, Obsidian |
 | [YAML check format](docs/api/yaml-reference.md) | Complete YAML config reference with annotated Gigler example |
-| [CLI reference](docs/api/cli-reference.md) | `dqt run`, `dqt version`, `dqt dashboard`, CI/CD integration |
+| [CLI reference](docs/api/cli-reference.md) | All CLI commands including `dqt wiki`, `dqt report`, `dqt list-detectors` |
 | [Local dashboard](docs/dashboard.md) | Browser UI for check results — install, quickstart, notebook pattern, limitations |
 | [Adapters](docs/api/adapters.md) | LocalAdapter, PostgresAdapter, custom adapter protocol |
 | [Semantic layer & LLM Wiki](docs/semantic-layer.md) | Build your data knowledge graph from Trello tickets, SQL, and BI reports using Karpathy's LLM Wiki pattern + Claude Code |
