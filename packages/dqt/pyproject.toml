@@ -40,6 +40,11 @@ explain    = ["shap>=0.45", "pgmpy>=0.1"]
 files      = ["openpyxl>=3.0", "pyarrow>=14.0"]
 reports    = ["matplotlib>=3.8"]
 lineage    = ["sqlglot>=23.0"]
+dashboard  = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "jinja2>=3.1",
+]
 
 [project.scripts]
 dqt = "dqt.cli.main:main"

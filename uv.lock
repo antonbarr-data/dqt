@@ -1461,6 +1461,11 @@ causal = [
 clickhouse = [
     { name = "clickhouse-connect" },
 ]
+dashboard = [
+    { name = "fastapi" },
+    { name = "jinja2" },
+    { name = "uvicorn", extra = ["standard"] },
+]
 databricks = [
     { name = "databricks-sql-connector" },
 ]
@@ -1504,9 +1509,11 @@ requires-dist = [
     { name = "diptest", specifier = ">=0.6" },
     { name = "dowhy", marker = "extra == 'causal'", specifier = ">=0.11" },
     { name = "duckdb", specifier = ">=0.9" },
+    { name = "fastapi", marker = "extra == 'dashboard'", specifier = ">=0.111" },
     { name = "google-cloud-bigquery", marker = "extra == 'bigquery'", specifier = ">=3.19" },
     { name = "ibis-framework", specifier = ">=9.0" },
     { name = "ibis-framework", extras = ["postgres"], marker = "extra == 'postgres'", specifier = ">=9.0" },
+    { name = "jinja2", marker = "extra == 'dashboard'", specifier = ">=3.1" },
     { name = "jsonschema", specifier = ">=4.22" },
     { name = "matplotlib", marker = "extra == 'reports'", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.26" },
@@ -1531,8 +1538,9 @@ requires-dist = [
     { name = "stumpy", marker = "extra == 'forecast'", specifier = ">=1.4" },
     { name = "tigramite", marker = "extra == 'causal'", specifier = ">=0.7" },
     { name = "torch", marker = "extra == 'deep'", specifier = ">=2.3" },
+    { name = "uvicorn", extras = ["standard"], marker = "extra == 'dashboard'", specifier = ">=0.29" },
 ]
-provides-extras = ["postgres", "clickhouse", "bigquery", "snowflake", "databricks", "causal", "forecast", "deep", "explain", "files", "reports", "lineage"]
+provides-extras = ["postgres", "clickhouse", "bigquery", "snowflake", "databricks", "causal", "forecast", "deep", "explain", "files", "reports", "lineage", "dashboard"]
 
 [[package]]
 name = "duckdb"
