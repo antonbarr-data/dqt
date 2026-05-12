@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.6.0](v0.6.0.md) | 2026-05-12 | `deduplicate_alerts()`: causal-aware alert deduplication via lineage graph |
 | [v0.5.5](v0.5.5.md) | 2026-05-12 | Statistical primer doc; auto-generated README benchmark headline numbers |
 | [v0.5.4](v0.5.4.md) | 2026-05-12 | `calibrate_from_history()`: continuous threshold drift detection from stored pass runs |
 | [v0.5.3](v0.5.3.md) | 2026-05-12 | Detector versioning in `RunResult`; runner auto-refits on algorithm version change |
