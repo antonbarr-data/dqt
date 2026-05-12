@@ -83,3 +83,25 @@ print(det.score(curr_stable, state).verdict)  # pass
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_chi_square_drift.py`
+
+## When it works well
+
+- Categorical or low-cardinality integer columns where values are drawn from a fixed set.
+- Standard drift test for model feature distributions and categorical labels; well-calibrated at α=0.05.
+
+## When it fails / Limitations
+
+- Continuous numeric columns — requires binning first; bin choice strongly affects the result. Use `ks_pvalue` or `wasserstein_1` for continuous data.
+- Expected cell counts < 5 cause the chi-squared approximation to break down — apply Fisher's exact test or merge rare categories.
+- High cardinality (> 100 unique values) produces many sparse cells; consider grouping rare categories into an "other" bin.
+- Minimum recommended sample: 5 expected observations per category in both windows.
+- FPR at defaults (α=0.05) on stable categorical data: ~5%.
+- FPR at defaults on heavy-tailed data: N/A (categorical detector).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Low-cardinality categorical | 0.05 | 0.01 | Standard α thresholds |
+| High-cardinality categorical | 0.10 | 0.05 | Merge rare cats; wider α |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

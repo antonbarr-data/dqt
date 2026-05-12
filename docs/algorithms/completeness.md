@@ -52,3 +52,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/completeness.py`
+
+## When it works well
+
+- Any column or dataset where "completeness" (fraction of non-null, non-empty values) is a defined data quality SLA.
+- Complements `null_fraction` — completeness = 1 − null_fraction for simple nullability, but may also count empty strings as incomplete.
+
+## When it fails / Limitations
+
+- Structural incompleteness (optional attributes, sparse FK columns) will always fire at default thresholds; calibrate per-column.
+- Does not detect semantically incomplete values (e.g. placeholder "N/A" strings) — use `validity` or `regex_match` for those.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Required field | 0.001 | 0.01 | Near-zero tolerance |
+| Optional field | 0.05 | 0.20 | Structural incompleteness expected |
+| Sparse / high-null | N/A | N/A | Use null_fraction for granular control |

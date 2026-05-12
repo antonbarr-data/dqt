@@ -91,3 +91,25 @@ print(result.details["n_anomalies"])  # 4
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_holt_winters.py`
+
+## When it works well
+
+- Time series with clear trend and/or additive/multiplicative seasonality at a known regular cadence (daily, weekly).
+- Good for forecasting-based anomaly detection when the series has been stable for at least 2–3 seasonal periods.
+
+## When it fails / Limitations
+
+- Non-seasonal or irregular time series — the seasonal component assumption causes over-smoothing and residuals lose meaning; use `cusum` or `page_hinkley` instead.
+- Fewer than 2 full seasonal periods of history — insufficient data to initialise the seasonal component.
+- Level shifts in the series confuse the exponential smoothing — the model adapts slowly, producing a streak of false positives after a genuine level change.
+- Minimum recommended sample: 2 × seasonal_period rows (e.g. 14 days for weekly seasonality).
+- FPR at defaults on stable seasonal data: ~2–5%.
+- FPR at defaults on non-seasonal or heavy-tailed data: 10–20%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Stable seasonal | (default) | (default) | STAT_SCALES defaults |
+| Non-seasonal | N/A | N/A | Use cusum or page_hinkley instead |
+| Highly irregular | N/A | N/A | Use bocpd for structural breaks |

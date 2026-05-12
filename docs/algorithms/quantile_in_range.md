@@ -61,3 +61,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Monitoring percentile-based SLAs (e.g. p95 latency < 500ms, p99 order value < $10,000).
+- More robust than `max_in_range` for heavy-tailed columns because extreme individual values don't move high percentiles significantly.
+
+## When it fails / Limitations
+
+- Requires choosing the quantile level — wrong choice misses the intended anomaly (e.g. p50 instead of p99 for tail-latency monitoring).
+- Quantile estimates at extreme percentiles (p99.9, p0.1) require large samples to be reliable.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1/(1-p) rows for the quantile level p (e.g. 100 rows for p99).
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based; but bounds should account for heavy tails).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal bounded | calibrated bounds | calibrated bounds | Derive from reference window |
+| Heavy-tailed (revenue, latency) | calibrated bounds | calibrated bounds | Use p95/p99 for tail monitoring |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

@@ -98,3 +98,25 @@ print(result_stable.score)         # low value, e.g. 0.32
 | 0.05 | ~5% | Default |
 | 0.01 | ~1% | Better for many-column tables |
 | 0.001 | ~0.1% | For very large N where tiny drifts matter |
+
+## When it works well
+
+- Continuous numeric columns of any distribution — the KS test is fully non-parametric.
+- Moderate to large samples (≥ 100 per window) where the test has sufficient power to detect practically relevant drift.
+
+## When it fails / Limitations
+
+- Very large N (> 10,000) — the test becomes over-sensitive and flags operationally irrelevant micro-drifts; use `wasserstein_1` for magnitude-sensitive monitoring.
+- Categorical or discrete columns with ties — the p-value is conservative; use `chi_square_drift` instead.
+- Does not measure drift magnitude — only whether the distributions are statistically different; use `wasserstein_1` or `psi` for quantitative magnitude.
+- Minimum recommended sample: 30 rows (both reference and current).
+- FPR at defaults (α=0.05) on clean normal data: ~5%.
+- FPR at defaults on heavy-tailed data: ~5% (KS is distribution-free; FPR is well-calibrated).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | 0.95 | 0.99 | STAT_SCALES defaults (1-p) |
+| Heavy-tailed (revenue, latency) | 0.95 | 0.99 | KS is distribution-free; defaults hold |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

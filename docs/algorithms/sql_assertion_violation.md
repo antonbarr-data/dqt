@@ -78,3 +78,26 @@ checks:
 ## Implementation
 
 [`packages/dqt/src/dqt/algorithms/basic/sql_assertion.py`](https://github.com/antonbarr-data/dqt/blob/main/packages/dqt/src/dqt/algorithms/basic/sql_assertion.py)
+
+## When it works well
+
+- Complex business rules that require arbitrary SQL (multi-table joins, window functions, CTEs) and cannot be expressed with single-column checks.
+- The SQL returns a count of failing rows; the violation fraction is this count divided by total rows.
+
+## When it fails / Limitations
+
+- User-supplied SQL — errors in the SQL produce `DetectorError`; always validate the assertion query against the warehouse before deploying.
+- Performance depends entirely on the SQL complexity; avoid full-table scans in critical-path checks.
+- Not portable across warehouse engines without SQL dialect adjustments; use ibis expressions or parameterised checks for multi-engine portability.
+- FPR at defaults: 0% (rule-based — the SQL defines the rule exactly).
+- Minimum recommended sample: as required by the SQL logic.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Hard business rule | (default) | (default) | STAT_SCALES defaults |
+| Soft tolerance | 0.001 | 0.01 | Allow small violation fraction |
+| Statistical assertion | calibrate | calibrate | Calibrate against reference data |

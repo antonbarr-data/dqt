@@ -96,3 +96,25 @@ print(result.score)           # raw score
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_mad_outlier_fraction.py`
+
+## When it works well
+
+- Numeric columns with any unimodal distribution including heavy-tailed and skewed data (revenue, latency, duration).
+- 50% breakdown point — the median and MAD are unaffected by up to half the data being contaminated.
+
+## When it fails / Limitations
+
+- Bimodal or multimodal distributions produce an inflated MAD (or near-zero MAD if modes are close), causing missed detections or constant false positives.
+- When MAD = 0 (more than 50% of values are identical), the modified Z-score is undefined; the implementation falls back to a small epsilon to avoid division by zero, but results are unreliable.
+- Less powerful than Z-score for detecting mild outliers in genuinely normal data.
+- Minimum recommended sample: 10 rows for stable MAD estimates.
+- FPR at defaults (threshold=3.5) on clean normal data: ~0.3%.
+- FPR at defaults on heavy-tailed data: ~0.5–1%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | MAD is robust; defaults hold |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

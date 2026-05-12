@@ -58,3 +58,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Financial reconciliation checks where the total sum of a column should match a known control total.
+- Batch completeness checks (e.g. total loaded revenue should be within 1% of expected).
+
+## When it fails / Limitations
+
+- The sum grows with volume — if row count changes, the sum changes proportionally even without per-row errors; combine with `row_count_in_range` and use a ratio check instead for volume-independent monitoring.
+- Sensitive to large individual values (outliers inflate the sum); monitor with both `sum_in_range` and `max_in_range`.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Fixed control total | exact bounds | exact bounds | Reconciliation use case |
+| Volume-dependent sum | relative bounds | relative bounds | e.g. ± 1% of expected sum |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

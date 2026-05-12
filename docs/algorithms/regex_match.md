@@ -57,3 +57,26 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/value_checks.py`
+
+## When it works well
+
+- String columns with a known format (email addresses, phone numbers, ISO codes, UUIDs, postal codes).
+- Zero false positives on clean data — a deterministic pattern match.
+
+## When it fails / Limitations
+
+- Regex complexity grows with format variations — overly strict patterns produce false positives on legitimate variations (e.g. international phone number formats).
+- Does not validate semantic correctness, only format — a syntactically valid email may not exist.
+- Performance degrades with complex regexes on very wide text columns (> 10,000 characters).
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Strict format column | (default) | (default) | STAT_SCALES defaults |
+| Flexible format column | 0.01 | 0.05 | Allow small fraction of format variations |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

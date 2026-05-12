@@ -53,3 +53,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/uniqueness.py`
+
+## When it works well
+
+- Primary key or unique constraint columns where duplicate values are always a data quality issue.
+- Works on any data type — string, numeric, timestamp.
+
+## When it fails / Limitations
+
+- Columns where duplicates are semantically expected (e.g. `customer_id` in a transactions table, `product_id` in an order-items table) — setting the threshold too tight produces constant false positives.
+- Large tables: counting distinct values requires a full scan; consider sampling with caution as sampling underestimates duplicate rates.
+- FPR at defaults (uniqueness_rate threshold): 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Primary key column | 1.0 | 1.0 | Exact uniqueness required |
+| Near-unique (natural key) | 0.99 | 0.95 | Small tolerance for duplicates |
+| Non-unique (FK column) | N/A | N/A | Not applicable; use cardinality_in_range |

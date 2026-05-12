@@ -85,3 +85,26 @@ print(result.details["ref_mean"])       # ~85.0
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_page_hinkley.py`
+
+## When it works well
+
+- Online / streaming time series where you want to detect a sustained upward (or downward) mean shift with low memory footprint.
+- Suitable for any numeric series without seasonality requirements; one-pass algorithm, O(1) memory per step.
+
+## When it fails / Limitations
+
+- Designed for one-directional monitoring — a Page-Hinkley test for upward shifts will miss downward shifts (and vice versa). Use two instances in parallel or a two-sided variant for bidirectional monitoring.
+- Gradual slow drift accumulates in the statistic but detection delay is high — better suited for abrupt shifts.
+- The delta (minimum detectable shift magnitude) and lambda (detection threshold) parameters must be tuned to the column's noise level; incorrect values produce either high FPR or missed detections.
+- Does not account for seasonality — apply STL deseasonalisation first on seasonal series.
+- Minimum recommended sample: 20 observations to calibrate mean and std.
+- FPR at defaults on stable data: ~1–3% depending on lambda.
+- FPR at defaults on heavy-tailed data: 5–10%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 15.0 | 25.0 | Raise lambda to reduce false alarms |
+| Seasonal series | N/A | N/A | Deseasonalise first |

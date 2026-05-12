@@ -59,3 +59,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Numeric columns with known expected median bounds; the median is robust to outliers making this more reliable than `numeric_mean` for skewed columns.
+- Preferred over `numeric_mean` for heavy-tailed distributions (revenue, latency, session duration).
+
+## When it fails / Limitations
+
+- For multimodal distributions, the median can fall between modes and may not represent a typical value; use distribution checks instead.
+- Requires explicit calibration of min/max median bounds for each column.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based; median is robust to heavy tails).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal bounded | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | calibrated bounds | calibrated bounds | Median is stable; set tight bounds |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

@@ -87,3 +87,25 @@ print(result.details["outlier_fraction"])  # fraction flagged
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_multi/test_lof.py`
+
+## When it works well
+
+- Datasets with non-uniform density clusters — LOF detects local outliers that are far from their neighbours even when they would appear normal globally.
+- Medium-dimensional feature sets (2–20 columns) where local neighbourhood structure is meaningful.
+
+## When it fails / Limitations
+
+- Clusters of very different densities — LOF's local reachability density comparison can misidentify dense-cluster members as outliers when adjacent to sparse clusters.
+- Very high dimensions (> 20 columns) — the "curse of dimensionality" makes nearest-neighbour distances uninformative; use `isolation_forest_fraction` or `ecod` instead.
+- Computationally O(n²) without approximation — slow for samples > 50,000 rows.
+- Minimum recommended sample: 100 rows (at least 10× the k_neighbours parameter).
+- FPR at defaults (k=20, contamination=0.1) on clean data: ~10%.
+- FPR at defaults on heavy-tailed data: ~10–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | LOF is distribution-agnostic |
+| Sparse / high-null | N/A | N/A | Impute nulls before use |

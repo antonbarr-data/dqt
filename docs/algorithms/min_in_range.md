@@ -57,3 +57,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Numeric columns where the minimum value should stay above a floor (e.g. price > 0, quantity ≥ 1, duration_ms ≥ 0).
+- Catches negative or zero values in strictly positive columns.
+
+## When it fails / Limitations
+
+- Legitimate minimum values at the edge of the range (e.g. a genuine zero-value transaction) can fire the check; set bounds with business domain knowledge.
+- For sparse columns, the minimum may vary significantly with sample size; consider using `quantile_in_range` at the 1st percentile for more stable monitoring.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Hard lower bound | (default) | (default) | STAT_SCALES defaults |
+| Near-zero floor | 0 | 0 | Exact zero tolerance |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

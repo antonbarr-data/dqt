@@ -85,3 +85,26 @@ print(result.details)        # {"outlier_fraction": 0.056, "score_threshold": ..
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_multi/test_ecod.py`
+
+## When it works well
+
+- High-dimensional tabular datasets (many numeric columns) — ECOD uses empirical CDFs and requires no distributional assumptions.
+- Excellent default for wide tables with heterogeneous column types; computationally efficient (O(n·d)).
+
+## When it fails / Limitations
+
+- Assumes feature independence — correlated features can cause over- or under-flagging; the score is a sum of tail probabilities across columns.
+- Very small samples (< 50 rows) produce unstable empirical CDFs at the tails.
+- Not suitable for purely categorical features.
+- The contamination parameter controls the score threshold; setting it too low misses anomalies, too high increases FPR.
+- Minimum recommended sample: 50 rows.
+- FPR at defaults (contamination=0.1) on clean data: ~10%.
+- FPR at defaults on heavy-tailed data: ~10–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | ECOD is distribution-agnostic |
+| Sparse / high-null | N/A | N/A | Impute nulls before use |

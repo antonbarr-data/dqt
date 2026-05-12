@@ -86,3 +86,26 @@ print(result.details["anomaly_count"])  # 1
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_stl_residual_zscore.py`
+
+## When it works well
+
+- Time series with clear, stable seasonal patterns (daily, weekly, or annual cycles) and at least 2 full seasons of history.
+- Metric monitoring at regular cadence (hourly, daily) where trend and seasonality can be cleanly separated from anomalies.
+
+## When it fails / Limitations
+
+- No seasonal pattern — STL decomposition assigns all variance to the residual component, inflating scores; use `cusum` or `page_hinkley` for non-seasonal series.
+- Fewer than 2 full seasonal periods — insufficient history to fit the Loess smoother reliably.
+- Abrupt level shifts in the trend component inflate the residuals for nearby points; BOCPD or CUSUM detect these more accurately.
+- Residuals inherit the Z-score limitation: FPR inflates on non-normal residuals (common in count or percentage time series).
+- Minimum recommended sample: 2 × seasonal_period rows (e.g. 14 observations for weekly seasonality).
+- FPR at defaults (z_threshold=3.0) on normal residuals: ~0.3%.
+- FPR at defaults on heavy-tailed residuals: 3–10%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal residuals | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed residuals | 4.0 | 5.0 | Raise threshold to reduce false positives |
+| No seasonality | N/A | N/A | Use cusum or page_hinkley instead |

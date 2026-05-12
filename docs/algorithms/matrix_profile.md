@@ -90,3 +90,26 @@ print(result.details["backend"])  # "stumpy" if installed, else "numpy"
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_matrix_profile.py`
+
+## When it works well
+
+- Time series with repeating motifs (patterns) where anomalies appear as unusual discords — subsequences that are maximally distant from all other subsequences.
+- Does not require distributional assumptions; works on any numeric time series.
+
+## When it fails / Limitations
+
+- Computationally intensive — O(n²) or O(n log n) with STUMPY's STOMP algorithm; not suitable for very long series (> 1M points) without windowing.
+- Requires choosing the window length (m) — too short misses long patterns, too long is too coarse for short anomalies.
+- Does not model seasonality or trend — apply STL deseasonalisation first if seasonal patterns dominate.
+- The matrix profile score is unitless and context-dependent; thresholds must be calibrated to each series.
+- Minimum recommended sample: 4 × window_size observations.
+- FPR at defaults on stable periodic data: ~2–5%.
+- FPR at defaults on non-periodic or heavy-tailed data: 5–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Periodic with clear motifs | (default) | (default) | STAT_SCALES defaults |
+| Non-periodic | N/A | N/A | STL + cusum is more appropriate |
+| Very long series (> 1M) | N/A | N/A | Use streaming CUSUM or ADWIN |

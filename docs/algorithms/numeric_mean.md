@@ -54,3 +54,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric.py`
+
+## When it works well
+
+- Numeric columns where the mean is a meaningful summary statistic and you have explicit business bounds for it.
+- Complements distribution checks by catching level shifts that may not be visible in the full distribution test.
+
+## When it fails / Limitations
+
+- Mean is sensitive to outliers — a few extreme values can move the mean outside the expected range even when the bulk of the data is healthy; consider using `median_in_range` for robust monitoring.
+- Heavy-tailed columns (revenue, session duration) have means that are heavily influenced by rare extreme values; set wide bounds or use median instead.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based, but needs wide bounds to avoid constant alerts).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal bounded | tight bounds | tight bounds | e.g. expected mean ± 10% |
+| Heavy-tailed (revenue, latency) | wide bounds | wide bounds | Or use median_in_range instead |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

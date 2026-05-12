@@ -80,3 +80,25 @@ print(result_stable.score)    # near 0
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_js_divergence.py`
+
+## When it works well
+
+- Continuous numeric columns with well-overlapping support; preferred over `kl_divergence` because JS is symmetric and bounded in [0, 1].
+- Suitable when you want an interpretable drift score that is always finite, even when distributions have non-overlapping regions.
+
+## When it fails / Limitations
+
+- Still requires binning of continuous distributions — sensitive to bin count choice; sparse bins inflate the score.
+- Bounded range [0, 1] limits sensitivity to large distributional differences — at extreme drift both JS and KL reach saturation.
+- Categorical high-cardinality columns produce many sparse bins and unreliable scores; use `chi_square_drift` instead.
+- Minimum recommended sample: 100 rows (both reference and current).
+- FPR at defaults on stable normal data: ~5–10%.
+- FPR at defaults on heavy-tailed data: ~8–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 0.15 | 0.35 | Heavier tails inflate bin sparsity |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

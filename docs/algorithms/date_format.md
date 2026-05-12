@@ -58,3 +58,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/value_checks.py`
+
+## When it works well
+
+- Date/timestamp string columns where the format must conform to a specific pattern (ISO 8601, US MM/DD/YYYY, etc.).
+- Zero false positives on clean data — a deterministic format check.
+
+## When it fails / Limitations
+
+- Multiple valid formats in the same column (e.g. dates sourced from different systems) — will flag the minority format as violations.
+- Does not validate that the date values are semantically correct (e.g. 2024-02-30 passes format check but is invalid).
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Single strict format | (default) | (default) | STAT_SCALES defaults |
+| Multi-format column | N/A | N/A | Standardise upstream first |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

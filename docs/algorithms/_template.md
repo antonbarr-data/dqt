@@ -40,6 +40,27 @@ One short paragraph: what the method computes, what input it expects, what it ou
 | `direction` | `up = bad` / `down = bad` |
 | `plain_english` | `<label>` |
 
+## When it works well
+
+- [Distribution/data shape where this detector excels]
+- [Typical use cases — revenue, counts, ratios, categorical]
+
+## When it fails / Limitations
+
+- [Known failure mode 1 — state the assumption violated]
+- [Known failure mode 2]
+- Minimum recommended sample: [N rows]
+- FPR at defaults on clean normal data: [X%]
+- FPR at defaults on heavy-tailed data: [X%]
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | [value] | [value] | Reduce false positives |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |
+
 ## Reference
 
 - Author, Year. *Title*. Journal/Conference. DOI / URL.

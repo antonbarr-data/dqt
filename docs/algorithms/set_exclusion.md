@@ -56,3 +56,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/value_checks.py`
+
+## When it works well
+
+- Categorical columns where certain values are never allowed (blocked country codes, deprecated status values, test environment markers).
+- Zero false positives on clean data — a pure deterministic rule.
+
+## When it fails / Limitations
+
+- The excluded set must be explicitly maintained; new prohibited values must be added manually.
+- Does not catch values outside the excluded set that are still invalid — combine with `set_membership` for a complete allowlist/blocklist approach.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Categorical with explicit blocklist | (default) | (default) | STAT_SCALES defaults |
+| High-cardinality columns | N/A | N/A | Maintain blocklist carefully |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

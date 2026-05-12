@@ -104,3 +104,26 @@ gql_det = RemoteCheckDetector(
 ## Tests
 
 `packages/dqt/tests/algorithms/custom/test_remote_check.py`
+
+## When it works well
+
+- Custom checks that require calling an external HTTP service (third-party validation APIs, internal microservice checks, external data enrichment).
+- Useful for referential checks that span systems (e.g. validate IDs against an external registry).
+
+## When it fails / Limitations
+
+- Network latency and availability affect check reliability — implement retries and timeouts in the remote endpoint.
+- External service failures produce `DetectorError`, not graceful verdicts; the remote service must be highly available if used in critical pipelines.
+- Not suitable for high-frequency checks (per-row validation) — use it for aggregate checks only.
+- FPR at defaults: entirely determined by the remote endpoint's logic.
+- Minimum recommended sample: as required by the remote endpoint.
+- FPR at defaults on clean normal data: user-defined.
+- FPR at defaults on heavy-tailed data: user-defined.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Deterministic remote rule | 0 | 0 | Remote returns pass/fail directly |
+| Statistical remote check | calibrate | calibrate | Calibrate against reference data |
+| High-frequency use | N/A | N/A | Use local check or callable_check |

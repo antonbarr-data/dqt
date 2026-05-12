@@ -88,3 +88,27 @@ print(result.plain_english)  # "5 of 30 values outside Prophet 95% uncertainty i
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_prophet_anomaly.py`
+
+## When it works well
+
+- Time series with strong seasonality (daily, weekly, annual), trend, and known holiday effects — Prophet models all three explicitly.
+- Requires a datetime index and a regular or near-regular cadence.
+
+## When it fails / Limitations
+
+- Irregular time series (missing timestamps, variable intervals) — Prophet requires a regular cadence or substantial imputation.
+- Very short series (< 2 × seasonal_period) — insufficient data to fit seasonal components.
+- Computationally heavy at fit time (Stan MCMC or MAP) — not suitable for high-frequency per-column checks at scale.
+- Level shifts confuse the trend model; use `changepoint_prior_scale` to control sensitivity.
+- Requires the optional `dqt[forecast]` extra (`fbprophet` / `prophet` dependency).
+- Minimum recommended sample: 2 × seasonal_period observations (e.g. 730 days for annual seasonality).
+- FPR at defaults (interval_width=0.99) on stable seasonal data: ~1%.
+- FPR at defaults on irregular or non-seasonal data: 5–20%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Stable seasonal | (default) | (default) | STAT_SCALES defaults |
+| Non-seasonal | N/A | N/A | Use stl_residual_zscore or cusum |
+| High-frequency (sub-hourly) | N/A | N/A | Too slow; use cusum or page_hinkley |

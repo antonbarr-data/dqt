@@ -107,3 +107,25 @@ Empirical (N=200 ref, N=200 curr, same distribution, 1000 trials):
 | poisson(λ=10) | ~1% |
 
 For heavy-tailed data: log-transform before passing to ADWIN, or use `wasserstein_1` instead.
+
+## When it works well
+
+- Streaming time series where the underlying distribution can change at any point and the change timing is unknown.
+- Adaptive window automatically shrinks when drift is detected, adapting to the new distribution.
+
+## When it fails / Limitations
+
+- Heavy-tailed data inflates sub-window mean variance, causing false positives (see FPR table already in this file); log-transform before applying ADWIN on skewed streams.
+- Very slow gradual drift may not trigger ADWIN until many observations after the change; CUSUM has lower detection delay for gradual shifts.
+- The delta parameter trades off FPR vs detection delay — smaller delta = more sensitive but higher FPR.
+- Minimum recommended sample: 30 observations before the first evaluation.
+- FPR at defaults (delta=0.002) on clean normal data: ~0.5%.
+- FPR at defaults on heavy-tailed data: ~3–8%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal streaming | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Log-transform first or use wasserstein_1 |
+| Batch (non-streaming) | N/A | N/A | Use ks_pvalue or wasserstein_1 instead |

@@ -86,3 +86,25 @@ print(result.details)        # {"outlier_fraction": 0.005, "score_threshold": ..
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_multi/test_hbos.py`
+
+## When it works well
+
+- High-dimensional tabular datasets — HBOS assumes feature independence and scores each column with a histogram, making it very fast (O(n·d)) for large feature sets.
+- Good baseline multivariate detector when you want interpretable per-feature anomaly contributions.
+
+## When it fails / Limitations
+
+- Correlated features — the independence assumption means HBOS misses anomalies that only appear in correlated pairs; use `mahalanobis_distance` or `isolation_forest_fraction` for correlated columns.
+- Sparse bins in high-cardinality columns inflate scores; the bin count choice strongly affects results.
+- Not suitable for categorical columns without ordinal meaning — requires numeric features.
+- Minimum recommended sample: 100 rows.
+- FPR at defaults (contamination=0.1) on clean data: ~10%.
+- FPR at defaults on heavy-tailed data: ~12–18%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | HBOS adapts via histogram |
+| Sparse / high-null | N/A | N/A | Impute nulls before use |

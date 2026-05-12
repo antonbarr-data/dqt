@@ -57,3 +57,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Numeric columns where the maximum value should stay within known bounds (e.g. discount rate ≤ 1.0, temperature ≤ 200°C, age ≤ 120).
+- Catches single-value spikes that would not move mean/median significantly.
+
+## When it fails / Limitations
+
+- A single legitimate extreme value (a valid large transaction) can fire the check; set bounds with business domain knowledge.
+- For skewed distributions, the max is highly variable; consider using `quantile_in_range` at the 99th percentile instead of monitoring the raw maximum.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based, but wide bounds needed for heavy-tailed data).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Hard upper bound | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Use quantile_in_range at p99 instead |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

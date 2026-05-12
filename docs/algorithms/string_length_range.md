@@ -58,3 +58,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/value_checks.py`
+
+## When it works well
+
+- String columns with known length constraints (SSN, postal codes, product codes, fixed-length identifiers).
+- Zero false positives on clean data that satisfies the constraint — a deterministic rule.
+
+## When it fails / Limitations
+
+- Variable-length free text columns (comments, descriptions) — length range is hard to define without producing false positives.
+- Requires calibration of min/max bounds; too-tight bounds fire on legitimate edge-case values.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Fixed-length identifier | exact min=max | exact min=max | Strict equality on length |
+| Variable-length with bounds | (default) | (default) | STAT_SCALES defaults |
+| Free text | N/A | N/A | Not appropriate for this check |

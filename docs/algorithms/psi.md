@@ -76,3 +76,26 @@ print(result.score)          # ~0.23
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_psi.py`
+
+## When it works well
+
+- Continuous numeric columns with well-defined reference distributions (credit scores, model features, bounded metrics).
+- Industry-standard drift measure for model monitoring; commonly used thresholds (0.1 / 0.2) are well understood.
+
+## When it fails / Limitations
+
+- Small N — sparse bins produce unstable PSI estimates; PSI is unreliable with fewer than 200 rows per window.
+- Zero-frequency reference bins cause division by zero; requires Laplace smoothing (add-ε correction), which the implementation applies automatically but still inflates PSI for sparse categories.
+- Categorical columns with high cardinality (> 50 categories) — bin explosion; use `chi_square_drift` instead.
+- PSI is asymmetric in bin definition; the reference window defines the bins, so large shifts can move mass outside the reference range entirely.
+- Minimum recommended sample: 200 rows (both reference and current).
+- FPR at defaults (warn=0.1) on stable normal data: ~5–10%.
+- FPR at defaults on heavy-tailed data: ~10–20%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | 0.10 | 0.20 | Industry standard |
+| Heavy-tailed (revenue, latency) | 0.20 | 0.40 | Heavy tails inflate PSI; widen bands |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

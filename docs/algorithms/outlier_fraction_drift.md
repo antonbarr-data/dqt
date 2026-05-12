@@ -85,3 +85,25 @@ print(result_high.plain_english)  # "Outlier fraction 0.120 is outside expected 
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_outlier_fraction_drift.py`
+
+## When it works well
+
+- Tracking whether the *fraction* of outliers (as defined by any univariate detector) changes between reference and current windows.
+- Useful when you have a calibrated outlier definition and want to detect systematic increases in anomaly rate over time.
+
+## When it fails / Limitations
+
+- Requires a stable reference window — noisy baselines produce noisy drift estimates.
+- The interpretation depends entirely on the upstream outlier detector; make sure the outlier fraction itself is meaningful before monitoring its drift.
+- Small samples produce unreliable fraction estimates (proportions near 0 have wide confidence intervals).
+- Minimum recommended sample: 50 rows in both reference and current windows.
+- FPR at defaults on clean stable data: ~5% (PSI-style thresholding).
+- FPR at defaults on heavy-tailed data: inherits from underlying detector; typically 5–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 0.10 | 0.25 | Wider band for noisier fraction estimates |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

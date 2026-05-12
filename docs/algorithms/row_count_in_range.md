@@ -68,3 +68,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/volume.py`
+
+## When it works well
+
+- Batch-loaded tables where the expected row count per run is known and stable.
+- Simple, stateless check with explicit min/max bounds that encode the business expectation.
+
+## When it fails / Limitations
+
+- Tables with variable load volumes require frequent threshold updates; consider a drift-based volume check instead for highly variable tables.
+- Does not identify *why* the count changed (upstream pipeline failure vs. genuine business change).
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Stable batch load | tight bounds | tight bounds | e.g. expected ± 10% |
+| Variable load | wide bounds | wide bounds | e.g. expected ± 50% |
+| Seasonal table | N/A | N/A | Use dynamic baseline check |

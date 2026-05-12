@@ -57,3 +57,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/string_case.py`
+
+## When it works well
+
+- String columns with a strict casing convention (UPPER for codes, lower for emails, Title for names).
+- Zero false positives on clean data — a deterministic rule.
+
+## When it fails / Limitations
+
+- Mixed-case columns (proper nouns, product names with abbreviations) require careful configuration or will produce constant false positives.
+- Does not normalise case — it only detects violations, not fixes them.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Strict casing required | (default) | (default) | STAT_SCALES defaults |
+| Mixed-case column | N/A | N/A | Not applicable |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

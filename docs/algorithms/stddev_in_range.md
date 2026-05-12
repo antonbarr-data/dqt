@@ -59,3 +59,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Monitoring variance stability in numeric columns where the spread should remain within known bounds.
+- Useful for detecting variance explosions (data engineering errors that introduce extreme values) or variance collapses (degenerate data).
+
+## When it fails / Limitations
+
+- Standard deviation is sensitive to outliers — a single extreme value can inflate the std significantly.
+- Heavy-tailed distributions have inherently high variance; use robust scale measures (MAD or IQR-based) for monitoring spread in skewed columns.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 2 rows.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based, but bounds must be calibrated for heavy tails).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal bounded variance | calibrated bounds | calibrated bounds | Derive from reference window |
+| Heavy-tailed (revenue, latency) | wide bounds | wide bounds | Std is unstable; widen or use MAD |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

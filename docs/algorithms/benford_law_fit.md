@@ -88,3 +88,26 @@ print(result_bad.score)           # ~1.0
 ## Tests
 
 `packages/dqt/tests/algorithms/pattern/test_benford_law_fit.py`
+
+## When it works well
+
+- Naturally occurring numeric datasets that span multiple orders of magnitude (invoices, populations, transaction amounts, financial ledgers) — Benford's Law predicts the distribution of first significant digits.
+- Fraud detection and data integrity checks where values are expected to arise organically.
+
+## When it fails / Limitations
+
+- Artificially constrained data (values in a fixed range like 1–100) — the first-digit distribution is not expected to follow Benford's Law.
+- Sequential IDs, ZIP codes, telephone numbers, or any column where values are assigned rather than naturally occurring.
+- Small N (< 1,000) — chi-squared test against Benford's distribution has low power and high variance at small sample sizes.
+- Categorical or boolean columns — not applicable.
+- Minimum recommended sample: 1,000 rows for reliable chi-squared goodness-of-fit.
+- FPR at defaults (α=0.05) on genuine Benford-distributed data: ~5%.
+- FPR at defaults on non-Benford data (arbitrary reason): undefined; the check is designed to flag deviations, not measure FPR.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Natural numeric (orders of magnitude) | (default) | (default) | STAT_SCALES defaults |
+| Constrained range (1–100) | N/A | N/A | Benford's Law does not apply |
+| Sequential IDs | N/A | N/A | Benford's Law does not apply |

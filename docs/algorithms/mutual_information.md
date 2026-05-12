@@ -93,3 +93,26 @@ print(result_shift.plain_english)  # "Normalized MI = 0.1832 — drift detected"
 ## Tests
 
 `packages/dqt/tests/algorithms/info/test_mutual_information.py`
+
+## When it works well
+
+- Detecting any type of statistical dependency (linear or non-linear) between two columns, regardless of their distributions.
+- Works for both continuous-continuous and mixed (continuous-categorical) pairs.
+
+## When it fails / Limitations
+
+- Very small samples (< 50 rows) — mutual information estimators have high variance; the result is unreliable.
+- Continuous variables require kernel density estimation or discretisation — the estimator choice (KDE bandwidth, bin count) affects results significantly.
+- Does not indicate direction of the association — only its magnitude.
+- High-cardinality categorical columns produce sparse joint distributions and inflate MI estimates.
+- Minimum recommended sample: 50 rows.
+- FPR at defaults on independent columns: ~5–10% (estimator variance-dependent).
+- FPR at defaults on heavy-tailed data: ~8–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal continuous | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | MI is distribution-agnostic |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

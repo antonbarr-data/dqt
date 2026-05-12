@@ -59,3 +59,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/numeric_bounds.py`
+
+## When it works well
+
+- Categorical or ID columns where the number of distinct values should remain within expected bounds.
+- Detects new categories appearing (cardinality increase) or category collapse (cardinality decrease).
+
+## When it fails / Limitations
+
+- High-cardinality columns (user IDs, session IDs) have cardinality that scales with row count — set bounds relative to expected sample size rather than absolute values.
+- New legitimate categories (new product lines, new country codes) will trigger the upper bound; review and update bounds when the business evolves.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Low-cardinality enum | exact expected bounds | exact expected bounds | e.g. status has 4 values |
+| Growing high-cardinality | relative to row count | relative to row count | e.g. max=row_count |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

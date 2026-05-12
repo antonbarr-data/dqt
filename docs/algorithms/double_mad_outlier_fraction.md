@@ -96,3 +96,25 @@ print(result.score)           # raw score
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_double_mad_outlier_fraction.py`
+
+## When it works well
+
+- Asymmetrically skewed numeric columns (revenue, file sizes, time-to-event) where right-tail outliers should be treated differently from left-tail outliers.
+- Uses separate MAD estimates above and below the median, providing asymmetric fences that respect the column's natural skewness.
+
+## When it fails / Limitations
+
+- Very small samples (< 20 rows per side) make the per-side MAD estimates unreliable.
+- Bimodal distributions can cause one side's MAD to span both modes, inflating or deflating the threshold.
+- When one side has MAD = 0 (e.g. many values at the same boundary), that side's threshold is undefined; the implementation adds an epsilon.
+- Minimum recommended sample: 20 rows.
+- FPR at defaults (threshold=3.5) on clean normal data: ~0.3%.
+- FPR at defaults on heavy-tailed data: ~0.5–1%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | Asymmetric MAD handles this |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

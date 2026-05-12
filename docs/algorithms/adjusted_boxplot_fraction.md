@@ -80,3 +80,25 @@ print(result.score)           # raw score
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_adjusted_boxplot_fraction.py`
+
+## When it works well
+
+- Numeric columns with mild to moderate skewness where the plain IQR fence over-flags the dominant tail (revenue, latency, session duration).
+- Non-parametric — no distributional assumptions; the medcouple correction adapts automatically to the column's asymmetry.
+
+## When it fails / Limitations
+
+- Extremely heavy skewness (|medcouple| > 0.6) causes the exponential correction to become unstable — use `double_mad_outlier_fraction` instead.
+- The medcouple computation is O(n log n) and requires at least 20 observations for a reliable estimate.
+- Normal data: slightly higher FPR than the plain IQR fence because the correction widens one fence.
+- Minimum recommended sample: 20 rows.
+- FPR at defaults (h=1.5) on clean normal data: ~0.7%.
+- FPR at defaults on heavy-tailed (lognormal) data: ~1–3%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | Medcouple correction handles this |
+| Extremely skewed (|MC| > 0.6) | N/A | N/A | Use double_mad_outlier_fraction instead |

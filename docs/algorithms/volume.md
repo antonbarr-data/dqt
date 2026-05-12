@@ -53,3 +53,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/volume.py`
+
+## When it works well
+
+- Any table where row count is a meaningful data quality signal (expected batch size, daily load volume).
+- Simple, stateless check — no reference window needed; set explicit min/max bounds.
+
+## When it fails / Limitations
+
+- Tables with highly variable volumes (event-driven tables, sparse seasonal data) require wide or dynamically adjusted bounds.
+- Does not distinguish volume change due to upstream pipeline failures from legitimate business variation; always combine with freshness checks.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Stable daily load | tight bounds | tight bounds | e.g. ±10% of expected |
+| Variable event-driven | wide bounds | wide bounds | e.g. ±50% of expected |
+| Seasonal table | N/A | N/A | Use dynamic baseline or row_count_in_range |

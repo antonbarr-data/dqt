@@ -96,3 +96,25 @@ print(result.details["distribution_type"])         # classified distribution typ
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_auto_outlier.py`
+
+## When it works well
+
+- Any numeric column when you don't want to manually select a detector — auto_outlier profiles the distribution and delegates to the most appropriate method.
+- Good starting point for new columns before you have enough knowledge to choose a specific method.
+
+## When it fails / Limitations
+
+- Profiling adds overhead (one extra pass to classify the distribution shape) — not suitable for very high-frequency streaming checks.
+- The selector heuristics (normality tests, skewness thresholds) can misclassify edge cases; always inspect the `evidence.selected_detector` field when debugging unexpected results.
+- Multimodal columns may be misclassified as unimodal, leading to sub-optimal detector choice.
+- Minimum recommended sample: 30 rows (needed by the normality profiling step).
+- FPR at defaults: inherits the FPR of the selected sub-detector (see individual detector docs).
+- FPR at defaults on heavy-tailed data: inherits from selected sub-detector; typically 0.3–5%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | Delegates to zscore_outlier_fraction |
+| Heavy-tailed (revenue, latency) | (default) | (default) | Delegates to double_mad_outlier_fraction |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

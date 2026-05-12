@@ -53,3 +53,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/null_fraction.py`
+
+## When it works well
+
+- Any column type. Stateless — no reference window needed.
+- Stable columns (IDs, required fields) where even 1% null is an incident.
+
+## When it fails / Limitations
+
+- Structural nulls (nullable FK columns, optional attributes) will always fire at the default 1% warn threshold. Set per-check thresholds for those columns.
+- Does not distinguish intentional nulls (explicit `NULL`) from missing data (ETL failure).
+- FPR at defaults: 0% (rule-based, no statistical approximation).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Column type | warn | fail | Notes |
+|---|---|---|---|
+| Critical ID / required field | 0.001 | 0.01 | Near-zero tolerance |
+| Optional attributes | 0.05 | 0.20 | Structural nulls expected |
+| Default | 0.01 | 0.05 | STAT_SCALES default |

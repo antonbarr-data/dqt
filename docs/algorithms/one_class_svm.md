@@ -88,3 +88,26 @@ print(result.details)        # {"outlier_fraction": 0.073, "n_rows": 540}
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_multi/test_one_class_svm.py`
+
+## When it works well
+
+- Numeric columns where the normal-class boundary is non-linear and complex — One-Class SVM can learn arbitrary decision boundaries using kernel functions.
+- Medium-sized datasets (100–10,000 rows) with well-defined in-distribution structure.
+
+## When it fails / Limitations
+
+- Very high dimensions (> 50 columns) — kernel computation becomes expensive and the decision boundary overfits; use `isolation_forest_fraction` or `ecod` instead.
+- Sensitive to the choice of kernel (rbf default) and nu parameter — requires calibration; incorrect nu directly sets the expected FPR.
+- Does not scale to large datasets (> 100,000 rows) without subsampling — training is O(n²) to O(n³).
+- No probabilistic output — returns a binary in/out decision, not a calibrated anomaly score.
+- Minimum recommended sample: 100 rows.
+- FPR at defaults (nu=0.1) on clean data: ~10% (nu controls the upper bound on the training error fraction).
+- FPR at defaults on heavy-tailed data: ~15–25%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Use isolation_forest_fraction instead |
+| Sparse / high-null | N/A | N/A | Impute nulls before use |

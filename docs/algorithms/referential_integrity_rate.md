@@ -59,3 +59,26 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/referential/referential.py`
+
+## When it works well
+
+- FK-like relationships between tables where the child column's values should all exist in the parent column's value set.
+- Detects orphaned records caused by ETL processing order issues or deletions in the parent table.
+
+## When it fails / Limitations
+
+- Soft deletes in the parent table (records logically deleted but still physically present) don't affect the check; hard deletes will cause FK violations that are expected.
+- The rate threshold must account for intentional orphans (e.g. `customer_id = 0` for anonymous users) — exclude these before computing the rate.
+- Performance depends on both table sizes — ensure appropriate indexes on the join columns.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Strict FK relationship | 1.0 | 1.0 | 100% integrity required |
+| Soft relationship (nullable FK) | 0.99 | 0.95 | Small tolerance for nulls/orphans |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

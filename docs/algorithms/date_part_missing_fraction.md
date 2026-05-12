@@ -59,3 +59,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/date_part.py`
+
+## When it works well
+
+- Date/timestamp columns where certain date parts (weekends, holidays, specific hours) are structurally absent and should be monitored separately from overall completeness.
+- Detects ETL pipeline gaps (e.g. "no data loaded for Sundays") that would be masked by an aggregate null_fraction check.
+
+## When it fails / Limitations
+
+- Requires a correct date_part specification (e.g. `dow`, `hour`, `month`) — wrong partitioning produces misleading results.
+- Structural absence (e.g. a pipeline that genuinely doesn't produce weekend records) requires threshold calibration to avoid false positives.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row per date part value.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| All date parts expected | (default) | (default) | STAT_SCALES defaults |
+| Known structural gaps | N/A | N/A | Exclude those date parts from check |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

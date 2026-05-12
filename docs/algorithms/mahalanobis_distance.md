@@ -89,3 +89,25 @@ print(result.details)        # {"outlier_fraction": 0.089, "chi2_threshold": ...
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_multi/test_mahalanobis_distance.py`
+
+## When it works well
+
+- Multivariate numeric datasets with correlated Gaussian-like features — accounts for covariance structure that univariate detectors miss.
+- Works well when anomalies are unusual combinations of individually normal values (e.g. revenue high + quantity low simultaneously).
+
+## When it fails / Limitations
+
+- Non-Gaussian marginals or non-linear dependencies — the covariance matrix captures only linear relationships; use `isolation_forest_fraction` or `lof` instead.
+- Singular or near-singular covariance matrix (highly correlated or duplicate columns) — inversion fails; use MCD (Minimum Covariance Determinant) variant or reduce dimensionality first.
+- More columns than rows (p > n) — the sample covariance matrix is not full rank; use `isolation_forest_fraction` instead.
+- Minimum recommended sample: max(100, 5 × number_of_columns) rows.
+- FPR at defaults on clean multivariate-normal data: ~1% (chi-squared threshold at 99th percentile).
+- FPR at defaults on heavy-tailed data: 5–20% depending on tail heaviness.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal (multivariate) | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Use isolation_forest_fraction instead |
+| Sparse / high-null | N/A | N/A | Impute nulls before use |

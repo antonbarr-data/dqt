@@ -79,3 +79,26 @@ print(result.score)          # ~0.18
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_kl_divergence.py`
+
+## When it works well
+
+- Continuous numeric columns with well-overlapping support in reference and current distributions.
+- Useful as an information-theoretic drift measure when you need sensitivity to tail changes and shape differences.
+
+## When it fails / Limitations
+
+- Zero-probability reference bins cause infinite KL divergence — requires Laplace smoothing (applied automatically), but this inflates the score for sparse distributions.
+- Asymmetric — KL(P||Q) ≠ KL(Q||P); the score depends on the direction of comparison. Use `js_divergence` for a symmetric alternative.
+- Heavily sensitive to bin count choice — more bins increase sensitivity but also noise; the implementation uses Sturges' rule by default.
+- Categorical columns with many unique values produce sparse bins and unreliable estimates.
+- Minimum recommended sample: 100 rows (both reference and current).
+- FPR at defaults on stable normal data: ~5–10%.
+- FPR at defaults on heavy-tailed data: ~10–20%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 0.20 | 0.50 | Wider bands; heavy tails inflate KL |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

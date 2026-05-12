@@ -96,3 +96,26 @@ Score = Wasserstein-1 distance normalized by reference std. Default thresholds: 
 | Small N (< 200) | False alarms on identical distributions | Collect more data; use `ks_pvalue` for small samples |
 | Heavy-tailed ref distribution | std estimate is inflated; normalized score deflated | Use un-normalized W1 threshold or log-transform data |
 | Categorical columns | W1 on integer encodings has no probabilistic interpretation | Use `psi` or `chi2_drift` for categorical drift |
+
+## When it works well
+
+- Continuous numeric columns with well-defined distributions (revenue, duration, latency).
+- Sensitive to both location shifts and shape changes.
+- Reference-based: compare against a known-good baseline window.
+
+## When it fails / Limitations
+
+- Requires a reference window (no baseline = cannot run).
+- Distance is unbounded for heavy-tailed distributions — use relative thresholds or normalise.
+- Insensitive to categorical columns — use `chi_square_drift` instead.
+- Minimum recommended sample: 100 rows in both reference and current.
+- FPR at defaults (warn=0.20) on stable normal data: ~5%.
+- FPR at defaults on heavy-tailed data: ~5–10% (heavy tails inflate reference std, deflating the normalised score).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal, bounded | 0.10 | 0.30 | Tight |
+| Lognormal (revenue) | 0.20 | 0.50 | Heavier tails need wider bands |
+| Latency / percentile | 0.15 | 0.40 | Focus on tail shift |

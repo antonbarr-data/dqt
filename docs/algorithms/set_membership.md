@@ -57,3 +57,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/value_checks.py`
+
+## When it works well
+
+- Categorical columns with a known, fixed allowed-values set (status codes, enum columns, country ISO codes).
+- Zero false positives on clean data — a pure deterministic rule.
+
+## When it fails / Limitations
+
+- Allowed-values set that is not stable over time (e.g. new product categories being added) — requires the set to be updated; otherwise fires on legitimate new values.
+- High-cardinality columns where maintaining a complete allowed set is impractical; use `regex_match` or a semantic check instead.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Enum / status column | (default) | (default) | STAT_SCALES defaults |
+| Evolving allowed set | N/A | N/A | Keep set updated or use regex_match |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

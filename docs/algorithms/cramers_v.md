@@ -85,3 +85,25 @@ print(det.score(curr_stable, state).verdict)  # pass
 ## Tests
 
 `packages/dqt/tests/algorithms/info/test_cramers_v.py`
+
+## When it works well
+
+- Categorical-categorical association monitoring — Cramér's V measures the strength of association between two nominal variables.
+- Useful for detecting when a categorical column's relationship with another categorical column changes over time.
+
+## When it fails / Limitations
+
+- Continuous columns — Cramér's V requires categorical data; binning continuous data introduces arbitrary choices that affect the result. Use `mutual_information` for mixed or continuous pairs.
+- Small samples produce upward-biased Cramér's V estimates — the bias-corrected variant (Tschuprow or bias-corrected V) should be used for N < 200.
+- High-cardinality columns produce sparse contingency tables, inflating V; consider grouping rare categories.
+- Minimum recommended sample: 50 rows (5 expected per cell in the contingency table).
+- FPR at defaults on independent categorical columns: ~5% (chi-squared based).
+- FPR at defaults on heavy-tailed data: N/A (categorical).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Low-cardinality categorical | (default) | (default) | STAT_SCALES defaults |
+| High-cardinality categorical | 0.05 | 0.10 | Many cells inflate V; raise threshold |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

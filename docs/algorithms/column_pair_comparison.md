@@ -60,3 +60,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/column_pairs.py`
+
+## When it works well
+
+- Detecting when the statistical relationship (e.g. mean difference, correlation, ratio) between two columns changes over time.
+- Useful for cross-column consistency rules (e.g. `gross_amount >= net_amount`, `end_date >= start_date`).
+
+## When it fails / Limitations
+
+- The comparison metric must be appropriate for the column types — comparing a numeric mean to a categorical column produces meaningless results.
+- Statistical tests between pairs have reduced power compared to single-column tests at the same sample size.
+- FPR at defaults: depends on the comparison metric; rule-based comparisons have 0% FPR.
+- Minimum recommended sample: 30 rows for statistical comparisons.
+- FPR at defaults on clean normal data: 0% (rule-based) or ~5% (statistical).
+- FPR at defaults on heavy-tailed data: ~5–15% for statistical comparisons.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Deterministic relationship | (default) | (default) | STAT_SCALES defaults |
+| Statistical relationship | 0.05 | 0.01 | p-value thresholds |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

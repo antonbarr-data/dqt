@@ -58,3 +58,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/monotonicity.py`
+
+## When it works well
+
+- Sequence or ID columns that should strictly increase (auto-increment IDs, version numbers, monotonically increasing timestamps).
+- Event sequence tables where out-of-order records indicate a data quality issue.
+
+## When it fails / Limitations
+
+- Reprocessing or late-arriving data may produce non-monotonic sequences that are legitimate — set the check to `warn` rather than `fail` for such tables.
+- Requires ordering by a specific column — ordering is applied in the check definition.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 2 rows.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Strict monotonic column | (default) | (default) | STAT_SCALES defaults |
+| Near-monotonic (late arrivals) | 0.001 | 0.01 | Small tolerance for out-of-order |
+| Non-monotonic by design | N/A | N/A | Not applicable |

@@ -54,3 +54,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/column_pairs.py`
+
+## When it works well
+
+- Composite primary keys or natural composite unique constraints (e.g. `(order_id, line_item_id)`, `(user_id, date)`) where the combination must be unique.
+- Complements `uniqueness` for multi-column keys.
+
+## When it fails / Limitations
+
+- Partial key columns that are individually non-unique — the check is only meaningful for the combination; individual-column uniqueness should use `uniqueness`.
+- Very large tables: the COUNT(DISTINCT) aggregation over multiple columns is expensive; ensure indexes cover the key columns.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Composite primary key | 1.0 | 1.0 | Exact uniqueness required |
+| Near-unique composite | 0.99 | 0.95 | Small tolerance |
+| Non-unique combination | N/A | N/A | Not applicable |

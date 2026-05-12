@@ -57,3 +57,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/value_checks.py`
+
+## When it works well
+
+- Numeric columns with known hard bounds (percentages 0–100, ratings 1–5, quantities > 0).
+- Zero false positives on clean data that satisfies the constraint — a deterministic rule.
+
+## When it fails / Limitations
+
+- Requires explicit min/max bounds — if bounds are not well-defined, threshold calibration is needed.
+- Does not catch distribution changes within the valid range; combine with statistical detectors for complete monitoring.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Hard constraint (0–100%) | (default) | (default) | Exact bounds |
+| Soft constraint (warn on approach) | 0.01 | 0.05 | Fraction of values out of range |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

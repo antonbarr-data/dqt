@@ -84,3 +84,26 @@ print(result.details)        # {"cusum_hi": 0.0, "cusum_lo": -67.12, "ref_mean":
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_cusum.py`
+
+## When it works well
+
+- Time series monitoring where you need to detect an abrupt, sustained mean shift as quickly as possible (minimise detection delay).
+- Works on any numeric time series without seasonal or trend requirements.
+
+## When it fails / Limitations
+
+- Gradual drift — CUSUM is designed for abrupt level changes; slow mean shifts accumulate in the statistic but detection delay grows proportionally.
+- The target_mean and sigma parameters must be set correctly — if the reference mean is wrong, the CUSUM statistic drifts continuously and fires false alarms.
+- One-directional variants miss shifts in the opposite direction; use two-sided CUSUM (default) for bidirectional monitoring.
+- Does not separate seasonal effects from mean shifts — apply STL decomposition first on seasonal series.
+- Minimum recommended sample: 20 observations in the reference window to estimate mean and std.
+- FPR at defaults on stable data: ~0.5–2% depending on k (slack parameter).
+- FPR at defaults on heavy-tailed data: 3–8%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 6.0 | 10.0 | Raise threshold (h) to reduce false alarms |
+| Seasonal series | N/A | N/A | Deseasonalise first (use STL + CUSUM) |

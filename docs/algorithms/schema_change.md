@@ -57,3 +57,25 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/schema/schema_checks.py`
+
+## When it works well
+
+- Any table where the schema (column names, types, nullability, ordering) is expected to be stable.
+- Catches accidental upstream schema changes (column renames, type promotions, dropped columns) before they break downstream queries.
+
+## When it fails / Limitations
+
+- Tables with intentionally evolving schemas (frequent DDL changes) require a tolerant mode (detect only removals/type conflicts, not additions).
+- Does not detect semantic schema changes (e.g. column meaning changes but name and type stay the same).
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: N/A (schema check, not a data sample check).
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Stable schema | (default) | (default) | STAT_SCALES defaults |
+| Additive-only evolution | additions=warn | removals=fail | Configure mode per table |
+| Frequent schema changes | N/A | N/A | Consider skipping or using custom policy |

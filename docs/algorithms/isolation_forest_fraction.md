@@ -90,3 +90,26 @@ print(result.score)          # ~0.08
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_multi/test_isolation_forest_fraction.py`
+
+## When it works well
+
+- High-dimensional numeric feature sets (≥ 2 columns, ideally ≥ 5) where outliers manifest as unusual combinations of values.
+- Large datasets (≥ 1,000 rows) — the ensemble of random trees is most reliable with sufficient data.
+- Does not assume any particular distribution; works well on both normal and non-normal columns.
+
+## When it fails / Limitations
+
+- Very few features (1–2 columns) — degenerates to a simple range check; use univariate detectors instead.
+- Highly correlated features — Isolation Forest treats each feature axis independently and may miss anomalies that only appear in a correlated subspace; use `mahalanobis_distance` for correlated Gaussian clusters.
+- The `contamination` parameter must be set appropriately — too low misses anomalies, too high produces excessive alerts.
+- Minimum recommended sample: 100 rows for training.
+- FPR at defaults (contamination=0.1) on clean data: ~10% (by design — contamination sets the expected outlier fraction).
+- FPR at defaults on heavy-tailed data: ~10–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | (default) | (default) | IF is distribution-agnostic |
+| Sparse / high-null | N/A | N/A | Impute or drop null columns first |

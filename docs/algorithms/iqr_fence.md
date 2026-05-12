@@ -80,3 +80,25 @@ print(result.score)           # raw score
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_iqr_fence.py`
+
+## When it works well
+
+- Any unimodal continuous distribution; robust to skew because it uses quartiles rather than mean/std.
+- Good default for numeric columns where normality cannot be assumed (prices, durations, percentages).
+
+## When it fails / Limitations
+
+- Bimodal or multimodal distributions cause high FPR — the IQR spans both modes and flags the valley between them.
+- Contaminated reference data (many outliers) inflates the IQR, raising the fence and missing true anomalies.
+- For highly skewed data (revenue, file sizes) the upper fence fires constantly; use `adjusted_boxplot_fraction` with medcouple correction instead.
+- Minimum recommended sample: 20 rows for stable quartile estimates.
+- FPR at defaults (k=1.5) on clean normal data: ~0.7%.
+- FPR at defaults on heavy-tailed data: 2–8% on the upper tail.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 3.0 | 4.5 | Wider k reduces false positives |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

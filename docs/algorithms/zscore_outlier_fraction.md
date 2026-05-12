@@ -82,3 +82,25 @@ print(result.score)           # raw score
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_zscore_outlier_fraction.py`
+
+## When it works well
+
+- Unimodal, approximately normal distributions (counts, bounded ratios, z-standardised scores).
+- Low-cardinality numeric columns where the population mean and std are stable across batches.
+
+## When it fails / Limitations
+
+- Assumes normality — on lognormal or Pareto data the inflated standard deviation masks extreme values, producing both false negatives (missed outliers) and false positives near the body of the distribution.
+- Contaminated reference data (outliers in the baseline) skews the mean and std, raising the threshold artificially.
+- Not robust to heavy tails — prefer `mad_outlier_fraction` or `double_mad_outlier_fraction` for revenue, latency, or any right-skewed column.
+- Minimum recommended sample: 30 rows (central-limit stabilisation of mean/std estimates).
+- FPR at defaults (threshold=3.0) on clean normal data: ~0.3%.
+- FPR at defaults on heavy-tailed data: 5–15% depending on tail index.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Use mad_outlier_fraction instead |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

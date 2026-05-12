@@ -94,3 +94,26 @@ print(result_stable.score)         # near 0.0
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_mmd.py`
+
+## When it works well
+
+- Continuous numeric or multivariate features; MMD is a kernel-based test that is sensitive to differences in higher-order moments (not just mean/variance).
+- Works without binning, making it more accurate than histogram-based methods for small to medium samples.
+
+## When it fails / Limitations
+
+- Requires choosing an appropriate kernel bandwidth — incorrect bandwidth makes the test insensitive or over-sensitive.
+- Computationally O(n²) — slow for samples > 10,000 rows; use PSI or Wasserstein for large samples.
+- Small samples (< 50 per window) produce unreliable test statistics and inflated FPR.
+- Not interpretable as a simple distance — scores are kernel-dependent and not comparable across different column types.
+- Minimum recommended sample: 50 rows (both reference and current).
+- FPR at defaults on stable normal data: ~5%.
+- FPR at defaults on heavy-tailed data: ~8–12%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 0.15 | 0.30 | Adjust kernel bandwidth too |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

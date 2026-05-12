@@ -102,3 +102,26 @@ print(result.details)        # {"score": 0.28, "ref_score": 0.09}
 ## Tests
 
 `packages/dqt/tests/algorithms/custom/test_callable_check.py`
+
+## When it works well
+
+- Custom business logic that doesn't fit any standard detector — the callable receives a DataFrame and returns a `DetectorResult`.
+- Useful for domain-specific rules (e.g. "total revenue must equal sum of line items") that require programmatic computation.
+
+## When it fails / Limitations
+
+- The callable is user-supplied Python — errors in the callable produce `DetectorError`, not graceful verdicts; test thoroughly before deploying.
+- Not serialisable to YAML check definitions without a registered callable slug; use the Python API only.
+- Cannot be run in sandboxed or remote environments without the callable being importable.
+- FPR at defaults: entirely determined by user-supplied logic.
+- Minimum recommended sample: as required by the callable's logic.
+- FPR at defaults on clean normal data: user-defined.
+- FPR at defaults on heavy-tailed data: user-defined.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| User-defined logic | user-defined | user-defined | Set thresholds in the callable |
+| Deterministic rule | 0 | 0 | No statistical threshold needed |
+| Statistical custom check | calibrate | calibrate | Calibrate against reference data |

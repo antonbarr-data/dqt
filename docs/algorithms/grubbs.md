@@ -81,3 +81,25 @@ print(result.score)           # 1 - p-value
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_grubbs.py`
+
+## When it works well
+
+- Small samples (3–100 rows) from normally distributed numeric columns (lab measurements, sensor readings, tight QA checks).
+- When you need a statistically rigorous binary answer: "is the single most extreme value anomalous?" with a p-value.
+
+## When it fails / Limitations
+
+- Non-normal distributions — p-value calibration is only valid under normality; use `mad_outlier_fraction` for skewed or heavy-tailed data.
+- Multiple outliers — Grubbs detects only the single most extreme value; masking and swamping effects occur when multiple outliers are present. Use `generalized_esd` for up to k outliers.
+- Large N (> 1,000) — the test becomes over-sensitive and flags insignificant deviations; fraction-based detectors are more appropriate.
+- Minimum recommended sample: 3 rows (hard minimum); 10+ rows for reliable results.
+- FPR at defaults (α=0.05) on clean normal data: ~5%.
+- FPR at defaults on heavy-tailed data: up to 20–30%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Use mad_outlier_fraction instead |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

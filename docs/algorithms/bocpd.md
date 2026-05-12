@@ -103,3 +103,24 @@ Score = `max P(r≤1)` over the current window, where r is the run length (steps
 | hazard_lambda too small (< 10) | Prior CP probability > 0.10 per step; BOCPD fires constantly on noise | Default hazard_lambda=50 (2% prior per step) |
 | Variance-only change | Mean-preserving scale shift does not move the score | Combine with `stl_residual_zscore` for variance-sensitive detection |
 | Smooth gradual drift | Score stays low; no run-length hypothesis spikes | Use `adwin` or `page_hinkley` for gradual trends |
+
+## When it works well
+
+- Time series where you need probabilistic confidence in changepoint locations with uncertainty quantification.
+- Works well for abrupt mean shifts in any numeric series; provides posterior run-length probabilities, not just a binary detection.
+
+## When it fails / Limitations
+
+- The failure modes already documented above (short reference window, kappa0, hazard_lambda, variance-only changes, gradual drift) cover the primary limitations.
+- Variance-only changes (mean-preserving scale shifts) do not move the Gaussian conjugate score; combine with `stl_residual_zscore` for complete coverage.
+- Minimum recommended sample: 100 observations for reliable posterior run-length estimates.
+- FPR at defaults (hazard_lambda=50) on stable data: ~2% (1/hazard_lambda prior per step).
+- FPR at defaults on heavy-tailed data: ~5–15%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal with abrupt shifts | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | 0.20 | 0.50 | Raise score threshold |
+| Gradual drift | N/A | N/A | Use adwin or page_hinkley instead |

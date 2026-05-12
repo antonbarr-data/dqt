@@ -63,3 +63,26 @@ check = Check(
 ## Source
 
 `packages/dqt/src/dqt/algorithms/basic/freshness.py`
+
+## When it works well
+
+- Any table where data should arrive within a known SLA (e.g. event streams should be < 300s behind, daily tables < 86400s behind).
+- Stateless — no reference window needed; compare `max(updated_at)` to `now()`.
+
+## When it fails / Limitations
+
+- Tables without a reliable `updated_at` or `created_at` timestamp column cannot be freshness-checked; use `volume` or `row_count_in_range` instead.
+- Scheduled batch tables will always appear stale between runs — set the `warn` threshold larger than the batch interval.
+- Clock skew between the warehouse and the dqt service can produce false positives; the health-check protocol includes a clock-skew probe to detect this.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Streaming table | 300 | 900 | Seconds; SLA-driven |
+| Daily batch table | 90000 | 172800 | ~25h warn, 48h fail |
+| Irregular / on-demand | N/A | N/A | Use manual SLA or skip this check |

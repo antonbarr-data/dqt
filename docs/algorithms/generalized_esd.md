@@ -84,3 +84,25 @@ print(result.score)           # raw score (outlier fraction)
 ## Tests
 
 `packages/dqt/tests/algorithms/outliers_uni/test_generalized_esd.py`
+
+## When it works well
+
+- Numeric columns with approximately normal distributions where up to k outliers may be present simultaneously.
+- Extends Grubbs for multiple-outlier scenarios (masking prevention) — ideal for small-to-medium samples (10–500 rows).
+
+## When it fails / Limitations
+
+- Assumes normality — fails on heavy-tailed or skewed distributions (same limitation as Grubbs); use `mad_outlier_fraction` or `double_mad_outlier_fraction` instead.
+- Requires specifying k (maximum number of outliers) in advance; if k is set too low, masking still occurs.
+- Computationally O(k·n) — acceptable for typical warehouse sample sizes but do not set k > 20.
+- Minimum recommended sample: 10 rows plus 2× the expected k.
+- FPR at defaults (α=0.05, k=10) on clean normal data: ~5% across all k tests; Bonferroni-style sequential control reduces overall FPR.
+- FPR at defaults on heavy-tailed data: 15–30%.
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Normal | (default) | (default) | STAT_SCALES defaults |
+| Heavy-tailed (revenue, latency) | N/A | N/A | Use mad_outlier_fraction instead |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |

@@ -86,3 +86,25 @@ print(result_ok.score)     # ~0.9998
 ## Tests
 
 `packages/dqt/tests/algorithms/basic/test_validity.py`
+
+## When it works well
+
+- Columns with a known schema-level type constraint or semantic validation rule (non-negative amounts, valid email, parseable JSON).
+- Combines multiple rule checks into a single validity score; useful when you want a holistic "is this column valid?" verdict.
+
+## When it fails / Limitations
+
+- Ambiguous validity definitions require careful specification — too broad misses issues, too strict produces false positives.
+- Does not pinpoint which specific rule is violated without inspecting the `evidence` dict.
+- FPR at defaults: 0% (rule-based).
+- Minimum recommended sample: 1 row.
+- FPR at defaults on clean normal data: 0%.
+- FPR at defaults on heavy-tailed data: 0% (rule-based).
+
+## Recommended thresholds by data shape
+
+| Data shape | warn | fail | Notes |
+|---|---|---|---|
+| Strict validity rule | (default) | (default) | STAT_SCALES defaults |
+| Partial validity allowed | 0.01 | 0.05 | Tolerance for edge-case values |
+| Sparse / high-null | N/A | N/A | Use null_fraction first |
