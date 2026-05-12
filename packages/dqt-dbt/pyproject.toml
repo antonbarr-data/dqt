@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbt-dqt"
+version = "0.7.1"
+description = "dbt integration for dqt — run quality checks after dbt models"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = ["dqtlib>=0.7.0"]
+
+[project.urls]
+Repository = "https://github.com/freightos/dqt"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dqt_dbt"]

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dagster-dqt"
+version = "0.7.3"
+description = "Dagster integration for dqt — asset checks and resources"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = ["dqtlib>=0.7.0"]
+
+[project.optional-dependencies]
+dagster = ["dagster>=1.6"]
+
+[project.urls]
+Repository = "https://github.com/freightos/dqt"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dqt_dagster"]

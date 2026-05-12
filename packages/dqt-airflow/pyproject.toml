@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "airflow-providers-dqt"
+version = "0.7.2"
+description = "Apache Airflow provider for dqt — DqtCheckOperator and DqtSuiteOperator"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = ["dqtlib>=0.7.0"]
+
+[project.optional-dependencies]
+airflow = ["apache-airflow>=2.8"]
+
+[project.entry-points."apache_airflow_provider"]
+provider_info = "dqt_airflow:get_provider_info"
+
+[project.urls]
+Repository = "https://github.com/freightos/dqt"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dqt_airflow"]

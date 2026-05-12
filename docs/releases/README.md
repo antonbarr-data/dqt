@@ -4,6 +4,9 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.7.3](v0.7.3.md) | 2026-05-12 | `dagster-dqt` package: DqtResource, run_checks_for(), DqtAssetCheckFailed |
+| [v0.7.2](v0.7.2.md) | 2026-05-12 | `airflow-providers-dqt` package: DqtCheckOperator, DqtSuiteOperator |
+| [v0.7.1](v0.7.1.md) | 2026-05-12 | `dbt-dqt` package: run_checks_for_dbt_run() filters by dbt success models |
 | [v0.7.0](v0.7.0.md) | 2026-05-12 | Native Slack/Teams bot: `/dq check`, `/dq incidents`, `/dq why` slash commands |
 | [v0.6.1](v0.6.1.md) | 2026-05-12 | `explain_incident()`: Granger-based upstream causal explanation from score history |
 | [v0.6.0](v0.6.0.md) | 2026-05-12 | `deduplicate_alerts()`: causal-aware alert deduplication via lineage graph |
