@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.8.2](v0.8.2.md) | 2026-05-12 | Failure-mode docs for all 64 detectors: FPR tables, threshold guides, symptom+fix tables |
 | [v0.8.1](v0.8.1.md) | 2026-05-12 | Dashboard --token/--generate-token; generalized CLI smoke tests; README numbers script |
 | [v0.8.0](v0.8.0.md) | 2026-05-12 | `ProofBundle`: cryptographic commitment binding RunResult to sample data hash |
 | [v0.7.3](v0.7.3.md) | 2026-05-12 | `dagster-dqt` package: DqtResource, run_checks_for(), DqtAssetCheckFailed |
