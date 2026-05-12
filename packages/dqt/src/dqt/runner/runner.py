@@ -51,10 +51,10 @@ class Runner:
 
         try:
             result = self._run_core(check, adapter)
-        except Exception:
+        except Exception as _exc:
             if self._emitter is not None:
                 try:
-                    self._emitter.emit(RunState.FAIL, job_name, run_id)
+                    self._emitter.emit(RunState.FAIL, job_name, run_id, error_message=str(_exc))
                 except Exception:
                     pass
             raise
