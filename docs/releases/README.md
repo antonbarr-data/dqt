@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.4.9](v0.4.9.md) | 2026-05-12 | Trust-building batch: docs completeness test, generalised smoke tests, benchmark CSV |
 | [v0.4.8](v0.4.8.md) | 2026-05-12 | LLM Wiki: dqt wiki sync/status + dqt report commands |
 | [v0.4.7](v0.4.7.md) | 2026-05-12 | dqt list-detectors command; EventSource deprecation warnings |
 | [v0.4.6](v0.4.6.md) | 2026-05-12 | Fix: dashboard footer version is now dynamic |

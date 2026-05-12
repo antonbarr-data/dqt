@@ -11,6 +11,39 @@ from dqt_cli.main import app
 
 runner = CliRunner()
 
+# ── parametrized --help coverage ──────────────────────────────────────────────
+# Add every subcommand here. The test asserts exit_code==0 and that a keyword
+# appears in the help output. New commands MUST be added to this list; CI will
+# catch missing entries because the command won't have a help test.
+
+_HELP_CASES: list[tuple[list[str], str]] = [
+    # command path            keyword that must appear in --help output
+    (["--help"],              "dqt"),
+    (["version", "--help"],   "version"),
+    (["run", "--help"],       "manifest"),
+    (["dashboard", "--help"], "port"),
+    (["list-detectors", "--help"], "detector"),
+    (["demo", "--help"],      "seed"),
+    (["demo", "seed", "--help"], "seed"),
+    (["demo", "reset", "--help"], "reset"),
+    (["wiki", "--help"],      "sync"),
+    (["wiki", "sync", "--help"], "raw"),
+    (["wiki", "status", "--help"], "raw"),
+    (["report", "--help"],    "vault"),
+]
+
+
+@pytest.mark.parametrize("cmd,keyword", _HELP_CASES, ids=[" ".join(c) for c, _ in _HELP_CASES])
+def test_help_exits_cleanly(cmd: list[str], keyword: str) -> None:
+    """Every subcommand --help must exit 0 and mention its key concept."""
+    result = runner.invoke(app, cmd)
+    assert result.exit_code == 0, f"`dqt {' '.join(cmd)}` exited {result.exit_code}:\n{result.output}"
+    assert keyword.lower() in result.output.lower(), (
+        f"`dqt {' '.join(cmd)}` help missing keyword {keyword!r}:\n{result.output}"
+    )
+
+
+# ── functional smoke tests ────────────────────────────────────────────────────
 
 def test_version_prints_something() -> None:
     """Test that `dqt version` prints something and exits cleanly."""

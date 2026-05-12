@@ -86,6 +86,16 @@ def run_all() -> None:
 
         rows.append((slug, tp, fp, fn, tn, _fmt(precision), _fmt(recall), _fmt(f1), _fmt(fpr)))
 
+    # ── CSV output ────────────────────────────────────────────────────────────
+    csv_path = _REPO_ROOT / "examples" / "benchmarks" / "results.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    csv_lines = ["slug,tp,fp,fn,tn,precision,recall,f1,fpr"]
+    for r in rows:
+        csv_lines.append(f"{r[0]},{r[1]},{r[2]},{r[3]},{r[4]},{r[5]},{r[6]},{r[7]},{r[8]}")
+    csv_path.write_text("\n".join(csv_lines) + "\n", encoding="utf-8")
+    print(f"examples/benchmarks/results.csv updated — {len(rows)} detectors")
+
+    # ── Markdown table ────────────────────────────────────────────────────────
     header = "| Detector | TP | FP | FN | TN | Precision | Recall | F1 | FPR |\n"
     sep = "|---|---|---|---|---|---|---|---|---|\n"
     body = "".join(
@@ -98,9 +108,12 @@ def run_all() -> None:
         "Do not edit — re-run to update._\n\n"
         "Fixtures: normal mean-shift, lognormal tail-shift, 5% outlier injection, "
         "10% null injection. N=500 rows each.\n\n"
+        "Raw results: [`examples/benchmarks/results.csv`]"
+        "(../examples/benchmarks/results.csv)\n\n"
         f"{header}{sep}{body}"
     )
-    Path("docs/benchmarks.md").write_text(out, encoding="utf-8")
+    docs_path = _REPO_ROOT / "docs" / "benchmarks.md"
+    docs_path.write_text(out, encoding="utf-8")
     print(f"docs/benchmarks.md updated — {len(rows)} detectors benchmarked")
 
 
