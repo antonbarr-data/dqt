@@ -34,3 +34,13 @@ def test_dashboard_generate_token_prints_64_char_hex():
     token_line = lines[0]
     assert len(token_line) == 64, f"Expected 64-char token, got: {token_line!r}"
     assert all(c in "0123456789abcdef" for c in token_line)
+
+
+def test_dashboard_token_and_generate_token_mutually_exclusive():
+    result = subprocess.run(
+        [sys.executable, "-m", "dqt_cli.main", "dashboard",
+         "--token", "abc123", "--generate-token"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "mutually exclusive" in result.stderr or "mutually exclusive" in result.stdout
