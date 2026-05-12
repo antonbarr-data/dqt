@@ -35,3 +35,23 @@ def test_prophet_registered():
 def test_prophet_scale_exists():
     from dqt.algorithms._scales import STAT_SCALES
     assert "prophet_anomaly" in STAT_SCALES
+
+
+def test_prophet_handles_nan_in_current():
+    """Prophet should not crash when current data has NaN values (missing days)."""
+    pytest.importorskip("prophet")
+    import numpy as np
+    import pandas as pd
+    from dqt.algorithms.timeseries.prophet_anomaly import ProphetAnomalyDetector
+
+    rng = np.random.default_rng(0)
+    ref = pd.DataFrame({"value": rng.normal(100, 5, 90)})
+    curr_with_nans = pd.DataFrame({
+        "value": [np.nan if i % 7 == 0 else float(rng.normal(100, 5)) for i in range(30)]
+    })
+
+    det = ProphetAnomalyDetector()
+    state = det.fit(ref)
+    result = det.score(curr_with_nans, state)
+    assert result.score >= 0.0
+    assert result.verdict is not None

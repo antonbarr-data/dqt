@@ -47,8 +47,10 @@ class ProphetAnomalyDetector(BaseDetector):
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         _require_prophet()
-        values = current.iloc[:, 0].dropna().to_numpy(dtype=float)
-        if len(values) == 0:
+        values = current.iloc[:, 0].to_numpy(dtype=float)
+        non_nan_mask = ~np.isnan(values)
+        n_scored = int(np.sum(non_nan_mask))
+        if n_scored == 0:
             return DetectorResult(
                 score=0.0, verdict=Verdict.pass_,
                 plain_english="No data to score.",
@@ -62,14 +64,14 @@ class ProphetAnomalyDetector(BaseDetector):
         forecast = model.predict(future)
         lower = forecast["yhat_lower"].to_numpy()
         upper = forecast["yhat_upper"].to_numpy()
-        anomalies = (values < lower) | (values > upper)
+        anomalies = non_nan_mask & ((values < lower) | (values > upper))
         n_anomalies = int(np.sum(anomalies))
-        frac = n_anomalies / n
+        frac = n_anomalies / n_scored
         return DetectorResult(
             score=frac,
             verdict=self._verdict(frac),
             plain_english=(
-                f"{n_anomalies} of {n} values outside Prophet "
+                f"{n_anomalies} of {n_scored} values outside Prophet "
                 f"{state['interval_width']:.0%} uncertainty interval ({frac:.1%})"
             ),
             details={"anomaly_fraction": frac, "n_anomalies": n_anomalies},
