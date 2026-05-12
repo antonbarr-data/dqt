@@ -1,0 +1,73 @@
+# .github/workflows/dqt-check.yml
+# Reusable workflow: run dqt checks on a warehouse and post results as PR status.
+# Usage:
+#   jobs:
+#     dqt:
+#       uses: antonbarr-data/dqt/.github/workflows/dqt-check.yml@main
+#       with:
+#         checks_file: checks.yaml
+#       secrets:
+#         DQT_CONNECTION: ${{ secrets.WAREHOUSE_CONNECTION_STRING }}
+
+name: dqt-check
+
+on:
+  workflow_call:
+    inputs:
+      checks_file:
+        description: Path to checks.yaml relative to repo root
+        type: string
+        required: false
+        default: checks.yaml
+      connection:
+        description: Warehouse connection string
+        type: string
+        required: false
+        default: ""
+      python_version:
+        description: Python version to use
+        type: string
+        required: false
+        default: "3.12"
+      fail_on_warn:
+        description: Fail if any check returns warn verdict
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      DQT_CONNECTION:
+        description: Warehouse connection string (overrides inputs.connection)
+        required: false
+
+jobs:
+  dqt-run:
+    name: Run dqt checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install dqtlib
+        run: pip install dqtlib
+
+      - name: Run dqt checks
+        env:
+          DQT_CONNECTION: ${{ secrets.DQT_CONNECTION || inputs.connection }}
+        run: |
+          CONN="${DQT_CONNECTION}"
+          if [ -z "$CONN" ]; then
+            python -m dqt_cli.main run "${{ inputs.checks_file }}" --output junit > dqt-results.xml
+          else
+            python -m dqt_cli.main run "${{ inputs.checks_file }}" --connection "$CONN" --output junit > dqt-results.xml
+          fi
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: dqt-results.xml
+          check_name: dqt checks
+          comment_mode: always
