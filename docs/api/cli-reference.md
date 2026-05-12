@@ -122,6 +122,25 @@ dqt run checks.yaml
 
 ---
 
+## `dqt dashboard`
+
+Start the local browser dashboard. Requires `pip install 'dqtlib[dashboard]'`.
+
+```bash
+dqt dashboard
+dqt dashboard --port 9000
+dqt dashboard --host 0.0.0.0 --port 8080
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port`, `-p` | `8080` | Port to listen on |
+| `--host` | `127.0.0.1` | Host to bind |
+
+The CLI starts the dashboard with an empty in-memory store. To see real results, use `create_app(store=store)` from Python and pass the same store your `Runner` writes to. See [Local Dashboard guide](../dashboard.md) for the full workflow.
+
+---
+
 ## Using in CI (GitHub Actions example)
 
 ```yaml

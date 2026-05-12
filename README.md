@@ -474,6 +474,39 @@ print(f"Summary : {result.plain_english}")
 
 ---
 
+## Local Dashboard
+
+Run checks, then open a browser UI to explore what happened — no server setup required.
+
+```bash
+pip install "dqtlib[dashboard]"
+```
+
+```python
+import uvicorn
+from dqt import Runner, MemoryStore
+from dqt.dashboard import create_app
+
+store = MemoryStore()
+runner = Runner(store)
+
+# ... run your checks against store ...
+
+app = create_app(store=store)
+uvicorn.run(app, host="127.0.0.1", port=8080)
+# → open http://127.0.0.1:8080
+```
+
+Or from the CLI:
+
+```bash
+dqt dashboard --port 8080
+```
+
+The dashboard shows all checks with their latest score and verdict, and a per-check run history page. It uses an in-memory store by default — results exist for the lifetime of the process. See [docs/dashboard.md](docs/dashboard.md) for the full guide including the Jupyter notebook pattern and Python API.
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -529,6 +562,9 @@ The server (`apps/server`) imports the library and adds auth, multi-tenancy, sch
 # Core library + CLI
 pip install dqtlib
 
+# + local dashboard (FastAPI + HTMX browser UI)
+pip install "dqtlib[dashboard]"
+
 # + matplotlib for HTML profiling and quality reports
 pip install "dqtlib[reports]"
 
@@ -562,7 +598,8 @@ Full API reference with Gigler sample dataset examples:
 | [Lineage API](docs/api/lineage.md) | LineageGraph from SQL (sqlglot), dbt manifest ingestion, OpenLineage, graph queries |
 | [Vault: LLM Wiki structure](docs/api/vault.md) | write_vault() output, raw/ frontmatter schema, wiki/ generated files, custom node types, Obsidian |
 | [YAML check format](docs/api/yaml-reference.md) | Complete YAML config reference with annotated Gigler example |
-| [CLI reference](docs/api/cli-reference.md) | `dqt run`, `dqt version`, CI/CD integration |
+| [CLI reference](docs/api/cli-reference.md) | `dqt run`, `dqt version`, `dqt dashboard`, CI/CD integration |
+| [Local dashboard](docs/dashboard.md) | Browser UI for check results — install, quickstart, notebook pattern, limitations |
 | [Adapters](docs/api/adapters.md) | LocalAdapter, PostgresAdapter, custom adapter protocol |
 | [Semantic layer & LLM Wiki](docs/semantic-layer.md) | Build your data knowledge graph from Trello tickets, SQL, and BI reports using Karpathy's LLM Wiki pattern + Claude Code |
 
