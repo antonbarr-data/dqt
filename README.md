@@ -505,6 +505,8 @@ dqt dashboard --port 8080
 
 The dashboard shows all checks with their latest score and verdict, and a per-check run history page. It uses an in-memory store by default — results exist for the lifetime of the process. See [docs/dashboard.md](docs/dashboard.md) for the full guide including the Jupyter notebook pattern and Python API.
 
+![dqt local dashboard — checks index with score and verdict](docs/screenshots/dashboard-index.png)
+
 ---
 
 ## Architecture
