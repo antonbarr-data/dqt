@@ -41,13 +41,27 @@ def test_adwin_stat_scale_verdict():
     assert compute_verdict(1.0, "adwin") == Verdict.fail
 
 
-def test_adwin_details_present(detector, normal_df):
+def test_adwin_details_stable(detector, normal_df):
     state = detector.fit(normal_df)
     result = detector.score(normal_df, state)
     assert "drift_detected" in result.details
+    assert result.details["drift_detected"] is False
     assert "ref_mean" in result.details
     assert "curr_mean" in result.details
     assert "n_windows_checked" in result.details
+
+
+def test_adwin_details_drift_uses_window_means(detector, normal_df, shifted_df):
+    """When drift detected, details must use window_before/window_after — not ref/curr means."""
+    state = detector.fit(normal_df)
+    result = detector.score(shifted_df, state)
+    assert result.details["drift_detected"] is True
+    assert "window_before" in result.details, "drift details must have window_before"
+    assert "window_after" in result.details, "drift details must have window_after"
+    assert "ref_mean" not in result.details, "ref_mean must not appear in drift details"
+    assert result.details["window_before"] != result.details["window_after"], (
+        "window_before and window_after must differ on drift"
+    )
 
 
 @pytest.mark.unit

@@ -56,14 +56,12 @@ def _bocpd_run(
         )
 
         log_growth = log_R + log_pred + np.log(1.0 - hazard)
-        active_indices = np.where(active)[0]
-        if len(active_indices) > 0:
-            log_cp = (
-                np.logaddexp.reduce(log_R[active_indices] + log_pred[active_indices])
-                + np.log(hazard)
-            )
-        else:
-            log_cp = -np.inf
+        # Adams & MacKay (2007) Eq. 2: the new-start predictive is the PRIOR predictive
+        # (index 0 always holds prior parameters mu0/kappa0/alpha0/beta0 after the previous
+        # update step).  Using the weighted-sum-of-all-hypotheses formula gives the
+        # mathematical identity cp_prob = hazard always — which is what the previous
+        # implementation produced.
+        log_cp = np.log(hazard) + log_pred[0] if active.any() else -np.inf
 
         log_R_next = np.empty(n + 1)
         log_R_next[0] = log_cp
@@ -95,7 +93,13 @@ def _bocpd_run(
             log_norm = np.logaddexp.reduce(log_R_next[finite_mask])
             log_R_next -= log_norm
 
-        cp_probs[t] = float(np.exp(log_R_next[0]))
+        # Score = P(r≤1): prob the current run started ≤1 step ago (new cp or cp last step).
+        # P(r=0) alone is bounded ~0.4 by competition with the grow-from-r=0 term when
+        # P(r_0_in_ref) > hazard due to truncation.  P(r=0)+P(r=1) spikes to >0.9 on a real
+        # shift because both hypotheses use the (wide, kappa0=0.1) prior predictive.
+        p0 = float(np.exp(log_R_next[0]))
+        p1 = float(np.exp(log_R_next[1])) if len(log_R_next) > 1 else 0.0
+        cp_probs[t] = min(p0 + p1, 1.0)
         log_R = log_R_next
         mu, kappa, alpha, beta = mu_next, kappa_next, alpha_next, beta_next
 
@@ -104,26 +108,30 @@ def _bocpd_run(
 
 @registry.register
 class BOCPDDetector(BaseDetector):
-    """Bayesian Online Changepoint Detection. Score = max posterior changepoint probability in current window."""
+    """Bayesian Online Changepoint Detection. Score = max P(r≤1) in current window (prob run started ≤1 step ago)."""
     slug = "bocpd"
     group = "timeseries"
     min_recommended_n: ClassVar[int] = 100
 
-    def __init__(self, hazard_lambda: float = 20.0) -> None:
+    def __init__(self, hazard_lambda: float = 50.0) -> None:
         self._hazard_lambda = hazard_lambda
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         values = reference.iloc[:, 0].dropna().to_numpy(dtype=float)
         mu0 = float(np.mean(values))
         std0 = float(np.std(values, ddof=1))
-        # max_run = half the reference length ensures old-regime hypotheses are
-        # pruned when a new regime begins, enabling reliable detection.
-        max_run = max(10, len(values) // 2)
+        # max_run must span the full reference so the pre-changepoint hypothesis is
+        # maintained; truncating at len//2 caused the +30% level-shift to score 0.14.
+        max_run = max(20, len(values))
+        # kappa0=0.1 makes the new-regime prior vague: the initial predictive is wide
+        # enough that a level-shifted observation is credible under "regime just started".
+        # kappa0=1.0 kept the prior tight (scale=std0), making the first shifted obs
+        # equally unlikely under new-start and old-regime → cp_prob ≈ hazard forever.
         return {
             "ref_mean": mu0,
             "ref_std": max(std0, 1e-8),
             "mu0": mu0,
-            "kappa0": 1.0,
+            "kappa0": 0.1,
             "alpha0": 1.0,
             "beta0": max(std0 ** 2, 1e-8),
             "hazard_lambda": self._hazard_lambda,

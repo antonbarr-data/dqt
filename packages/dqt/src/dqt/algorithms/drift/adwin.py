@@ -87,16 +87,23 @@ class ADWINDetector(BaseDetector):
         curr_mean = float(np.mean(curr))
         if drift_detected:
             means_str = f"window_before={detected_mean0:.4f}, window_after={detected_mean1:.4f}"
+            details = {
+                "drift_detected": True,
+                "window_before": detected_mean0,
+                "window_after": detected_mean1,
+                "n_windows_checked": n_checked,
+            }
         else:
             means_str = f"ref_mean={state['ref_mean']:.4f}, curr_mean={curr_mean:.4f}"
+            details = {
+                "drift_detected": False,
+                "ref_mean": state["ref_mean"],
+                "curr_mean": curr_mean,
+                "n_windows_checked": n_checked,
+            }
         return DetectorResult(
             score=score,
             verdict=self._verdict(score),
             plain_english=f"ADWIN: {'drift detected' if drift_detected else 'stable'} ({means_str})",
-            details={
-                "drift_detected": drift_detected,
-                "ref_mean": state["ref_mean"],
-                "curr_mean": curr_mean,
-                "n_windows_checked": n_checked,
-            },
+            details=details,
         )

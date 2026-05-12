@@ -2,6 +2,8 @@
 # Medcouple-corrected Tukey fences: for MC >= 0 (right skew):
 #   lower = Q1 − h·exp(−4·MC)·IQR,  upper = Q3 + h·exp(3·MC)·IQR
 # For MC < 0 (left skew): lower uses exp(−3·MC), upper uses exp(4·MC).
+# h=2.5 achieves ~0.1% FPR on lognormal (revenue-shaped) data; Tukey's default h=1.5
+# over-flags by ~31× on lognormal. Use suggest_threshold() to recalibrate for other shapes.
 from __future__ import annotations
 
 import numpy as np
@@ -31,7 +33,7 @@ class AdjustedBoxplotDetector(BaseDetector):
     slug = "adjusted_boxplot_fraction"
     group = "outliers_uni"
 
-    def __init__(self, h: float = 1.5) -> None:
+    def __init__(self, h: float = 2.5) -> None:
         self._h = h
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

@@ -318,6 +318,12 @@ export default function RootPage() {
           >
             Open source · MIT licensed
           </span>
+          <span
+            className="px-2.5 py-1 border t-small"
+            style={{ color: "var(--accent)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
+          >
+            v0.4.2
+          </span>
           <button
             onClick={copyInstall}
             className="px-2.5 py-1 border flex items-center gap-2 transition-colors hover:opacity-80"

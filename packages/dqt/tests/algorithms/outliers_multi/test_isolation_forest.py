@@ -11,7 +11,7 @@ from dqt.algorithms._base import Verdict
 @pytest.fixture()
 def detector():
     from dqt.algorithms.outliers_multi.isolation_forest import IsolationForestDetector
-    return IsolationForestDetector(contamination=0.05)
+    return IsolationForestDetector()
 
 
 @pytest.mark.unit

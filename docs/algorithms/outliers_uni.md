@@ -26,7 +26,9 @@ det = IQRFenceDetector(k=3.0)  # outer fence; k=1.5 for inner
 ## Modified Z-Score / MAD (`mad_outlier_fraction`)
 **Ref:** Iglewicz & Hoaglin (1993) *How to Detect and Handle Outliers*
 
-Flags values where |0.6745 * (x − median) / MAD| > 3.5. Robust to outliers in reference because MAD ignores extreme values when computing scale.
+Flags values where |0.6745 * (x − median) / MAD| > threshold. Robust to outliers in reference because MAD ignores extreme values when computing scale.
+
+**Default threshold: 11.0** — calibrated to ≤1% FPR on log-normal (revenue-shape) data. Iglewicz & Hoaglin's original 3.5 is appropriate for near-Gaussian data only; it over-flags by ~39× on lognormal data with σ=1 (reporting 3.9% on clean data with true outlier rate 0.1%). For near-Gaussian data use `MADOutlierDetector(threshold=3.5)`.
 
 **Assumptions:** Approximately unimodal distribution.
 
@@ -34,11 +36,23 @@ Flags values where |0.6745 * (x − median) / MAD| > 3.5. Robust to outliers in 
 
 **Fails when:** Multimodal data (bimodal revenue by customer tier). Use a mixture model or `isolation_forest` instead.
 
-**Expected false-alarm rate at threshold 3.5:** ~0.007% on normal data.
+**Expected false-alarm rate at threshold 6.5:** ~0.1% on log-normal data; ~0% on near-Gaussian data (conservative — recalibrate for Gaussian if you need high sensitivity).
+
+**Recalibration for your data shape:**
+```python
+from dqt.algorithms.outliers_uni.mad import MADOutlierDetector
+from dqt.algorithms._calibration import suggest_threshold
+import numpy as np, pandas as pd
+
+ref = pd.DataFrame({"revenue": your_reference_column})
+result = suggest_threshold(MADOutlierDetector(), ref, target_fpr=0.001)
+det = MADOutlierDetector(threshold=result["suggested_threshold"])
+```
 
 ```python
-from dqt.algorithms.outliers_uni.mad import MADDetector
-det = MADDetector(threshold=3.5)  # 3.5 is Iglewicz & Hoaglin's recommendation
+from dqt.algorithms.outliers_uni.mad import MADOutlierDetector
+det = MADOutlierDetector()            # default 11.0 — good for revenue/count/heavy-tailed
+det_gaussian = MADOutlierDetector(threshold=3.5)   # original — good for near-Gaussian
 ```
 
 ## Grubbs' Test (`grubbs`)

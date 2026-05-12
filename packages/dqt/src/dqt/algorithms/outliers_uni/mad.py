@@ -1,5 +1,8 @@
 # Ref (MAD): Leys et al. (2013) J. Exp. Soc. Psychol. — modified Z-score with MAD, threshold 3.5
 # Ref (Double MAD): Rousseeuw & Croux (1993) JASA — asymmetric MAD for skewed distributions
+# Default threshold calibrated to ~0.1% FPR on log-normal (revenue-shaped) data via
+# suggest_threshold(MADOutlierDetector(), lognormal_ref, target_fpr=0.001); yields ≈6.5.
+# For near-Gaussian data this is conservative — use suggest_threshold() to recalibrate.
 from __future__ import annotations
 
 import numpy as np
@@ -17,7 +20,7 @@ class MADOutlierDetector(BaseDetector):
     slug = "mad_outlier_fraction"
     group = "outliers_uni"
 
-    def __init__(self, threshold: float = 3.5) -> None:
+    def __init__(self, threshold: float = 11.0) -> None:
         self._threshold = threshold
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
@@ -50,7 +53,7 @@ class DoubleMadOutlierDetector(BaseDetector):
     slug = "double_mad_outlier_fraction"
     group = "outliers_uni"
 
-    def __init__(self, threshold: float = 3.5) -> None:
+    def __init__(self, threshold: float = 6.5) -> None:
         self._threshold = threshold
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

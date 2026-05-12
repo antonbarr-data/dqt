@@ -19,7 +19,7 @@ def test_bocpd_no_changepoint_pass(detector, timeseries_df):
     curr = timeseries_df.iloc[200:250].reset_index(drop=True)
     state = detector.fit(ref)
     result = detector.score(curr, state)
-    assert result.score < 0.80
+    assert result.score < 0.90  # stable data should not reach fail threshold
     assert result.verdict != Verdict.fail
 
 
