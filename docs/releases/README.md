@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.8.6](v0.8.6.md) | 2026-05-12 | Prometheus /metrics exporter (G.6) |
 | [v0.8.5](v0.8.5.md) | 2026-05-12 | Hypothesis property tests for ProofBundle + LineageGraph; GitHub Actions reusable workflow |
 | [v0.8.4](v0.8.4.md) | 2026-05-12 | query_runs, dry_run, parallel suite, retries, dqt healthcheck |
 | [v0.8.3](v0.8.3.md) | 2026-05-12 | PostgresStore persistent store + save_proof/list_proofs + query_runs |
