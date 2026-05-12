@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken } from "@/lib/auth";
+import { DQT_VERSION } from "@/lib/version";
 
 const GITHUB_URL = "https://github.com/antonbarr-data/dqt";
 const REGISTRY_URL = "https://raw.githubusercontent.com/antonbarr-data/dqt/main/docs/registry.json";
@@ -324,7 +325,7 @@ export default function RootPage() {
             className="px-2.5 py-1 border t-small"
             style={{ color: "var(--accent)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
           >
-            v0.4.4
+            v{DQT_VERSION}
           </span>
           <button
             onClick={copyInstall}

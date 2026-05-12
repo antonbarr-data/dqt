@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { isSysAdmin, decodeToken, getToken, clearToken } from "@/lib/auth";
+import { DQT_VERSION } from "@/lib/version";
 
 const NAV_GROUPS = [
   {
@@ -115,7 +116,7 @@ export function Sidebar() {
               dqt
             </span>
             <div className="flex items-center gap-2">
-              <span className="t-micro" style={{ color: "var(--fg-3)" }}>v0.4.1</span>
+              <span className="t-micro" style={{ color: "var(--fg-3)" }}>v{DQT_VERSION}</span>
               <button
                 onClick={() => setCollapsed(true)}
                 className="flex items-center justify-center"
