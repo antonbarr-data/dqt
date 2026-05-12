@@ -41,6 +41,10 @@ class RunResult:
     diagnostic_sql: str | None = None
     # Bundle for offline reproduction / audit
     reproducibility: ReproducibilityBundle | None = None
+    # Detector algorithm version at the time of this run (BaseDetector.version).
+    # Allows the store to flag results produced by a different algorithm version
+    # than the one currently registered.
+    detector_version: str = "1"
 
     def to_bundle(self, path: str | Path) -> None:
         """Write reproducibility artifacts to a directory.
@@ -62,6 +66,7 @@ class RunResult:
             "check_id": str(self.check_id),
             "run_id": str(self.run_id),
             "detector_slug": self.detector_slug,
+            "detector_version": self.detector_version,
             "verdict": self.verdict.value,
             "score": self.score,
             "plain_english": self.plain_english,

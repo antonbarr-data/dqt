@@ -69,6 +69,9 @@ class BaseDetector:
     slug: ClassVar[str]
     group: ClassVar[str]
     kind: ClassVar[str] = "sample"
+    # Bump version when the scoring algorithm changes so the runner can detect
+    # stale baselines and automatically re-fit them.
+    version: ClassVar[str] = "1"
     # Minimum N for reliable results. Runner prepends a low-power warning when
     # len(current_df) < min_recommended_n.
     min_recommended_n: ClassVar[int] = 30

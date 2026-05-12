@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from dqt.checks.models import Check
     from dqt.store._protocol import ResultsStore, RunResult
 
+_VersionedState = tuple[str, "DetectorState"]  # (detector_version, state)
+
 
 @dataclass
 class SuiteResult:
@@ -37,7 +39,7 @@ class Runner:
 
     def __init__(self, store: ResultsStore, emitter=None) -> None:
         self._store = store
-        self._states: dict[UUID, DetectorState] = {}
+        self._states: dict[UUID, _VersionedState] = {}
         self._emitter = emitter
 
     def fit(self, check: Check, adapter: WarehouseAdapter) -> None:
@@ -45,7 +47,7 @@ class Runner:
         cls = registry.get(check.detector_slug)
         detector = cls(**(check.params or {}))
         ref_df = self._fetch(check, adapter)
-        self._states[check.id] = detector.fit(ref_df)
+        self._states[check.id] = (cls.version, detector.fit(ref_df))
         _log.info("fit", check_id=str(check.id), slug=check.detector_slug)
 
     def run(self, check: Check, adapter: WarehouseAdapter) -> RunResult:
@@ -86,7 +88,17 @@ class Runner:
 
         cls = registry.get(check.detector_slug)
         detector = cls(**(check.params or {}))
-        state = self._states[check.id]
+        cached_version, state = self._states[check.id]
+        if cached_version != cls.version:
+            _log.warning(
+                "detector_version_changed_refitting",
+                check_id=str(check.id),
+                slug=check.detector_slug,
+                cached_version=cached_version,
+                current_version=cls.version,
+            )
+            self.fit(check, adapter)
+            _, state = self._states[check.id]
 
         started_at = datetime.now(timezone.utc)
         # Pass the same detector instance to _fetch so aggregate detectors can store
@@ -125,6 +137,7 @@ class Runner:
                         "non_null_fraction": _non_null_frac,
                         "n_unique": _n_unique,
                     },
+                    detector_version=cls.version,
                 )
                 self._store.save_run(run_result)
                 self._store.save_incident(Incident(
@@ -172,6 +185,7 @@ class Runner:
             plain_english=_power_prefix + result.plain_english,
             details=result.details,
             diagnostic_sql=diagnostic_sql,
+            detector_version=cls.version,
         )
         self._store.save_run(run_result)
 
