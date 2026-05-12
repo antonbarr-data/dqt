@@ -238,3 +238,67 @@ def test_degenerate_distribution_skips_outlier_detection():
     result = runner.run(check, _SparseAdapter())
     assert "degenerate" in result.plain_english.lower()
     assert result.verdict == Verdict.warn
+
+
+def test_runner_emits_openlineage_events():
+    """Runner emits >= 2 OpenLineage events (START + COMPLETE) when emitter is provided."""
+    from dqt.lineage.openlineage import OpenLineageEmitter
+    from dqt.runner.runner import Runner
+
+    emitter = OpenLineageEmitter(producer="dqt/test", transport=None)
+
+    adapter = make_adapter(aggregate_result={"null_count": 5, "total_count": 1000})
+    check = completeness_check()
+
+    store = MemoryStore()
+    runner = Runner(store, emitter=emitter)
+    runner.run(check, adapter)
+
+    assert len(emitter._emitted) >= 2, (
+        f"Expected >=2 events (START+COMPLETE), got {len(emitter._emitted)}: {emitter._emitted}"
+    )
+    event_types = [e["eventType"] for e in emitter._emitted]
+    assert "START" in event_types, f"START event missing: {event_types}"
+    assert "COMPLETE" in event_types, f"COMPLETE event missing: {event_types}"
+
+
+def test_runner_emits_fail_event_on_exception():
+    """Runner emits FAIL event when the underlying run raises an exception."""
+    from dqt.lineage.openlineage import OpenLineageEmitter
+    from dqt.runner.runner import Runner
+    from dqt.checks.models import Check
+
+    emitter = OpenLineageEmitter(producer="dqt/test", transport=None)
+
+    # Adapter that raises on aggregate (will trigger after fit succeeds)
+    adapter = make_adapter(aggregate_result={"null_count": 5, "total_count": 1000})
+    check = completeness_check()
+    store = MemoryStore()
+    runner = Runner(store, emitter=emitter)
+
+    # Pre-fit so run() doesn't call fit again, then make aggregate raise
+    runner.fit(check, adapter)
+    adapter.aggregate.side_effect = RuntimeError("warehouse exploded")
+
+    with pytest.raises(RuntimeError):
+        runner.run(check, adapter)
+
+    event_types = [e["eventType"] for e in emitter._emitted]
+    assert "FAIL" in event_types, f"FAIL event missing after exception: {event_types}"
+
+
+def test_runner_emitter_failure_does_not_propagate():
+    """Emitter errors must never surface to the caller."""
+    from dqt.runner.runner import Runner
+
+    class _BrokenEmitter:
+        def emit(self, *args, **kwargs):
+            raise RuntimeError("emit exploded")
+
+    adapter = make_adapter(aggregate_result={"null_count": 5, "total_count": 1000})
+    check = completeness_check()
+    store = MemoryStore()
+    runner = Runner(store, emitter=_BrokenEmitter())
+    # Should complete without raising despite broken emitter
+    result = runner.run(check, adapter)
+    assert result is not None

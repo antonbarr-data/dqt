@@ -25,9 +25,10 @@ class Runner:
     or let run() auto-fit on first execution.
     """
 
-    def __init__(self, store: ResultsStore) -> None:
+    def __init__(self, store: ResultsStore, emitter=None) -> None:
         self._store = store
         self._states: dict[UUID, DetectorState] = {}
+        self._emitter = emitter
 
     def fit(self, check: Check, adapter: WarehouseAdapter) -> None:
         from dqt.algorithms._registry import registry
@@ -38,6 +39,35 @@ class Runner:
         _log.info("fit", check_id=str(check.id), slug=check.detector_slug)
 
     def run(self, check: Check, adapter: WarehouseAdapter) -> RunResult:
+        from dqt.lineage.openlineage import RunState
+        job_name = f"{check.schema_name}.{check.table_name}.{check.detector_slug}"
+        run_id = str(check.id)
+
+        if self._emitter is not None:
+            try:
+                self._emitter.emit(RunState.START, job_name, run_id)
+            except Exception:
+                _log.warning("openlineage_emit_failed", phase="start")
+
+        try:
+            result = self._run_core(check, adapter)
+        except Exception:
+            if self._emitter is not None:
+                try:
+                    self._emitter.emit(RunState.FAIL, job_name, run_id)
+                except Exception:
+                    pass
+            raise
+
+        if self._emitter is not None:
+            try:
+                self._emitter.emit(RunState.COMPLETE, job_name, run_id)
+            except Exception:
+                _log.warning("openlineage_emit_failed", phase="complete")
+
+        return result
+
+    def _run_core(self, check: Check, adapter: WarehouseAdapter) -> RunResult:
         from dqt.algorithms._registry import registry
         from dqt.store._protocol import Incident, RunResult
 
