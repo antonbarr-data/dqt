@@ -22,8 +22,8 @@ jobs:
           enable-cache: true
           python-version: '3.12'
 
-      - name: Install dqt
-        run: uv sync --frozen
+      - name: Install dqt library
+        run: uv sync --frozen --package dqtlib
 
       - name: Generate docs/registry.json
         run: uv run python scripts/generate_registry.py
