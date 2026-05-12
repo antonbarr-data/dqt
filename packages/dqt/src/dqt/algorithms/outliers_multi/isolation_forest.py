@@ -30,6 +30,11 @@ class IsolationForestDetector(BaseDetector):
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         from sklearn.ensemble import IsolationForest
         X = reference.select_dtypes(include="number").fillna(0.0)
+        if X.shape[1] < 2:
+            raise ValueError(
+                "IsolationForest requires ≥2 numeric columns. "
+                "For single-column outlier detection use 'ecod' or 'lof' instead."
+            )
         model = IsolationForest(contamination="auto", random_state=42, n_estimators=100)
         model.fit(X)
         ref_scores = model.score_samples(X)

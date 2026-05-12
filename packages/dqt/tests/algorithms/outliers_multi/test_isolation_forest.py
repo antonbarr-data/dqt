@@ -76,7 +76,7 @@ def test_if_clean_data(detector):
     assert result.score <= 0.15
 
 
-@given(n=st.integers(min_value=50, max_value=300), ncols=st.integers(min_value=1, max_value=5))
+@given(n=st.integers(min_value=50, max_value=300), ncols=st.integers(min_value=2, max_value=5))
 @settings(max_examples=30, deadline=10_000)
 def test_if_stability(n, ncols):
     from dqt.algorithms.outliers_multi.isolation_forest import IsolationForestDetector
@@ -95,3 +95,19 @@ def test_if_stat_scale_verdict():
     assert compute_verdict(0.03, "isolation_forest_fraction") == Verdict.pass_
     assert compute_verdict(0.07, "isolation_forest_fraction") == Verdict.warn
     assert compute_verdict(0.15, "isolation_forest_fraction") == Verdict.fail
+
+
+@pytest.mark.unit
+def test_fit_raises_on_single_column(detector):
+    """IsolationForest must reject single-column DataFrames."""
+    df = pd.DataFrame({"amount": [1.0, 2.0, 3.0, 4.0, 5.0]})
+    with pytest.raises(ValueError, match="IsolationForest requires"):
+        detector.fit(df)
+
+
+@pytest.mark.unit
+def test_fit_raises_on_zero_numeric_columns(detector):
+    """IsolationForest must reject DataFrames with no numeric columns."""
+    df = pd.DataFrame({"label": ["a", "b", "c"]})
+    with pytest.raises(ValueError, match="IsolationForest requires"):
+        detector.fit(df)
