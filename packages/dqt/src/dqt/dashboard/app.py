@@ -9,9 +9,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from dqt.utils.logging import get_logger
+
 if TYPE_CHECKING:
     from dqt.store._protocol import ResultsStore
 
+_log = get_logger(__name__)
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
@@ -204,30 +207,23 @@ def _strength_order(strength: str) -> int:
 
 
 def _get_all_incidents(store: "ResultsStore") -> list[dict]:
-    """Return all incidents across all check_ids, newest first.
-
-    Accesses MemoryStore._incidents directly (read-only); non-MemoryStore
-    backends with no public list-all API return empty until one is added.
-    """
-    incidents_map: dict = getattr(store, "_incidents", {})
+    all_incidents = store.list_all_incidents()
     result = []
-    for check_id, inc_list in incidents_map.items():
-        for inc in inc_list:
-            sev = getattr(inc, "severity", "fail")
-            result.append({
-                "check_id": str(check_id),
-                "incident_id": str(getattr(inc, "incident_id", "")),
-                "severity": sev.value if hasattr(sev, "value") else str(sev),
-                "score": float(getattr(inc, "score", 0.0)),
-                "opened_at": str(getattr(inc, "opened_at", "")),
-                "status": getattr(inc, "status", "open"),
-                "detector_slug": getattr(inc, "detector_slug", ""),
-            })
+    for inc in all_incidents:
+        sev = inc.severity
+        result.append({
+            "check_id": str(inc.check_id),
+            "incident_id": str(getattr(inc, "incident_id", "")),
+            "severity": sev.value if hasattr(sev, "value") else str(sev),
+            "score": float(inc.score),
+            "opened_at": str(inc.opened_at),
+            "status": getattr(inc, "status", "open"),
+            "detector_slug": inc.detector_slug,
+        })
     return sorted(result, key=lambda r: r["opened_at"], reverse=True)
 
 
 def _get_incident_detail(store: "ResultsStore", check_id: str) -> dict:
-    """Return runs and incidents for a single check_id string."""
     try:
         uid = UUID(check_id)
     except ValueError:
@@ -237,19 +233,18 @@ def _get_incident_detail(store: "ResultsStore", check_id: str) -> dict:
     try:
         runs = [_run_to_dict(r) for r in store.list_runs(uid, limit=50)]
     except Exception:
-        pass
+        _log.warning("dashboard_incident_detail_runs_error", check_id=check_id)
     try:
-        raw_incidents = store.list_incidents(uid)
-        for inc in raw_incidents:
-            sev = getattr(inc, "severity", "fail")
+        for inc in store.list_incidents(uid):
+            sev = inc.severity
             incidents.append({
                 "incident_id": str(getattr(inc, "incident_id", "")),
-                "detector_slug": getattr(inc, "detector_slug", ""),
+                "detector_slug": inc.detector_slug,
                 "severity": sev.value if hasattr(sev, "value") else str(sev),
-                "score": float(getattr(inc, "score", 0.0)),
-                "opened_at": str(getattr(inc, "opened_at", "")),
+                "score": float(inc.score),
+                "opened_at": str(inc.opened_at),
                 "status": getattr(inc, "status", "open"),
             })
     except Exception:
-        pass
+        _log.warning("dashboard_incident_detail_incidents_error", check_id=check_id)
     return {"runs": runs, "incidents": incidents}

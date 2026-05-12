@@ -29,6 +29,12 @@ class MemoryStore:
             items = [i for i in items if i.status == status]
         return list(items)
 
+    def list_all_incidents(self) -> list[Incident]:
+        result = []
+        for inc_list in self._incidents.values():
+            result.extend(inc_list)
+        return result
+
     def save_causal_review(self, review: CausalEdgeReview) -> None:
         self._causal_reviews.append(review)
 
