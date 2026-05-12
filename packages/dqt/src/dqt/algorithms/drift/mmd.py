@@ -26,7 +26,10 @@ def _median_gamma(X: np.ndarray) -> float:
         rng = np.random.default_rng(0)
         X = X[rng.choice(len(X), 200, replace=False)]
     dists_sq = np.sum((X[:, None] - X[None, :]) ** 2, axis=-1)
-    median_sq = float(np.median(dists_sq[dists_sq > 0]))
+    nonzero = dists_sq[dists_sq > 0]
+    if len(nonzero) == 0:
+        return 1.0
+    median_sq = float(np.median(nonzero))
     return 1.0 / (2.0 * median_sq) if median_sq > 0 else 1.0
 
 

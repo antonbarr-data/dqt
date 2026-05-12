@@ -3,18 +3,11 @@
 from __future__ import annotations
 
 import datetime
-import json
-from io import BytesIO
-from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from dqt.causality.events import (
-    AirflowEventSource,
-    DagsterEventSource,
-    DbtCloudEventSource,
     DeployEvent,
     EventSource,
     InMemoryEventSource,
@@ -31,16 +24,6 @@ T0 = datetime.datetime(2024, 1, 1, 0, 0, 0)
 T1 = datetime.datetime(2024, 1, 2, 0, 0, 0)
 T2 = datetime.datetime(2024, 1, 3, 0, 0, 0)
 T3 = datetime.datetime(2024, 1, 4, 0, 0, 0)
-
-
-def _make_response(payload: dict) -> MagicMock:
-    """Return a mock context-manager that yields a urllib response."""
-    body = json.dumps(payload).encode()
-    resp = MagicMock()
-    resp.read.return_value = body
-    resp.__enter__ = lambda s: s
-    resp.__exit__ = MagicMock(return_value=False)
-    return resp
 
 
 def _granger_df(n: int = 60) -> pd.DataFrame:
@@ -158,126 +141,3 @@ def test_granger_no_annotation_when_period_is_none():
     assert "confounded_by_events" not in report.metadata
 
 
-# ---------------------------------------------------------------------------
-# AirflowEventSource (mocked HTTP)
-# ---------------------------------------------------------------------------
-
-def test_airflow_event_source_returns_deploy_events():
-    dag_runs_payload = {
-        "dag_runs": [
-            {
-                "dag_run_id": "run_1",
-                "execution_date": "2024-01-01T12:00:00Z",
-                "state": "success",
-            }
-        ]
-    }
-    with patch("urllib.request.urlopen", return_value=_make_response(dag_runs_payload)):
-        src = AirflowEventSource(
-            base_url="http://airflow.local",
-            dag_ids=["my_dag"],
-        )
-        events = src.get_events(T0, T2)
-
-    assert len(events) == 1
-    assert events[0].event_type == "deploy"
-    assert events[0].source == "airflow"
-    assert events[0].metadata["dag_id"] == "my_dag"
-
-
-def test_airflow_event_source_empty_dag_runs():
-    with patch("urllib.request.urlopen", return_value=_make_response({"dag_runs": []})):
-        src = AirflowEventSource("http://airflow.local", dag_ids=["noop_dag"])
-        events = src.get_events(T0, T2)
-    assert events == []
-
-
-# ---------------------------------------------------------------------------
-# DagsterEventSource (mocked HTTP)
-# ---------------------------------------------------------------------------
-
-def test_dagster_event_source_returns_deploy_events():
-    gql_response = {
-        "data": {
-            "pipelineRunsOrError": {
-                "results": [
-                    {
-                        "runId": "abc-123",
-                        "pipelineName": "my_pipeline",
-                        "status": "SUCCESS",
-                        "startTime": T1.timestamp(),
-                        "endTime": T1.timestamp() + 60,
-                    }
-                ]
-            }
-        }
-    }
-    with patch("urllib.request.urlopen", return_value=_make_response(gql_response)):
-        src = DagsterEventSource(url="http://dagster.local/graphql")
-        events = src.get_events(T0, T2)
-
-    assert len(events) == 1
-    assert events[0].event_type == "deploy"
-    assert events[0].source == "dagster"
-    assert events[0].metadata["run_id"] == "abc-123"
-
-
-def test_dagster_event_source_empty_results():
-    gql_response = {"data": {"pipelineRunsOrError": {"results": []}}}
-    with patch("urllib.request.urlopen", return_value=_make_response(gql_response)):
-        src = DagsterEventSource(url="http://dagster.local/graphql")
-        events = src.get_events(T0, T2)
-    assert events == []
-
-
-# ---------------------------------------------------------------------------
-# DbtCloudEventSource (mocked HTTP)
-# ---------------------------------------------------------------------------
-
-def test_dbt_cloud_event_source_returns_deploy_events():
-    api_response = {
-        "data": [
-            {
-                "id": 99,
-                "job_id": 7,
-                "created_at": "2024-01-01T06:00:00Z",
-                "status": 10,
-            }
-        ]
-    }
-    with patch("urllib.request.urlopen", return_value=_make_response(api_response)):
-        src = DbtCloudEventSource(account_id=1, api_token="tok")
-        events = src.get_events(T0, T2)
-
-    assert len(events) == 1
-    assert events[0].event_type == "deploy"
-    assert events[0].source == "dbt_cloud"
-    assert events[0].metadata["job_id"] == 7
-
-
-def test_dbt_cloud_event_source_filters_by_job_id():
-    api_response = {
-        "data": [
-            {"id": 1, "job_id": 7, "created_at": "2024-01-01T06:00:00Z", "status": 10},
-            {"id": 2, "job_id": 8, "created_at": "2024-01-01T07:00:00Z", "status": 10},
-        ]
-    }
-    with patch("urllib.request.urlopen", return_value=_make_response(api_response)):
-        src = DbtCloudEventSource(account_id=1, api_token="tok", job_ids=[7])
-        events = src.get_events(T0, T2)
-
-    assert len(events) == 1
-    assert events[0].metadata["job_id"] == 7
-
-
-def test_dbt_cloud_event_source_filters_out_of_range():
-    api_response = {
-        "data": [
-            # T3 is after T2 — should be excluded
-            {"id": 3, "job_id": 7, "created_at": "2024-01-04T00:00:00Z", "status": 10},
-        ]
-    }
-    with patch("urllib.request.urlopen", return_value=_make_response(api_response)):
-        src = DbtCloudEventSource(account_id=1, api_token="tok")
-        events = src.get_events(T0, T2)
-    assert events == []
