@@ -177,6 +177,21 @@ def _cmd_fit(args: argparse.Namespace) -> None:
     )
 
 
+def _cmd_dashboard(args: argparse.Namespace) -> None:
+    """Start the local dqt dashboard (requires dqtlib[dashboard])."""
+    try:
+        import uvicorn
+    except ImportError:
+        print("error: dqtlib[dashboard] is required. Run: pip install 'dqtlib[dashboard]'",
+              file=sys.stderr)
+        sys.exit(1)
+    from dqt.dashboard import create_app
+    from dqt.store.memory import MemoryStore
+    app = create_app(store=MemoryStore())
+    print(f"dqt dashboard -> http://{args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port)
+
+
 def _cmd_demo(_args: argparse.Namespace) -> None:
     """Generate a synthetic demo: 30% level shift in 'revenue', run wasserstein_1, print result."""
     import numpy as np
@@ -264,6 +279,11 @@ def main() -> None:
     # demo
     sub.add_parser("demo", help="Run a synthetic in-memory demo with wasserstein_1")
 
+    # dashboard
+    p_dashboard = sub.add_parser("dashboard", help="Start the local dqt dashboard (requires dqtlib[dashboard])")
+    p_dashboard.add_argument("--port", "-p", type=int, default=8080, help="Port to listen on (default: 8080)")
+    p_dashboard.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+
     args = parser.parse_args()
 
     dispatch = {
@@ -272,6 +292,7 @@ def main() -> None:
         "fit": _cmd_fit,
         "compile": _cmd_compile,
         "demo": _cmd_demo,
+        "dashboard": _cmd_dashboard,
     }
     dispatch[args.command](args)
 

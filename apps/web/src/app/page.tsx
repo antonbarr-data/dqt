@@ -322,7 +322,7 @@ export default function RootPage() {
             className="px-2.5 py-1 border t-small"
             style={{ color: "var(--accent)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
           >
-            v0.4.3
+            v0.4.4
           </span>
           <button
             onClick={copyInstall}
