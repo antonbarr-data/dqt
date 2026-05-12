@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pandas as pd
 
@@ -37,10 +37,18 @@ class Runner:
     or let run() auto-fit on first execution.
     """
 
-    def __init__(self, store: ResultsStore, emitter=None) -> None:
+    def __init__(
+        self,
+        store: ResultsStore,
+        emitter=None,
+        max_retries: int = 3,
+        retry_delay_seconds: float = 1.0,
+    ) -> None:
         self._store = store
         self._states: dict[UUID, _VersionedState] = {}
         self._emitter = emitter
+        self._max_retries = max_retries
+        self._retry_delay = retry_delay_seconds
 
     def fit(self, check: Check, adapter: WarehouseAdapter) -> None:
         from dqt.algorithms._registry import registry
@@ -51,7 +59,12 @@ class Runner:
         _log.info("fit", check_id=str(check.id), slug=check.detector_slug)
 
     def run(self, check: Check, adapter: WarehouseAdapter) -> RunResult:
+        import time
         from dqt.lineage.openlineage import RunState
+        from dqt.store._protocol import Incident, RunResult
+
+        _RETRYABLE = (TimeoutError, OSError, ConnectionError)
+
         job_name = f"{check.schema_name}.{check.table_name}.{check.detector_slug}"
         run_id = str(check.id)
 
@@ -61,15 +74,61 @@ class Runner:
             except Exception:
                 _log.warning("openlineage_emit_failed", phase="start")
 
-        try:
-            result = self._run_core(check, adapter)
-        except Exception as _exc:
+        last_exc: BaseException | None = None
+        result = None
+        for attempt in range(self._max_retries):
+            try:
+                result = self._run_core(check, adapter)
+                break
+            except _RETRYABLE as exc:
+                last_exc = exc
+                _log.warning(
+                    "run_retryable_error",
+                    check_id=str(check.id),
+                    attempt=attempt + 1,
+                    max_retries=self._max_retries,
+                    error=str(exc),
+                )
+                if attempt < self._max_retries - 1:
+                    time.sleep(self._retry_delay * (2 ** attempt))
+            except Exception as _exc:
+                if self._emitter is not None:
+                    try:
+                        self._emitter.emit(RunState.FAIL, job_name, run_id, error_message=str(_exc))
+                    except Exception:
+                        pass
+                raise
+
+        if result is None:
+            # All retries exhausted — graceful degradation
+            now = datetime.now(timezone.utc)
+            result = RunResult(
+                run_id=uuid4(),
+                check_id=check.id,
+                detector_slug=check.detector_slug,
+                detector_version="unknown",
+                started_at=now,
+                finished_at=now,
+                verdict=Verdict.warn,
+                score=0.0,
+                plain_english=f"adapter timeout after {self._max_retries} retries: {last_exc}",
+                details={"error": str(last_exc)},
+            )
+            self._store.save_run(result)
+            self._store.save_incident(Incident(
+                check_id=check.id,
+                run_id=result.run_id,
+                detector_slug=check.detector_slug,
+                severity=Verdict.warn,
+                opened_at=now,
+                score=0.0,
+            ))
             if self._emitter is not None:
                 try:
-                    self._emitter.emit(RunState.FAIL, job_name, run_id, error_message=str(_exc))
+                    self._emitter.emit(RunState.FAIL, job_name, run_id, error_message=str(last_exc))
                 except Exception:
                     pass
-            raise
+            return result
 
         if self._emitter is not None:
             try:
@@ -257,11 +316,30 @@ class Runner:
             return df[[check.column_name]]
         return df
 
+    def dry_run(self, check: Check, adapter: WarehouseAdapter) -> tuple:
+        """Return the SQL that would be executed and a CostEstimate, without running."""
+        from dqt.algorithms._base import CostEstimate
+        from dqt.algorithms._registry import registry
+
+        cls = registry.get(check.detector_slug)
+        detector = cls(**(check.params or {}))
+        cost = detector.estimate_cost(row_count=100_000)
+
+        col = getattr(check, "column_name", None)
+        schema = getattr(check, "schema_name", "public")
+        table = getattr(check, "table_name", "unknown")
+        if col:
+            sql = f"SELECT {col} FROM {schema}.{table} TABLESAMPLE SYSTEM (10) LIMIT 100000"
+        else:
+            sql = f"SELECT * FROM {schema}.{table} TABLESAMPLE SYSTEM (10) LIMIT 100000"
+        return sql, cost
+
     def run_suite(
         self,
         checks: list[Check],
         adapter: WarehouseAdapter,
         cost_budget_usd: float = 10.0,
+        parallelism: int = 1,
     ) -> SuiteResult:
         """Run multiple checks in cost order, stopping when the budget is exhausted.
 
@@ -305,6 +383,7 @@ class Runner:
 
         ranked = sorted(checks, key=lambda c: _cost(c).warehouse_cost_usd)
 
+        to_run = []
         for check in ranked:
             est = _cost(check)
             if result.budget_spent_usd + est.warehouse_cost_usd > cost_budget_usd:
@@ -319,11 +398,26 @@ class Runner:
                     slug=check.detector_slug,
                     reason=reason,
                 )
-                continue
+            else:
+                to_run.append(check)
+                result.budget_spent_usd += _cost(check).warehouse_cost_usd
 
-            run_result = self.run(check, adapter)
-            result.ran.append(run_result)
-            result.budget_spent_usd += est.warehouse_cost_usd
+        if parallelism <= 1:
+            for check in to_run:
+                result.ran.append(self.run(check, adapter))
+        else:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            with ThreadPoolExecutor(max_workers=parallelism) as pool:
+                futures = {pool.submit(self.run, check, adapter): check for check in to_run}
+                for future in as_completed(futures):
+                    try:
+                        result.ran.append(future.result())
+                    except Exception as exc:
+                        _log.error(
+                            "suite_check_failed",
+                            check_id=str(futures[future].id),
+                            error=str(exc),
+                        )
 
         _log.info(
             "run_suite_complete",
