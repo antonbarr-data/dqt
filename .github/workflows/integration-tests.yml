@@ -1,0 +1,99 @@
+name: Adapter Integration Tests
+
+on:
+  schedule:
+    # Nightly at 02:00 UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      adapter:
+        description: "Adapter to test (all / postgres / clickhouse / snowflake / bigquery / databricks)"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Postgres (testcontainers — always runs) ────────────────────────────────
+  postgres:
+    name: Postgres adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync --group dev
+      - run: uv run pytest packages/dqt/tests/adapters/test_postgres_adapter.py -v -m adapter
+        env:
+          PYTHONPATH: packages/dqt/src
+
+  # ── ClickHouse (testcontainers — always runs) ──────────────────────────────
+  clickhouse:
+    name: ClickHouse adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync --group dev
+      - run: uv run pytest packages/dqt/tests/adapters/test_clickhouse_adapter.py -v -m adapter
+        env:
+          PYTHONPATH: packages/dqt/src
+
+  # ── Snowflake (skipped unless DQT_SNOWFLAKE_DSN secret present) ───────────
+  snowflake:
+    name: Snowflake adapter
+    runs-on: ubuntu-latest
+    if: ${{ vars.DQT_SNOWFLAKE_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync --group dev
+      - run: uv run pytest packages/dqt/tests/adapters/test_snowflake_adapter.py -v -m adapter
+        env:
+          DQT_SNOWFLAKE_DSN: ${{ secrets.DQT_SNOWFLAKE_DSN }}
+          PYTHONPATH: packages/dqt/src
+
+  # ── BigQuery (skipped unless DQT_BIGQUERY_PROJECT secret present) ─────────
+  bigquery:
+    name: BigQuery adapter
+    runs-on: ubuntu-latest
+    if: ${{ vars.DQT_BIGQUERY_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync --group dev
+      - run: |
+          echo '${{ secrets.DQT_GCP_SERVICE_ACCOUNT_KEY }}' > /tmp/gcp_key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_key.json
+          uv run pytest packages/dqt/tests/adapters/test_bigquery_adapter.py -v -m adapter
+        env:
+          DQT_BIGQUERY_PROJECT: ${{ secrets.DQT_BIGQUERY_PROJECT }}
+          DQT_BIGQUERY_DATASET: ${{ secrets.DQT_BIGQUERY_DATASET }}
+          PYTHONPATH: packages/dqt/src
+
+  # ── Databricks (skipped unless DQT_DATABRICKS_HTTP_PATH secret present) ───
+  databricks:
+    name: Databricks adapter
+    runs-on: ubuntu-latest
+    if: ${{ vars.DQT_DATABRICKS_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - run: uv sync --group dev
+      - run: uv run pytest packages/dqt/tests/adapters/test_databricks_adapter.py -v -m adapter
+        env:
+          DQT_DATABRICKS_HOST: ${{ secrets.DQT_DATABRICKS_HOST }}
+          DQT_DATABRICKS_TOKEN: ${{ secrets.DQT_DATABRICKS_TOKEN }}
+          DQT_DATABRICKS_HTTP_PATH: ${{ secrets.DQT_DATABRICKS_HTTP_PATH }}
+          DQT_DATABRICKS_CATALOG: ${{ secrets.DQT_DATABRICKS_CATALOG }}
+          PYTHONPATH: packages/dqt/src

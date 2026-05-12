@@ -724,6 +724,20 @@ dqt/
 
 ---
 
+## Adapter integration tests
+
+The nightly CI workflow (`.github/workflows/integration-tests.yml`) runs adapter tests for each supported warehouse engine. Postgres and ClickHouse run unconditionally via testcontainers. Cloud adapters are skipped unless the corresponding repository variable and secret are set:
+
+| Adapter | Enable variable | Secret(s) |
+|---|---|---|
+| Snowflake | `DQT_SNOWFLAKE_ENABLED=true` | `DQT_SNOWFLAKE_DSN` |
+| BigQuery | `DQT_BIGQUERY_ENABLED=true` | `DQT_BIGQUERY_PROJECT`, `DQT_BIGQUERY_DATASET`, `DQT_GCP_SERVICE_ACCOUNT_KEY` |
+| Databricks | `DQT_DATABRICKS_ENABLED=true` | `DQT_DATABRICKS_HOST`, `DQT_DATABRICKS_TOKEN`, `DQT_DATABRICKS_HTTP_PATH`, `DQT_DATABRICKS_CATALOG` |
+
+To run adapter tests locally: `uv run pytest packages/dqt/tests/adapters/ -m adapter`.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
