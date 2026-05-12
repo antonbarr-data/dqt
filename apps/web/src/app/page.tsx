@@ -793,7 +793,7 @@ export default function RootPage() {
             <div>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-0)", marginBottom: 6 }}>Install</p>
               <pre style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)", background: "var(--bg-0)", border: "1px solid var(--line)", padding: "10px 14px", margin: 0, overflowX: "auto" }}>
-{`pip install "dqtlib[dashboard]"`}
+{`pip install dqtlib`}
               </pre>
             </div>
           </div>
@@ -854,7 +854,8 @@ print(result.verdict, result.plain_english)`}
             <div>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-0)", marginBottom: 6 }}>Open the dashboard</p>
               <pre style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)", background: "var(--bg-0)", border: "1px solid var(--line)", padding: "10px 14px", margin: 0, marginBottom: 10, overflowX: "auto" }}>
-{`dqt dashboard --port 8080
+{`pip install "dqtlib[dashboard]"  # adds FastAPI + uvicorn
+dqt dashboard --port 8080
 # → http://127.0.0.1:8080`}
               </pre>
               <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7 }}>
