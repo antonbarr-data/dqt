@@ -62,3 +62,18 @@ def test_mahal_details_present(detector):
     assert "outlier_fraction" in result.details
     assert "chi2_threshold" in result.details
     assert "n_rows" in result.details
+
+
+def test_mahalanobis_singular_cov_in_details():
+    """singular_covariance=True surfaced in details when covariance matrix is rank-deficient."""
+    from dqt.algorithms.outliers_multi.mahalanobis import MahalanobisDetector
+
+    x = np.arange(50, dtype=float)
+    ref = pd.DataFrame({"a": x, "b": x, "c": x * 2})  # rank-deficient
+    curr = pd.DataFrame({"a": x[:20], "b": x[:20], "c": x[:20] * 2})
+
+    det = MahalanobisDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+    assert "singular_covariance" in result.details
+    assert result.details["singular_covariance"] is True

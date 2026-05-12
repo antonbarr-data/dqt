@@ -50,3 +50,21 @@ def test_auto_result_carries_metadata():
     result = det.score(df, state)
     assert "auto_selected_method" in result.details
     assert "distribution_type" in result.details
+
+
+def test_auto_outlier_logs_chosen_detector():
+    """chosen_detector key present in details and maps to a valid slug."""
+    from dqt.algorithms.outliers_uni.auto_outlier import AutoOutlierDetector
+
+    rng = np.random.default_rng(0)
+    ref = pd.DataFrame({"x": rng.lognormal(0, 1, 100)})
+    curr = pd.DataFrame({"x": rng.lognormal(0, 1, 50)})
+
+    det = AutoOutlierDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+    assert "chosen_detector" in result.details
+    assert result.details["chosen_detector"] in (
+        "mad_outlier_fraction", "double_mad_outlier_fraction", "adjusted_boxplot_fraction",
+        "zscore_outlier_fraction",
+    )

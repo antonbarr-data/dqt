@@ -105,6 +105,7 @@ class AutoOutlierDetector(BaseDetector):
             details={
                 **result.details,
                 "auto_selected_method": state["detector_slug"],
+                "chosen_detector": state["detector_slug"],
                 "distribution_type": state["distribution_type"],
             },
         )

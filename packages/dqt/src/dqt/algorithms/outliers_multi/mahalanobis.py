@@ -29,10 +29,16 @@ class MahalanobisDetector(BaseDetector):
         cov = np.cov(X, rowvar=False)
         if cov.ndim == 0:
             cov = np.array([[float(cov)]])
-        try:
-            cov_inv = np.linalg.inv(cov + _EPSILON * np.eye(len(mean)))
-        except np.linalg.LinAlgError:
+        rank = np.linalg.matrix_rank(cov)
+        singular = bool(rank < cov.shape[0])
+        if singular:
             cov_inv = np.linalg.pinv(cov)
+        else:
+            try:
+                cov_inv = np.linalg.inv(cov + _EPSILON * np.eye(cov.shape[0]))
+            except np.linalg.LinAlgError:
+                cov_inv = np.linalg.pinv(cov)
+                singular = True
         df = X.shape[1]
         chi2_threshold = float(scipy_stats.chi2.ppf(1.0 - self._p_threshold, df=df))
         return {
@@ -41,6 +47,7 @@ class MahalanobisDetector(BaseDetector):
             "columns": columns,
             "chi2_threshold": chi2_threshold,
             "n_features": df,
+            "singular_cov": singular,
         }
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
@@ -64,5 +71,6 @@ class MahalanobisDetector(BaseDetector):
                 "outlier_fraction": frac,
                 "chi2_threshold": state["chi2_threshold"],
                 "n_rows": len(X),
+                "singular_covariance": state.get("singular_cov", False),
             },
         )
