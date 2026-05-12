@@ -2,7 +2,7 @@
 """dqt — open-source data quality, observability, and causality library."""
 from __future__ import annotations
 
-__version__ = "0.8.6"
+__version__ = "0.8.7"
 
 from dqt.algorithms._base import (
     BaseAggregateDetector,

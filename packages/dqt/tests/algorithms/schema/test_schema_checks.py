@@ -72,3 +72,43 @@ def test_schema_stat_scale_verdict():
     from dqt.algorithms._base import compute_verdict
     assert compute_verdict(0.0, "schema_change") == Verdict.pass_
     assert compute_verdict(1.0, "schema_change") == Verdict.fail
+
+
+def test_schema_change_detects_rename():
+    """When a column is renamed, details should contain 'renamed_columns'."""
+    from dqt.algorithms.schema.schema_checks import SchemaChangeDetector
+
+    ref = schema_df([("user_id", "integer"), ("created_at", "text"), ("amount", "numeric")])
+    curr = schema_df([("user_id", "integer"), ("created_ts", "text"), ("amount", "numeric")])
+
+    det = SchemaChangeDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+
+    assert result.score > 0.0
+    renames = result.details.get("renamed_columns", [])
+    assert len(renames) >= 1
+    rename = renames[0]
+    assert rename["from"] == "created_at"
+    assert rename["to"] == "created_ts"
+
+
+def test_schema_rename_not_in_removed_or_added():
+    """Renamed columns should not appear in added/removed lists."""
+    from dqt.algorithms.schema.schema_checks import SchemaChangeDetector
+
+    ref = schema_df([("id", "integer"), ("amt", "numeric")])
+    curr = schema_df([("id", "integer"), ("amount", "numeric")])
+
+    det = SchemaChangeDetector()
+    state = det.fit(ref)
+    result = det.score(curr, state)
+
+    # "amt" -> "amount" is within Levenshtein 3 but dtype same: should be a rename
+    renames = result.details.get("renamed_columns", [])
+    rename_froms = {r["from"] for r in renames}
+    rename_tos = {r["to"] for r in renames}
+    # either detected as rename OR as add/remove, but not both
+    if renames:
+        assert "amt" not in result.details.get("removed", [])
+        assert "amount" not in result.details.get("added", [])
