@@ -111,3 +111,15 @@ print(result.details)        # {"outlier_fraction": 0.089, "chi2_threshold": ...
 | Normal (multivariate) | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | N/A | N/A | Use isolation_forest_fraction instead |
 | Sparse / high-null | N/A | N/A | Impute nulls before use |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Singular covariance matrix | When features are collinear, standard covariance is singular; `pinv` fallback used automatically | A warning is logged when `pinv` is used; consider PCA whitening to remove collinearity |
+| N < p (fewer samples than features) | Covariance estimate is rank-deficient; MCD is less reliable | Use LOF or ECOD for high-dimensional data with small N |
+| Non-Gaussian features | Mahalanobis p-values assume chi-square distribution of distances; skewed features inflate FPR | Transform skewed features (log, box-cox) before use |
+
+## Recommended use
+
+Best for: correlated numeric features, moderate N>>p. The p_threshold parameter maps directly to chi-square critical value (e.g. p_threshold=0.001 means chi-square critical at 0.1%).

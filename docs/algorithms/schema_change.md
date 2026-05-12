@@ -79,3 +79,11 @@ check = Check(
 | Stable schema | (default) | (default) | STAT_SCALES defaults |
 | Additive-only evolution | additions=warn | removals=fail | Configure mode per table |
 | Frequent schema changes | N/A | N/A | Consider skipping or using custom policy |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Column renames fire as remove+add | Two events instead of one rename event | Task J.14 (schema rename detection) addresses this with fuzzy matching |
+| Type changes with implicit casting | Some warehouses silently cast INT to BIGINT; schema_change fires on type string mismatch | Normalise type strings before comparison (e.g. `int64` = `int`) |
+| New optional columns | Adding a nullable column is not always a quality failure | Use `allow_new_columns=True` parameter if your team frequently adds columns |

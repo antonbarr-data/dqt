@@ -86,3 +86,11 @@ check = Check(
 | Streaming table | 300 | 900 | Seconds; SLA-driven |
 | Daily batch table | 90000 | 172800 | ~25h warn, 48h fail |
 | Irregular / on-demand | N/A | N/A | Use manual SLA or skip this check |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Timezone confusion | Warehouse clock vs local clock mismatch causes false freshness violations | Always use UTC timestamps; check `details["warehouse_clock_utc"]` |
+| Batch ingestion windows | Data is refreshed every 6h; freshness fires between batches | Set `max_seconds_behind` to batch interval * 1.5 for tolerance |
+| No max_updated_at column | Some tables have no update timestamp; freshness is approximate | Pair with a row-count check to detect ingestion failure |

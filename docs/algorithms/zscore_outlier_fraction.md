@@ -104,3 +104,30 @@ print(result.score)           # raw score
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | N/A | N/A | Use mad_outlier_fraction instead |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Heavy-tailed data (revenue, latency) | Z-score inflated by extreme values in mean/std; FPR near 100% at the default threshold | Use `mad_outlier_fraction` or `double_mad_outlier_fraction` instead |
+| Non-stationary reference (trending data) | Z-score measures deviation from a shifting baseline; FPR doubles per unit of trend slope | Detrend before scoring, or use `stl_residual_zscore` |
+| Small reference (N < 30) | Mean/std estimates noisy; scores unstable | Collect more reference data |
+| All-identical reference | std=0 causes ZeroDivision; masked to std=1e-10 | Add uniqueness check upstream |
+
+## FPR at default threshold 3.0
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~0.3% (theoretical: 0.27%) |
+| lognormal(0,1) | ~5-15% -- **do not use raw Z-score on skewed data** |
+| poisson(lambda=10) | ~1% |
+
+**Key message:** Raw Z-score is only appropriate for near-Gaussian data. For everything else use MAD or double-MAD.
+
+## Recommended thresholds by data shape (failure-mode guide)
+
+| Data shape | threshold | Notes |
+|---|---|---|
+| Normal | 3.0 (default) | Theoretical 0.27% FPR |
+| Normal, stricter | 3.5 | ~0.05% FPR |
+| Heavy-tailed | **do not use** | Use `mad_outlier_fraction` with threshold=11.0 |

@@ -103,3 +103,19 @@ print(result.score)           # 1 - p-value
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | N/A | N/A | Use mad_outlier_fraction instead |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Non-normal data | Grubbs assumes normality; FPR > 10% on lognormal | Use `mad_outlier_fraction` for non-normal data |
+| Masking effect | Multiple outliers suppress each other's Z-scores; GESD is the fix | Use `generalized_esd` when >1 outlier is expected |
+| N < 7 | Test has no power; always returns no outlier | Collect more data |
+| Multiple simultaneous outliers | Only the most extreme is tested per call | Use `generalized_esd` with `k` set to expected max outlier count |
+
+## FPR at default alpha=0.05
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~5% per-test (controlled by alpha) |
+| lognormal(0,1) | ~20-40% |

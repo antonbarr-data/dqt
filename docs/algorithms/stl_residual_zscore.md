@@ -109,3 +109,20 @@ print(result.details["anomaly_count"])  # 1
 | Normal residuals | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed residuals | 4.0 | 5.0 | Raise threshold to reduce false positives |
 | No seasonality | N/A | N/A | Use cusum or page_hinkley instead |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Wrong seasonality period | If `period` doesn't match data frequency (weekly data with period=30), residuals carry seasonal signal | Use `period=7` for daily data, `period=52` for weekly; auto-detection via STL auto-period (J.1) |
+| Non-stationary trend | STL handles trend via LOESS; very fast trend changes may appear in residuals | Check `details["trend_magnitude"]`; CUSUM may better handle abrupt level shifts |
+| Too short series | `min_len = 2*period + 1` enforced; raises ValueError below | Ensure at least `2*period+1` observations |
+| Scores > 1.0 | STL residual z-score is unbounded; score is clipped | Check `details["max_z"]` for raw score |
+
+## FPR at default threshold (z=3.0)
+
+| Data shape | FPR |
+|---|---|
+| Gaussian residuals (ideal) | ~0.3% |
+| Lognormal residuals (revenue) | ~1-5% |
+| Highly seasonal with period mismatch | Up to 50% -- **always verify period** |

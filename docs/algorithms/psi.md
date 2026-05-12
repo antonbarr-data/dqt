@@ -99,3 +99,17 @@ print(result.score)          # ~0.23
 | Normal | 0.10 | 0.20 | Industry standard |
 | Heavy-tailed (revenue, latency) | 0.20 | 0.40 | Heavy tails inflate PSI; widen bands |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Zero-count bins | PSI is undefined (log(0)) when a bin is empty in either distribution | Smoothing applied automatically (eps=1e-4); very low expected counts still inflate PSI |
+| Sparse data (N < 100) | Bin estimates noisy; PSI unstable | Use at least 100 rows per distribution |
+| Numeric binning sensitivity | Default 10 equal-width bins may be wrong for bimodal data | Set `n_bins` manually; for ordinal data use `chi_square_drift` |
+| PSI thresholds (0.1/0.2) are dataset-agnostic | These were developed for credit scoring; may not suit all domains | Calibrate with `calibrate_from_history()` |
+
+## PSI thresholds
+
+Standard credit-scoring thresholds: < 0.1 negligible, 0.1-0.2 moderate drift, > 0.2 significant drift.
+These are conservative defaults -- use `calibrate_from_history()` to tune per column.

@@ -113,3 +113,11 @@ print(result.details["n_anomalies"])  # 4
 | Stable seasonal | (default) | (default) | STAT_SCALES defaults |
 | Non-seasonal | N/A | N/A | Use cusum or page_hinkley instead |
 | Highly irregular | N/A | N/A | Use bocpd for structural breaks |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Requires seasonal data | Additive/multiplicative seasonality assumed; fails on aperiodic data | Use `stl_residual_zscore` for irregular patterns or switch to `prophet_anomaly` |
+| Parameter initialisation | alpha/beta/gamma are smoothing parameters; poor initialisation causes slow adaptation | Use `fit()` to estimate via MLE before scoring |
+| Level shifts | After a step change, Holt-Winters takes many periods to adapt; false alarms during adaptation | Use CUSUM or BOCPD for abrupt level-shift detection |

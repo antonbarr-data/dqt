@@ -112,3 +112,12 @@ print(result.plain_english)  # "5 of 30 values outside Prophet 95% uncertainty i
 | Stable seasonal | (default) | (default) | STAT_SCALES defaults |
 | Non-seasonal | N/A | N/A | Use stl_residual_zscore or cusum |
 | High-frequency (sub-hourly) | N/A | N/A | Too slow; use cusum or page_hinkley |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Missing days in time series | Prophet expects a complete daily series; gaps create false anomalies | Reindex to full date range and fill missing values before scoring (J.3 fix) |
+| Requires `dqt[forecast]` | ImportError if prophet not installed | Install `dqt[forecast]` |
+| Slow fit | Prophet uses Stan/MCMC; fit takes 5-30s per column | Cache fitted model; refit weekly not daily |
+| Wide confidence bands on short series | < 30 data points gives bands too wide to detect moderate anomalies | Collect at least 60 days of history before enabling |

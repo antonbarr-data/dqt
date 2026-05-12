@@ -102,3 +102,28 @@ print(result.score)           # raw score
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | 3.0 | 4.5 | Wider k reduces false positives |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Symmetric IQR on asymmetric data | Lower fence fires constantly on revenue/latency right tail | Use `adjusted_boxplot_fraction` (medcouple-adjusted) |
+| Sparse data (N < 30) | Quartile estimates noisy; fences unstable | Increase sample size |
+| Constant value | IQR=0; all deviations flagged | Handle constant columns upstream with `uniqueness` check |
+| Very short-tailed distributions (uniform) | IQR covers too little; normal values flagged as outliers | Increase `multiplier` (default 1.5) to 3.0 |
+
+## FPR at default multiplier 1.5
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~0.7% |
+| lognormal(0,1) | ~5-20% (right skew pushes points past upper fence) |
+| uniform(0,1) | ~0% (fences always contain full range) |
+
+## Recommended thresholds by data shape (failure-mode guide)
+
+| Data shape | multiplier | Notes |
+|---|---|---|
+| Near-Gaussian | 1.5 (default) | Tukey (1977) recommendation |
+| Heavy-tailed | 3.0 | Reduces false positive rate |
+| Revenue/latency | **use adjusted_boxplot** | Medcouple correction handles skew |

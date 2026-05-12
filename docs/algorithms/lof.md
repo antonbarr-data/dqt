@@ -109,3 +109,12 @@ print(result.details["outlier_fraction"])  # fraction flagged
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | LOF is distribution-agnostic |
 | Sparse / high-null | N/A | N/A | Impute nulls before use |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| k selection | Default k=20 may be too small for sparse data or too large for dense data | Use auto-k (J.9): k = max(5, ceil(sqrt(n))) when n_neighbors=None |
+| LOF is transductive | LOF scores for new points via novelty=True require sklearn >= 0.20 | Ensure sklearn version constraint |
+| No global threshold | LOF score > 1.0 means anomalous; the boundary is relative | Use `calibrate_from_history()` to set a percentile-based threshold |
+| Slow on high dimensions | LOF is O(n^2) in naive form; use approximate NN for N > 10k | Consider HBOS or ECOD for large N |

@@ -75,3 +75,10 @@ check = Check(
 | Primary key column | 1.0 | 1.0 | Exact uniqueness required |
 | Near-unique (natural key) | 0.99 | 0.95 | Small tolerance for duplicates |
 | Non-unique (FK column) | N/A | N/A | Not applicable; use cardinality_in_range |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Natural duplicates | Some columns (category, status) legitimately have few unique values | Set `min_unique_fraction` based on expected cardinality |
+| PK uniqueness vs value uniqueness | Primary key should be 100% unique; measure columns may have duplicates | Use separate checks for PK and measure columns |

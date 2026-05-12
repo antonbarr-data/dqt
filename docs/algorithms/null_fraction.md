@@ -75,3 +75,10 @@ check = Check(
 | Critical ID / required field | 0.001 | 0.01 | Near-zero tolerance |
 | Optional attributes | 0.05 | 0.20 | Structural nulls expected |
 | Default | 0.01 | 0.05 | STAT_SCALES default |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Threshold too tight for sparse columns | A column that's naturally 30% null will always fail if threshold=0.05 | Set threshold to `baseline_null_fraction * 1.5` via `calibrate_from_history()` |
+| JOIN-induced nulls | Null fraction spikes after a failed LEFT JOIN -- this is a lineage signal, not a data quality signal | Check lineage upstream; pair with schema-change check |

@@ -113,3 +113,12 @@ print(result.details["backend"])  # "stumpy" if installed, else "numpy"
 | Periodic with clear motifs | (default) | (default) | STAT_SCALES defaults |
 | Non-periodic | N/A | N/A | STL + cusum is more appropriate |
 | Very long series (> 1M) | N/A | N/A | Use streaming CUSUM or ADWIN |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Window size sensitivity | `m` must be chosen to match the anomaly length; wrong `m` causes misses | Set `m` to expected anomaly duration in samples |
+| Requires at least 2m+1 samples | Very short series fail | Ensure series length > 2*m+1 |
+| Requires `dqt[forecast]` (stumpy) | ImportError if stumpy not installed | Install `dqt[forecast]` |
+| Computational cost | O(n*m) via STUMPY's GPU or optimised STUMP | STUMPY is fast but stumpy must be installed |

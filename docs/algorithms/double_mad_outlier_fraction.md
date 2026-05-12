@@ -118,3 +118,26 @@ print(result.score)           # raw score
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | Asymmetric MAD handles this |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Symmetric data | Double-MAD uses separate MADs for left/right halves; symmetric distributions work fine | Use `mad_outlier_fraction` for simplicity on symmetric data |
+| Very small reference (N < 50) | Separate half-MADs are noisy below 25 points each | Increase baseline window |
+| Unimodal asymmetric distributions | Double-MAD excels here | Best choice for revenue, latency columns |
+
+## FPR at default threshold 11.0 (per side)
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~0.0% |
+| lognormal(0,1) | ~0.05% -- better than MAD for right-skewed data |
+| Pareto(alpha=2) | ~0.1% |
+
+## Recommended thresholds by data shape (failure-mode guide)
+
+| Data shape | threshold | Notes |
+|---|---|---|
+| Revenue/order amounts (lognormal) | 11.0 (default) | Best choice for right-skewed data |
+| Near-Gaussian | 3.5 | Same as `mad_outlier_fraction` |

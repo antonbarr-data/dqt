@@ -107,3 +107,11 @@ print(result.details)        # {"cusum_hi": 0.0, "cusum_lo": -67.12, "ref_mean":
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | 6.0 | 10.0 | Raise threshold (h) to reduce false alarms |
 | Seasonal series | N/A | N/A | Deseasonalise first (use STL + CUSUM) |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Requires target mean estimate | CUSUM is sensitive to reference mean estimation; noisy reference inflates FPR | Use a long stable reference window (>100 observations) |
+| Persistent drift not reset | CUSUM accumulates; after detecting drift, the cumulative sum does not auto-reset | Call `reset()` explicitly after acknowledging an incident, or use ADWIN for auto-reset |
+| Threshold `k` sensitivity | `k` controls the allowance per step; wrong `k` causes false alarms or missed changes | Calibrate `k = 0.5 * expected_shift_magnitude / sigma` |

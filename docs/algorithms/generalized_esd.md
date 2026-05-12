@@ -106,3 +106,18 @@ print(result.score)           # raw score (outlier fraction)
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | N/A | N/A | Use mad_outlier_fraction instead |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Non-normal data | GESD assumes normality like Grubbs | Use `mad_outlier_fraction` for non-normal data |
+| k too large | Setting k close to N/2 means the test iterates until it finds k outliers | Set k to the expected maximum number of outliers (typically 1-5% of N) |
+| N < 25 | Critical values are unreliable for small samples | Increase sample size |
+
+## FPR at default alpha=0.05
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~5% (controlled by alpha, applied to each of k iterations) |
+| lognormal(0,1) | ~15-30% |

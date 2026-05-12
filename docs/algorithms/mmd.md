@@ -117,3 +117,12 @@ print(result_stable.score)         # near 0.0
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | 0.15 | 0.30 | Adjust kernel bandwidth too |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| O(n^2) kernel computation | Slow on large samples; capped at 500 subsampled rows | Increase `_MAX_SUBSAMPLE` if memory allows; or use `ks_pvalue` for speed |
+| All-zero features | RBF kernel evaluates to 1.0 for all pairs; MMD=0 always | Remove zero-variance columns before passing to MMD |
+| Gamma=0 (all-identical reference) | `_median_gamma` returns 1.0 as fallback; results may not reflect true drift | Apply uniqueness/variance check upstream |
+| Score interpretation | MMD clipped to [0,1] via empirical max; the clipping is heuristic | Use `ks_pvalue` p-value for statistical significance |

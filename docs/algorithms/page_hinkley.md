@@ -108,3 +108,11 @@ print(result.details["ref_mean"])       # ~85.0
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | 15.0 | 25.0 | Raise lambda to reduce false alarms |
 | Seasonal series | N/A | N/A | Deseasonalise first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Only detects mean shifts | Page-Hinkley is a mean-shift detector; variance changes are not detected | Pair with a variance test (IQR or MAD) for full coverage |
+| One-directional by default | Standard PH only detects upward shifts | Use bidirectional variant or two complementary detectors |
+| delta sensitivity | `delta` (minimum detectable effect) must be tuned to the noise level | Set `delta` to 0.5x the expected shift magnitude |

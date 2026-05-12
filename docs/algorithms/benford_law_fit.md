@@ -109,5 +109,14 @@ print(result_bad.score)           # ~1.0
 | Data shape | warn | fail | Notes |
 |---|---|---|---|
 | Natural numeric (orders of magnitude) | (default) | (default) | STAT_SCALES defaults |
-| Constrained range (1–100) | N/A | N/A | Benford's Law does not apply |
+| Constrained range (1-100) | N/A | N/A | Benford's Law does not apply |
 | Sequential IDs | N/A | N/A | Benford's Law does not apply |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Only valid for naturally-occurring data spanning multiple orders of magnitude | Financial transactions, population counts, physical constants follow Benford's Law; synthetic or bounded data do not | Verify column spans at least 2 orders of magnitude before enabling |
+| Fabricated/rounded data detected as anomalous | Intentional data (prices like $9.99) violates Benford's first digit distribution | This is the intended use case for fraud detection |
+| Small N | Chi-square test of Benford's fit requires >200 rows for power | Aggregate by time window to accumulate rows |
+| Category: revenue, counts, geographic | Best for: invoice amounts, population figures, scientific measurements | Avoid: age, height, or any data that is naturally bounded |

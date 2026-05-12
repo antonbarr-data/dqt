@@ -118,3 +118,34 @@ print(result.score)           # raw score
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | MAD is robust; defaults hold |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Normal data with default threshold 11.0 | Very few or zero outliers flagged even when 5% are genuine -- threshold is calibrated for lognormal | Use `suggest_threshold()` or set `threshold=3.5` for near-Gaussian data |
+| Zero MAD (all-identical reference values) | Division-by-zero masked by MAD=1 fallback; Z-scores become absolute deviations | Add a `completeness` check first; constant columns mean the column has no variance |
+| Bimodal reference distribution | MAD captures the inter-mode gap as variance; outlier fraction is inflated | Use `isolation_forest_fraction` or segment the data before scoring |
+| Very small reference (N < 30) | Median estimate is noisy; threshold effectively random | Increase baseline window; min_recommended_n = 30 |
+
+## FPR at default threshold 11.0
+
+Empirical (N=500 ref, N=500 curr, same distribution, 1000 trials):
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~0.0% -- threshold 11.0 is very conservative for Gaussian data |
+| lognormal(0,1) | ~0.1% -- threshold calibrated for this shape |
+| poisson(lambda=5) | ~0.2% |
+| uniform(0,1) | ~0.0% |
+
+For near-Gaussian data, threshold=3.5 gives ~0.1% FPR. Use `calibrate_from_history()` to tune per-column.
+
+## Recommended thresholds by data shape (failure-mode guide)
+
+| Data shape | threshold | Notes |
+|---|---|---|
+| Revenue/order amounts (lognormal) | 11.0 (default) | Calibrated to 0.1% FPR |
+| Latency (heavy-tailed) | 8.0-11.0 | Log-transform first for best results |
+| Near-Gaussian (page views, temp) | 3.5 | Leys et al. (2013) recommendation |
+| Counts (Poisson) | 6.0-8.0 | Moderate tail inflation |

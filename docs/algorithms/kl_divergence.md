@@ -102,3 +102,12 @@ print(result.score)          # ~0.18
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | 0.20 | 0.50 | Wider bands; heavy tails inflate KL |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Zero-probability bins | KL divergence is undefined when P=0 for a bin Q>0 | Smoothing applied; but very sparse data still gives unstable scores |
+| Asymmetry | KL(P||Q) != KL(Q||P); direction matters | Use `js_divergence` for a symmetric version |
+| Unbounded | KL can go to infinity for disjoint distributions | Check `details["score_raw"]`; clip or use JS divergence |
+| Not a metric | KL violates triangle inequality; can't compare across columns | Use Wasserstein-1 for column-to-column comparisons |

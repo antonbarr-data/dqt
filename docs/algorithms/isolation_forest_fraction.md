@@ -113,3 +113,12 @@ print(result.score)          # ~0.08
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | IF is distribution-agnostic |
 | Sparse / high-null | N/A | N/A | Impute or drop null columns first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Single-column input | Isolation Forest is best on >=2 features; on 1 feature it degrades to a tree-based density estimator | Use `mad_outlier_fraction` for single-column outlier detection |
+| High contamination in reference | If the reference contains outliers, the baseline threshold shifts upward | Pre-clean the reference with a single-pass MAD filter |
+| Large N slow fit | Tree ensemble fit is O(n*trees*depth) | Subsample reference to 10k for fitting |
+| Categorical features | Requires numeric input; categorical columns must be encoded | One-hot encode categoricals before passing |

@@ -111,3 +111,11 @@ print(result.details)        # {"outlier_fraction": 0.073, "n_rows": 540}
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | N/A | N/A | Use isolation_forest_fraction instead |
 | Sparse / high-null | N/A | N/A | Impute nulls before use |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| nu parameter sensitivity | `nu` is the expected fraction of outliers; wrong `nu` causes systematic under/over-flagging | Set `nu` to expected contamination rate (0.01-0.10) |
+| Slow fit on large N | SVM fit is O(n^2) to O(n^3) | Subsample reference to <5000 rows for fitting |
+| Kernel selection | RBF kernel is default; wrong kernel degrades performance on structured data | Try `linear` for near-linear decision boundaries |

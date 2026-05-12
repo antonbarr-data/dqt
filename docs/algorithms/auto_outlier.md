@@ -118,3 +118,15 @@ print(result.details["distribution_type"])         # classified distribution typ
 | Normal | (default) | (default) | Delegates to zscore_outlier_fraction |
 | Heavy-tailed (revenue, latency) | (default) | (default) | Delegates to double_mad_outlier_fraction |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+The auto-router inspects skewness and kurtosis to pick among MAD, double-MAD, and adjusted_boxplot.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Borderline skewness | Router picks MAD for slightly-skewed data where double-MAD would be better | Check `details["chosen_detector"]` and override if needed |
+| Multimodal data | All three constituent detectors can fail on multimodal distributions | Use `isolation_forest_fraction` for multivariate/multimodal data |
+| Router changes between versions | Chosen detector may differ across algorithm version bumps; causes apparent threshold drift | Pin `detector_slug` explicitly in checks.yaml if reproducibility is required |
+
+The chosen detector is always surfaced in `details["chosen_detector"]` so the routing decision is auditable.

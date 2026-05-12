@@ -82,3 +82,10 @@ check = Check(
 | Strict FK relationship | 1.0 | 1.0 | 100% integrity required |
 | Soft relationship (nullable FK) | 0.99 | 0.95 | Small tolerance for nulls/orphans |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Soft deletes vs hard deletes | FK references to soft-deleted rows are not integrity violations | Filter soft-deleted rows before computing integrity rate |
+| Cross-schema references | Some warehouses don't support cross-schema FK queries via info_schema | Specify the reference table fully-qualified in the check definition |

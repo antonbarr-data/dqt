@@ -79,3 +79,10 @@ check = Check(
 | Enum / status column | (default) | (default) | STAT_SCALES defaults |
 | Evolving allowed set | N/A | N/A | Keep set updated or use regex_match |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Allowed set expansion | New valid values added to a categorical column fire as violations until the check is updated | Trigger a baseline refresh when the business adds new categories |
+| Case sensitivity | "Active" vs "active" are treated as different values | Normalise case upstream or set `case_sensitive=False` |

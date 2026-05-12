@@ -105,3 +105,11 @@ print(det.score(curr_stable, state).verdict)  # pass
 | Low-cardinality categorical | 0.05 | 0.01 | Standard α thresholds |
 | High-cardinality categorical | 0.10 | 0.05 | Merge rare cats; wider α |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Expected cell count < 5 | Chi-square approximation breaks down; p-value unreliable | Merge rare categories; use `cramers_v` which handles sparse contingency tables more gracefully |
+| Continuous data | Categories must be discrete; binning continuous data introduces bin-boundary sensitivity | Use `ks_pvalue` or `wasserstein_1` for continuous columns |
+| High-cardinality categoricals (>50 categories) | Degrees of freedom explode; very small p-values even for minor shifts | Limit to top-K categories + "other" bucket |

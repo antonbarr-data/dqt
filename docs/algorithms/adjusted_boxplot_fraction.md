@@ -102,3 +102,19 @@ print(result.score)           # raw score
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | Medcouple correction handles this |
 | Extremely skewed (|MC| > 0.6) | N/A | N/A | Use double_mad_outlier_fraction instead |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Multimodal reference | Medcouple estimates median of a mixed distribution; fences may not span all modes | Segment data before scoring |
+| N < 50 | Medcouple estimate noisy -- requires ~50 points for stability | Increase baseline window |
+| Symmetric data | Medcouple=0; fences reduce to standard IQR -- no downside, just unnecessary | Use `iqr_fence` for cleaner semantics |
+
+## FPR at default (medcouple-adjusted fences)
+
+| Data shape | FPR |
+|---|---|
+| normal(0,1) | ~1% |
+| lognormal(0,1) | ~0.5% -- key advantage over plain IQR |
+| Pareto(alpha=1.5) | ~1% |

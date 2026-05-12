@@ -76,6 +76,13 @@ check = Check(
 
 | Data shape | warn | fail | Notes |
 |---|---|---|---|
-| Hard constraint (0–100%) | (default) | (default) | Exact bounds |
+| Hard constraint (0-100%) | (default) | (default) | Exact bounds |
 | Soft constraint (warn on approach) | 0.01 | 0.05 | Fraction of values out of range |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Range drift over time | Legitimate data expansion beyond historical range fires as a violation | Use `calibrate_from_history()` to auto-expand range bounds quarterly |
+| Exclusive vs inclusive bounds | Off-by-one on boundary values | Verify `inclusive_lower` and `inclusive_upper` parameters match business rules |

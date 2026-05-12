@@ -74,3 +74,10 @@ check = Check(
 | Required field | 0.001 | 0.01 | Near-zero tolerance |
 | Optional field | 0.05 | 0.20 | Structural incompleteness expected |
 | Sparse / high-null | N/A | N/A | Use null_fraction for granular control |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Table truncation | Row count drops to near-zero; completeness fires on total row count | Pair with a row-count check (`null_fraction` on a surrogate PK column) |
+| Partial nulls vs full nulls | Completeness measures non-null fraction; a column may be partially populated by design | Set `min_completeness` to reflect expected fill rate per column |

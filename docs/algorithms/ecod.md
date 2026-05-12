@@ -108,3 +108,11 @@ print(result.details)        # {"outlier_fraction": 0.056, "score_threshold": ..
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | ECOD is distribution-agnostic |
 | Sparse / high-null | N/A | N/A | Impute nulls before use |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Skewed marginal distributions | ECOD uses empirical CDFs which are asymmetric for skewed data | Best for heavy-tailed data; use with log-transforms for revenue/latency columns |
+| Requires N > 50 per feature | Empirical CDF estimates are noisy for small N | Increase baseline window |
+| Default for high-dimensional tabular data | ECOD is dqt's default multivariate detector above 10 features | Override via `detector_slug` in checks.yaml if a different detector is preferred |

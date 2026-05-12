@@ -102,3 +102,11 @@ print(result_stable.score)    # near 0
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | 0.15 | 0.35 | Heavier tails inflate bin sparsity |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Zero-count bins | JS smooths asymmetrically but still sensitive to sparse bins | Use at least 50 rows per distribution |
+| Score always in [0, 1] | Unlike KL, JS is bounded -- this is a feature | Score=1.0 means disjoint distributions |
+| Categorical data | Requires discrete or binned distributions | Works well; use `chi_square_drift` for more statistical power |

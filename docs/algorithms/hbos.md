@@ -108,3 +108,11 @@ print(result.details)        # {"outlier_fraction": 0.005, "score_threshold": ..
 | Normal | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | HBOS adapts via histogram |
 | Sparse / high-null | N/A | N/A | Impute nulls before use |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Assumes feature independence | HBOS histograms each feature independently; correlated features are not captured | Use Mahalanobis or LOF when feature correlations matter |
+| Bin count sensitivity | Default bin count may miss narrow anomaly peaks | Set `n_bins` to sqrt(n) as a rule of thumb |
+| Fast but approximate | HBOS is a speed/accuracy trade-off | Use ECOD or LOF for higher accuracy at more compute cost |
