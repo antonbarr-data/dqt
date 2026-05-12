@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.8.0](v0.8.0.md) | 2026-05-12 | `ProofBundle`: cryptographic commitment binding RunResult to sample data hash |
 | [v0.7.3](v0.7.3.md) | 2026-05-12 | `dagster-dqt` package: DqtResource, run_checks_for(), DqtAssetCheckFailed |
 | [v0.7.2](v0.7.2.md) | 2026-05-12 | `airflow-providers-dqt` package: DqtCheckOperator, DqtSuiteOperator |
 | [v0.7.1](v0.7.1.md) | 2026-05-12 | `dbt-dqt` package: run_checks_for_dbt_run() filters by dbt success models |
