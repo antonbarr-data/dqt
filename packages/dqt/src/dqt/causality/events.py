@@ -1,12 +1,24 @@
 # packages/dqt/src/dqt/causality/events.py
 # Protocol + concrete adapters for external event sources used to condition causal discovery.
 # Ref: Pearl (2009) Causality Ch.3 — conditioning on observed interventions (do-calculus)
+#
+# NOTE: AirflowEventSource, DagsterEventSource, and DbtCloudEventSource are deprecated as of
+# v0.4.7. The causal math (granger_pairwise, pcmci) does not consume event sources — the
+# parameter was removed in v0.4.3. These classes will be removed in v0.6.0.
+# InMemoryEventSource and NullEventSource remain supported (used in tests and notebooks).
 from __future__ import annotations
 
 import datetime
 import json
+import warnings
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
+
+_DEPRECATION_MSG = (
+    "{cls} is deprecated as of dqt v0.4.7 and will be removed in v0.6.0. "
+    "The causal discovery math does not condition on event sources. "
+    "Use InMemoryEventSource for testing or remove the event source from your code."
+)
 
 
 @dataclass
@@ -78,7 +90,11 @@ def _iso(dt: datetime.datetime) -> str:
 # ---------------------------------------------------------------------------
 
 class AirflowEventSource:
-    """Reads DAG run completions from Airflow REST API v2."""
+    """Reads DAG run completions from Airflow REST API v2.
+
+    .. deprecated:: 0.4.7
+        Use InMemoryEventSource for testing. Will be removed in v0.6.0.
+    """
 
     def __init__(
         self,
@@ -87,6 +103,7 @@ class AirflowEventSource:
         username: str | None = None,
         password: str | None = None,
     ) -> None:
+        warnings.warn(_DEPRECATION_MSG.format(cls="AirflowEventSource"), DeprecationWarning, stacklevel=2)
         self._base_url = base_url.rstrip("/")
         self._dag_ids = dag_ids  # None = fetch all DAGs
         self._username = username
@@ -165,7 +182,11 @@ query PipelineRuns($after: String, $before: String, $names: [String!]) {
 
 
 class DagsterEventSource:
-    """Reads pipeline run completions from Dagster GraphQL API."""
+    """Reads pipeline run completions from Dagster GraphQL API.
+
+    .. deprecated:: 0.4.7
+        Use InMemoryEventSource for testing. Will be removed in v0.6.0.
+    """
 
     def __init__(
         self,
@@ -173,6 +194,7 @@ class DagsterEventSource:
         pipeline_names: list[str] | None = None,
         api_key: str | None = None,
     ) -> None:
+        warnings.warn(_DEPRECATION_MSG.format(cls="DagsterEventSource"), DeprecationWarning, stacklevel=2)
         self._url = url
         self._pipeline_names = pipeline_names
         self._api_key = api_key
@@ -219,7 +241,11 @@ class DagsterEventSource:
 # ---------------------------------------------------------------------------
 
 class DbtCloudEventSource:
-    """Reads dbt Cloud job runs via dbt Cloud API v2."""
+    """Reads dbt Cloud job runs via dbt Cloud API v2.
+
+    .. deprecated:: 0.4.7
+        Use InMemoryEventSource for testing. Will be removed in v0.6.0.
+    """
 
     _BASE = "https://cloud.getdbt.com"
 
@@ -229,6 +255,7 @@ class DbtCloudEventSource:
         api_token: str,
         job_ids: list[int] | None = None,
     ) -> None:
+        warnings.warn(_DEPRECATION_MSG.format(cls="DbtCloudEventSource"), DeprecationWarning, stacklevel=2)
         self._account_id = account_id
         self._api_token = api_token
         self._job_ids = job_ids

@@ -4,11 +4,13 @@ import typer
 
 from dqt_cli.commands.dashboard import dashboard_command
 from dqt_cli.commands.demo import reset_command, seed_command
+from dqt_cli.commands.list_detectors import list_detectors_command
 from dqt_cli.commands.run import run_command
 
 app = typer.Typer(name="dqt", help="dqt data quality CLI", no_args_is_help=True)
 app.command("run")(run_command)
 app.command("dashboard")(dashboard_command)
+app.command("list-detectors")(list_detectors_command)
 
 demo_app = typer.Typer(help="Demo data commands")
 app.add_typer(demo_app, name="demo")

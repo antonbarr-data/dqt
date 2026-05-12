@@ -5,7 +5,7 @@
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
-[![Release notes](https://img.shields.io/badge/release%20notes-v0.4.6-blue?style=flat-square)](docs/releases/v0.4.6.md)
+[![Release notes](https://img.shields.io/badge/release%20notes-v0.4.7-blue?style=flat-square)](docs/releases/v0.4.7.md)
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
 
