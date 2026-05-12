@@ -12,6 +12,7 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from dqt import __version__ as _DQT_VERSION
 from dqt.utils.logging import get_logger
 
 from dqt.store._protocol import CausalEdgeReview
@@ -48,7 +49,7 @@ def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
     async def index(request: Request):
         runs = _get_recent_runs(store)
         return _TEMPLATES.TemplateResponse(
-            request, "index.html", {"runs": runs, "title": "dqt", "active": "checks"}
+            request, "index.html", {"runs": runs, "title": "dqt", "active": "checks", "dqt_version": _DQT_VERSION}
         )
 
     @app.get("/checks/{check_id}", response_class=HTMLResponse)
