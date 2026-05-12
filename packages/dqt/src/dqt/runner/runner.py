@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -11,9 +12,18 @@ from dqt.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from dqt.adapters._protocol import WarehouseAdapter
-    from dqt.algorithms._base import DetectorState
+    from dqt.algorithms._base import CostEstimate, DetectorState
     from dqt.checks.models import Check
     from dqt.store._protocol import ResultsStore, RunResult
+
+
+@dataclass
+class SuiteResult:
+    """Result of Runner.run_suite() across multiple checks."""
+    ran: list[RunResult] = field(default_factory=list)
+    skipped: list[tuple[Check, str]] = field(default_factory=list)  # (check, reason)
+    budget_spent_usd: float = 0.0
+    budget_total_usd: float = 0.0
 
 _log = get_logger(__name__)
 
@@ -232,3 +242,79 @@ class Runner:
         if check.column_name and check.column_name in df.columns:
             return df[[check.column_name]]
         return df
+
+    def run_suite(
+        self,
+        checks: list[Check],
+        adapter: WarehouseAdapter,
+        cost_budget_usd: float = 10.0,
+    ) -> SuiteResult:
+        """Run multiple checks in cost order, stopping when the budget is exhausted.
+
+        Checks are sorted cheapest-first by CostEstimate.warehouse_cost_usd so the most
+        impactful low-cost checks always run. When a check would push the cumulative spend
+        past cost_budget_usd it is recorded as skipped rather than dropped silently.
+
+        Args:
+            checks: list of Check definitions to run
+            adapter: warehouse adapter to fetch data from
+            cost_budget_usd: maximum total warehouse cost allowed across the suite
+        """
+        from dqt.algorithms._registry import registry
+
+        result = SuiteResult(budget_total_usd=cost_budget_usd)
+
+        # Estimate cost and sort cheapest-first
+        table_row_counts: dict[tuple[str, str], int] = {}
+
+        def _row_count(check: Check) -> int:
+            key = (check.schema_name, check.table_name)
+            if key not in table_row_counts:
+                try:
+                    cols = adapter.describe_columns(check.schema_name, check.table_name)
+                    table_row_counts[key] = cols[0].row_count if cols and cols[0].row_count else 100_000
+                except Exception:
+                    table_row_counts[key] = 100_000
+            return table_row_counts[key]
+
+        def _cost(check: Check) -> CostEstimate:
+            try:
+                cls = registry.get(check.detector_slug)
+                det = cls(**(check.params or {}))
+                return det.estimate_cost(
+                    row_count=_row_count(check),
+                    sample_n=check.sample_n,
+                )
+            except Exception:
+                from dqt.algorithms._base import CostEstimate
+                return CostEstimate(rows_scanned=100_000, warehouse_cost_usd=0.0, wall_time_seconds=1.0)
+
+        ranked = sorted(checks, key=lambda c: _cost(c).warehouse_cost_usd)
+
+        for check in ranked:
+            est = _cost(check)
+            if result.budget_spent_usd + est.warehouse_cost_usd > cost_budget_usd:
+                reason = (
+                    f"cost estimate ${est.warehouse_cost_usd:.4f} would exceed "
+                    f"remaining budget ${cost_budget_usd - result.budget_spent_usd:.4f}"
+                )
+                result.skipped.append((check, reason))
+                _log.info(
+                    "run_suite_skipped",
+                    check_id=str(check.id),
+                    slug=check.detector_slug,
+                    reason=reason,
+                )
+                continue
+
+            run_result = self.run(check, adapter)
+            result.ran.append(run_result)
+            result.budget_spent_usd += est.warehouse_cost_usd
+
+        _log.info(
+            "run_suite_complete",
+            ran=len(result.ran),
+            skipped=len(result.skipped),
+            budget_spent_usd=result.budget_spent_usd,
+        )
+        return result

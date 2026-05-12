@@ -2,11 +2,12 @@
 """dqt — open-source data quality, observability, and causality library."""
 from __future__ import annotations
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 from dqt.algorithms._base import (
     BaseAggregateDetector,
     BaseDetector,
+    CostEstimate,
     DetectorResult,
     Verdict,
     compute_verdict,
@@ -15,7 +16,7 @@ from dqt.adapters._protocol import AggExpr, ColumnMeta, HealthCheckResult, Wareh
 from dqt.store._protocol import CausalEdgeReview, Incident, ResultsStore, RunResult
 from dqt.store.memory import MemoryStore
 from dqt.checks.models import BaselineConfig, Check, CheckFilter, CheckScope
-from dqt.runner.runner import Runner
+from dqt.runner.runner import Runner, SuiteResult
 
 # Import all detector groups to trigger @registry.register side effects
 import dqt.algorithms.basic           # noqa: F401
@@ -33,6 +34,7 @@ __all__ = [
     "__version__",
     "Verdict",
     "DetectorResult",
+    "CostEstimate",
     "BaseDetector",
     "BaseAggregateDetector",
     "compute_verdict",
@@ -50,4 +52,5 @@ __all__ = [
     "CheckFilter",
     "BaselineConfig",
     "Runner",
+    "SuiteResult",
 ]

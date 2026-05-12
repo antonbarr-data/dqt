@@ -31,6 +31,14 @@ class DetectorResult:
 DetectorState = Any
 
 
+@dataclass
+class CostEstimate:
+    """Resource estimate for one detector run against one table."""
+    rows_scanned: int
+    warehouse_cost_usd: float  # 0.0 for local/DuckDB execution; non-zero for cloud warehouses
+    wall_time_seconds: float   # rough wall-clock estimate
+
+
 def compute_verdict(
     score: float,
     slug: str,
@@ -84,9 +92,30 @@ class BaseDetector:
         from dqt.algorithms._calibration import suggest_threshold as _suggest
         return _suggest(self, reference_df, target_fpr=target_fpr, n_bootstrap=n_bootstrap)
 
+    def estimate_cost(self, row_count: int, sample_n: int = 100_000) -> CostEstimate:
+        """Return a resource estimate for running this detector on a table.
+
+        Default implementation assumes local DuckDB execution (no warehouse cost).
+        Detectors that push work to the warehouse should override this method.
+
+        Args:
+            row_count: total rows in the target table (from adapter.describe_columns or info_schema)
+            sample_n: configured sample size for this check
+        """
+        rows = min(row_count, sample_n)
+        return CostEstimate(
+            rows_scanned=rows,
+            warehouse_cost_usd=0.0,
+            wall_time_seconds=rows * 2e-5,  # ~50k rows/sec for typical stat computation
+        )
+
 
 class BaseAggregateDetector(BaseDetector):
     kind: ClassVar[str] = "aggregate"
 
     def get_aggregations(self, col: str) -> list[AggExpr]:
         raise NotImplementedError
+
+    def estimate_cost(self, row_count: int, sample_n: int = 100_000) -> CostEstimate:
+        # Aggregate detectors push a single SQL aggregate — near-zero cost.
+        return CostEstimate(rows_scanned=row_count, warehouse_cost_usd=0.0, wall_time_seconds=0.1)

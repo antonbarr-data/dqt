@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.5.2](v0.5.2.md) | 2026-05-12 | Per-detector `estimate_cost()` + `Runner.run_suite(cost_budget_usd=)` + `SuiteResult` |
 | [v0.5.1](v0.5.1.md) | 2026-05-12 | Nightly adapter integration-test CI workflow; ClickHouse/Snowflake/BigQuery/Databricks test files |
 | [v0.5.0](v0.5.0.md) | 2026-05-12 | Hypothesis property-based tests for all 64 detectors; EventSource deprecated adapters removed |
 | [v0.4.9](v0.4.9.md) | 2026-05-12 | Trust-building batch: docs completeness test, generalised smoke tests, benchmark CSV |
