@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from dqt.utils.logging import get_logger
+
+from dqt.store._protocol import CausalEdgeReview
 
 if TYPE_CHECKING:
     from dqt.store._protocol import ResultsStore
@@ -84,13 +87,12 @@ def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
         reviewer: str = Form(default="anonymous"),
         reason: str = Form(default=""),
     ):
-        from dqt.store._protocol import CausalEdgeReview
-        from uuid import uuid4
-        from datetime import datetime
         try:
             eid = UUID(edge_id)
         except ValueError:
-            eid = uuid4()
+            raise HTTPException(status_code=400, detail="Invalid edge_id format")
+        if decision not in ("accept", "reject"):
+            raise HTTPException(status_code=400, detail="decision must be 'accept' or 'reject'")
         store.save_causal_review(CausalEdgeReview(
             edge_id=eid, cause=cause, effect=effect,
             decision=decision, reviewer=reviewer,
