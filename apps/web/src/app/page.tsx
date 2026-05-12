@@ -238,7 +238,8 @@ export default function RootPage() {
           <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Code</a>
           <a href="#start" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Get started</a>
-          <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
+          <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Compare</a>
+          <a href="#about" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>About</a>
         </div>
 
         {/* desktop CTAs */}
@@ -289,7 +290,8 @@ export default function RootPage() {
           <a href="#why" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Code</a>
           <a href="#start" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Get started</a>
-          <a href="#compare" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
+          <a href="#compare" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Compare</a>
+          <a href="#about" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>About</a>
           <div className="flex gap-2 px-6 py-4">
             <a
               href={GITHUB_URL}
@@ -998,7 +1000,7 @@ dqt dashboard --port 8080
       </section>
 
       {/* ── about ── */}
-      <section className="border-t border-line px-8 py-10" style={{ background: "var(--bg-0)" }}>
+      <section id="about" className="border-t border-line px-8 py-10" style={{ background: "var(--bg-0)" }}>
         <div className="mx-auto" style={{ maxWidth: 700 }}>
           <p style={{ fontSize: 13, color: "var(--fg-2)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>About the author</p>
           <p style={{ fontSize: 15, color: "var(--fg-1)", lineHeight: 1.75 }}>
