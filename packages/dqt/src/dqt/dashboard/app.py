@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from dqt.utils.logging import get_logger
@@ -24,6 +25,18 @@ _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
     app = FastAPI(title="dqt dashboard", docs_url=None, redoc_url=None)
+
+    @app.middleware("http")
+    async def _token_auth(request: Request, call_next):
+        token = os.environ.get("DQT_DASHBOARD_TOKEN")
+        if token is None:
+            return await call_next(request)
+        if request.url.path in ("/health",):
+            return await call_next(request)
+        auth = request.headers.get("Authorization", "")
+        if auth == f"Bearer {token}":
+            return await call_next(request)
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):

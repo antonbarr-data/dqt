@@ -221,6 +221,15 @@ Or from the terminal (starts with an empty store):
 dqt dashboard --port 8080
 ```
 
+To protect the dashboard with a token:
+
+```bash
+export DQT_DASHBOARD_TOKEN=my-secret-token
+dqt dashboard --port 8080
+```
+
+Then pass `Authorization: Bearer my-secret-token` in requests, or use a browser extension.
+
 The dashboard has three views:
 
 | View | URL | What it shows |
