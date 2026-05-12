@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -20,11 +22,32 @@ def run_command(
     manifest_path: Path = typer.Argument(..., help="Path to the YAML manifest file"),
     fit: bool = typer.Option(True, "--fit/--no-fit", help="Fit baselines before scoring"),
     output: str = typer.Option("table", "--output", "-o", help="Output format: table | json"),
+    watch: bool = typer.Option(False, "--watch", help="Re-run checks on a schedule"),
+    interval: float = typer.Option(60.0, "--interval", help="Seconds between watch runs"),
+    max_runs: Optional[int] = typer.Option(
+        None, "--max-runs", hidden=True, help="Maximum number of runs (for testing)"
+    ),
 ) -> None:
     """Run data quality checks defined in a YAML manifest."""
+    runs = 0
+    while True:
+        exit_code = _run_once(manifest_path, fit, output)
+        runs += 1
+        if max_runs is not None and runs >= max_runs:
+            raise typer.Exit(code=exit_code)
+        if not watch:
+            raise typer.Exit(code=exit_code)
+        console.print(f"  watching — next run in {interval:.0f}s (Ctrl+C to stop)")
+        time.sleep(interval)
+
+
+def _run_once(
+    manifest_path: Path, fit: bool = True, output: str = "table"
+) -> int:
+    """Execute checks once, return exit code (0 or 2)."""
     if not manifest_path.exists():
         console.print(f"[red]Error:[/red] manifest file not found: {manifest_path}")
-        raise typer.Exit(1)
+        return 1
 
     manifest = load_manifest(str(manifest_path))
     adapter = build_adapter(manifest.source)
@@ -33,11 +56,11 @@ def run_command(
         checks = [Check.model_validate(raw) for raw in manifest.checks]
     except Exception as exc:
         console.print(f"[red]Error loading checks:[/red] {exc}")
-        raise typer.Exit(1)
+        return 1
 
     if not checks:
         console.print("[yellow]No checks defined in manifest.[/yellow]")
-        raise typer.Exit(0)
+        return 0
 
     store = MemoryStore()
     runner = Runner(store)
@@ -78,8 +101,7 @@ def run_command(
     any_fail = any(
         isinstance(r, Exception) or r.verdict.value in ("fail",) for _, r in results
     )
-    if any_fail:
-        raise typer.Exit(2)
+    return 2 if any_fail else 0
 
 
 def _print_table(results: list) -> None:

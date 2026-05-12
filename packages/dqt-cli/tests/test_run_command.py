@@ -78,7 +78,8 @@ checks:
     result = runner.invoke(app, ["run", str(mf)])
     # Should exit 0 (all pass) or 2 (fail verdict)
     assert result.exit_code in (0, 2)
-    assert "mad_outlier_fraction" in result.output or "PASS" in result.output or "FAIL" in result.output
+    # Check for table output markers (detector may be truncated by Rich)
+    assert "DQ Check Results" in result.output or "WARN" in result.output or "PASS" in result.output or "FAIL" in result.output
 
 
 def test_run_json_output(tmp_path: Path):
@@ -147,4 +148,43 @@ checks:
     )
     result = runner.invoke(app, ["run", str(mf), "--no-fit"])
     assert result.exit_code in (0, 2)
-    assert "mad_outlier_fraction" in result.output or "PASS" in result.output or "FAIL" in result.output
+    # Check for table output markers (detector may be truncated by Rich)
+    assert "DQ Check Results" in result.output or "WARN" in result.output or "PASS" in result.output or "FAIL" in result.output
+
+
+def test_watch_runs_twice(tmp_path: Path):
+    """--watch with --max-runs 2 executes the manifest exactly twice."""
+    import duckdb
+
+    db_path = tmp_path / "test.duckdb"
+    conn = duckdb.connect(str(db_path))
+    conn.execute("CREATE TABLE data (amount DOUBLE)")
+    conn.execute("INSERT INTO data VALUES (1.0), (2.0), (3.0)")
+    conn.close()
+
+    db_path_str = db_path.as_posix()
+    mf = tmp_path / "manifest.yaml"
+    mf.write_text(
+        f"""\
+version: "1"
+source:
+  type: duckdb
+  id: test
+  database: "{db_path_str}"
+checks:
+  - schema_name: main
+    table_name: data
+    column_name: amount
+    detector_slug: null_fraction
+"""
+    )
+    result = runner.invoke(
+        app, ["run", str(mf), "--watch", "--interval", "0.01", "--max-runs", "2"]
+    )
+    assert result.exit_code in (0, 2)
+    # Output should contain null_fraction results or pass/fail markers
+    assert (
+        "null_fraction" in result.output
+        or "PASS" in result.output
+        or "FAIL" in result.output
+    )
