@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.8.8](v0.8.8.md) | 2026-05-12 | CLI cosmetic polish: colored output, --quiet, enhanced version, /health with uptime |
 | [v0.8.7](v0.8.7.md) | 2026-05-12 | STL auto-period, Prophet NaN fix, Cramers V bias correction, LOF auto-k, Mahalanobis warning, schema rename |
 | [v0.8.6](v0.8.6.md) | 2026-05-12 | Prometheus /metrics exporter (G.6) |
 | [v0.8.5](v0.8.5.md) | 2026-05-12 | Hypothesis property tests for ProofBundle + LineageGraph; GitHub Actions reusable workflow |

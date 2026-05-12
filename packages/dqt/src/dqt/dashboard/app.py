@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import json
 import os
+import time as _time_module
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
+
+_start_time = _time_module.time()
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -168,7 +171,11 @@ def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "version": _DQT_VERSION,
+            "uptime_seconds": round(_time_module.time() - _start_time, 1),
+        }
 
     return app
 

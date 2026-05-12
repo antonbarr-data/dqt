@@ -24,6 +24,7 @@ def run_command(
     output: str = typer.Option("table", "--output", "-o", help="Output format: table | json"),
     watch: bool = typer.Option(False, "--watch", help="Re-run checks on a schedule"),
     interval: float = typer.Option(60.0, "--interval", help="Seconds between watch runs"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress output except errors"),
     max_runs: Optional[int] = typer.Option(
         None, "--max-runs", hidden=True, help="Maximum number of runs (for testing)"
     ),
@@ -31,18 +32,19 @@ def run_command(
     """Run data quality checks defined in a YAML manifest."""
     runs = 0
     while True:
-        exit_code = _run_once(manifest_path, fit, output)
+        exit_code = _run_once(manifest_path, fit, output, quiet=quiet)
         runs += 1
         if max_runs is not None and runs >= max_runs:
             raise typer.Exit(code=exit_code)
         if not watch:
             raise typer.Exit(code=exit_code)
-        console.print(f"  watching — next run in {interval:.0f}s (Ctrl+C to stop)")
+        if not quiet:
+            console.print(f"  watching — next run in {interval:.0f}s (Ctrl+C to stop)")
         time.sleep(interval)
 
 
 def _run_once(
-    manifest_path: Path, fit: bool = True, output: str = "table"
+    manifest_path: Path, fit: bool = True, output: str = "table", *, quiet: bool = False
 ) -> int:
     """Execute checks once, return exit code (0 or 2)."""
     if not manifest_path.exists():
@@ -59,7 +61,8 @@ def _run_once(
         return 1
 
     if not checks:
-        console.print("[yellow]No checks defined in manifest.[/yellow]")
+        if not quiet:
+            console.print("[yellow]No checks defined in manifest.[/yellow]")
         return 0
 
     store = MemoryStore()
@@ -75,28 +78,29 @@ def _run_once(
         except Exception as exc:
             results.append((check, exc))
 
-    if output == "json":
-        import json
+    if not quiet:
+        if output == "json":
+            import json
 
-        out = []
-        for check, result in results:
-            if isinstance(result, Exception):
-                out.append({"check": check.detector_slug, "error": str(result)})
-            else:
-                out.append(
-                    {
-                        "check": check.detector_slug,
-                        "table": f"{check.schema_name}.{check.table_name}",
-                        "column": check.column_name,
-                        "verdict": result.verdict.value,
-                        "score": result.score,
-                        "plain_english": result.plain_english,
-                    }
-                )
-        # Use plain print to avoid Rich ANSI codes polluting JSON output
-        print(json.dumps(out, indent=2))
-    else:
-        _print_table(results)
+            out = []
+            for check, result in results:
+                if isinstance(result, Exception):
+                    out.append({"check": check.detector_slug, "error": str(result)})
+                else:
+                    out.append(
+                        {
+                            "check": check.detector_slug,
+                            "table": f"{check.schema_name}.{check.table_name}",
+                            "column": check.column_name,
+                            "verdict": result.verdict.value,
+                            "score": result.score,
+                            "plain_english": result.plain_english,
+                        }
+                    )
+            # Use plain print to avoid Rich ANSI codes polluting JSON output
+            print(json.dumps(out, indent=2))
+        else:
+            _print_table(results)
 
     any_fail = any(
         isinstance(r, Exception) or r.verdict.value in ("fail",) for _, r in results

@@ -18,7 +18,7 @@ _CLI = [sys.executable, "-m", "dqt_cli.main"]
 _SUBCOMMANDS = [
     (
         ["run", "--help"],
-        ["--fit", "--output", "--watch", "--interval", "MANIFEST_PATH"],
+        ["--fit", "--output", "--watch", "--interval", "--quiet", "MANIFEST_PATH"],
     ),
     (
         ["dashboard", "--help"],

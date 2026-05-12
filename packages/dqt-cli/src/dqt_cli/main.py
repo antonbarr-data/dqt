@@ -28,10 +28,15 @@ demo_app.command("reset")(reset_command)
 
 @app.command()
 def version() -> None:
-    """Print dqt library version."""
+    """Print dqt version, Python version, and platform."""
+    import platform
+    import sys
+
     import dqt
 
-    typer.echo(dqt.__version__)
+    typer.echo(f"dqt {dqt.__version__}")
+    typer.echo(f"Python {sys.version.split()[0]}")
+    typer.echo(f"Platform {platform.platform()}")
 
 
 if __name__ == "__main__":
