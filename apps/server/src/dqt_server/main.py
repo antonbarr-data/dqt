@@ -10,6 +10,7 @@ from sqlalchemy import select
 from dqt_server.auth.models import ROLE_SYSADMIN, User
 from dqt_server.auth.router import router as auth_router
 from dqt_server.auth.service import SEEDED_SYSADMIN_EMAIL
+from dqt_server.dashboard import router as dashboard_router
 from dqt_server.db.engine import AsyncSessionLocal, Base, engine
 
 log = structlog.get_logger(__name__)
@@ -46,6 +47,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/health", tags=["ops"])
