@@ -1309,6 +1309,7 @@ name = "dqt-cli"
 version = "0.1.0"
 source = { editable = "packages/dqt-cli" }
 dependencies = [
+    { name = "anthropic" },
     { name = "dqtlib" },
     { name = "duckdb" },
     { name = "pyyaml" },
@@ -1318,6 +1319,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.26" },
     { name = "dqtlib", editable = "packages/dqt" },
     { name = "duckdb", specifier = ">=0.10" },
     { name = "pyyaml", specifier = ">=6.0" },
@@ -1428,7 +1430,7 @@ dev = [
 
 [[package]]
 name = "dqtlib"
-version = "0.4.3"
+version = "0.4.8"
 source = { editable = "packages/dqt" }
 dependencies = [
     { name = "diptest" },
@@ -1464,6 +1466,7 @@ clickhouse = [
 dashboard = [
     { name = "fastapi" },
     { name = "jinja2" },
+    { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 databricks = [
@@ -1499,9 +1502,13 @@ reports = [
 snowflake = [
     { name = "snowflake-connector-python" },
 ]
+wiki = [
+    { name = "anthropic" },
+]
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", marker = "extra == 'wiki'", specifier = ">=0.26" },
     { name = "causal-learn", marker = "extra == 'causal'", specifier = ">=0.1" },
     { name = "clickhouse-connect", marker = "extra == 'clickhouse'", specifier = ">=0.7" },
     { name = "databricks-sql-connector", marker = "extra == 'databricks'", specifier = ">=3.1" },
@@ -1526,6 +1533,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyod", specifier = ">=1.1" },
     { name = "pyod", extras = ["deep"], marker = "extra == 'deep'", specifier = ">=1.1" },
+    { name = "python-multipart", marker = "extra == 'dashboard'", specifier = ">=0.0.9" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "river", specifier = ">=0.21" },
     { name = "scikit-learn", specifier = ">=1.5" },
@@ -1540,7 +1548,7 @@ requires-dist = [
     { name = "torch", marker = "extra == 'deep'", specifier = ">=2.3" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'dashboard'", specifier = ">=0.29" },
 ]
-provides-extras = ["postgres", "clickhouse", "bigquery", "snowflake", "databricks", "causal", "forecast", "deep", "explain", "files", "reports", "lineage", "dashboard"]
+provides-extras = ["postgres", "clickhouse", "bigquery", "snowflake", "databricks", "causal", "forecast", "deep", "explain", "files", "reports", "lineage", "wiki", "dashboard"]
 
 [[package]]
 name = "duckdb"

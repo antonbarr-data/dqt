@@ -10,6 +10,7 @@ dependencies = [
     "rich>=13.0",
     "pyyaml>=6.0",
     "duckdb>=0.10",
+    "anthropic>=0.26",
 ]
 
 [project.scripts]

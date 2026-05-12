@@ -120,3 +120,110 @@ def test_list_detectors_help() -> None:
     result = runner.invoke(app, ["list-detectors", "--help"])
     assert result.exit_code == 0
     assert "detector" in result.output.lower()
+
+
+# ── wiki / report commands ────────────────────────────────────────────────────
+
+def test_wiki_help() -> None:
+    """dqt wiki --help exits cleanly."""
+    result = runner.invoke(app, ["wiki", "--help"])
+    assert result.exit_code == 0
+    assert "sync" in result.output.lower()
+
+
+def test_wiki_sync_help() -> None:
+    """dqt wiki sync --help exits cleanly."""
+    result = runner.invoke(app, ["wiki", "sync", "--help"])
+    assert result.exit_code == 0
+    assert "raw" in result.output.lower() or "wiki" in result.output.lower()
+
+
+def test_wiki_status_help() -> None:
+    """dqt wiki status --help exits cleanly."""
+    result = runner.invoke(app, ["wiki", "status", "--help"])
+    assert result.exit_code == 0
+
+
+def test_wiki_sync_missing_raw_dir(tmp_path: pathlib.Path) -> None:
+    """dqt wiki sync exits with code 1 when raw_dir does not exist."""
+    result = runner.invoke(
+        app, ["wiki", "sync", str(tmp_path / "nonexistent"), str(tmp_path / "wiki")]
+    )
+    assert result.exit_code == 1
+
+
+def test_wiki_sync_empty_raw_dir(tmp_path: pathlib.Path) -> None:
+    """dqt wiki sync exits cleanly with code 0 when raw_dir is empty."""
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    result = runner.invoke(app, ["wiki", "sync", str(raw), str(tmp_path / "wiki")])
+    assert result.exit_code == 0
+    assert "nothing" in result.output.lower() or "no documents" in result.output.lower()
+
+
+def test_wiki_status_empty(tmp_path: pathlib.Path) -> None:
+    """dqt wiki status runs without crashing on an empty raw + wiki dir."""
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    result = runner.invoke(app, ["wiki", "status", str(raw), str(wiki)])
+    assert result.exit_code == 0
+
+
+def test_report_help() -> None:
+    """dqt report --help exits cleanly."""
+    result = runner.invoke(app, ["report", "--help"])
+    assert result.exit_code == 0
+    assert "vault" in result.output.lower()
+
+
+def test_report_missing_vault(tmp_path: pathlib.Path) -> None:
+    """dqt report exits with code 1 when vault dir does not exist."""
+    result = runner.invoke(
+        app, ["report", "--vault", str(tmp_path / "nonexistent"), "--out", str(tmp_path / "out.html")]
+    )
+    assert result.exit_code == 1
+
+
+def test_report_empty_wiki(tmp_path: pathlib.Path) -> None:
+    """dqt report exits cleanly with code 0 when wiki has no entries."""
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    result = runner.invoke(
+        app, ["report", "--vault", str(wiki), "--out", str(tmp_path / "out.html")]
+    )
+    assert result.exit_code == 0
+    assert "entries" in result.output.lower() or "no wiki" in result.output.lower()
+
+
+def test_report_generates_html(tmp_path: pathlib.Path) -> None:
+    """dqt report writes a valid HTML file when wiki entries are present."""
+    import json
+    from datetime import datetime, timezone
+
+    wiki = tmp_path / "wiki"
+    (wiki / "semantic").mkdir(parents=True)
+
+    # Write a synthetic wiki entry
+    entry_body = "> A test entry about orders.\n\n## Key Facts\n\n- fact one\n- fact two\n"
+    fm = (
+        "---\n"
+        "id: 'abc123def456'\n"
+        "title: 'Orders Table'\n"
+        "kind: 'semantic'\n"
+        f"generated_at: '{datetime.now(timezone.utc).isoformat()}'\n"
+        "---\n"
+    )
+    (wiki / "semantic" / "abc123def456.md").write_text(
+        fm + "# Orders Table\n\n" + entry_body, encoding="utf-8"
+    )
+
+    out = tmp_path / "report.html"
+    result = runner.invoke(app, ["report", "--vault", str(wiki), "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert out.exists()
+    html = out.read_text(encoding="utf-8")
+    assert "<!DOCTYPE html>" in html
+    assert "Orders Table" in html
+    assert "dqt" in html

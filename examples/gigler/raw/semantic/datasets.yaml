@@ -1,0 +1,49 @@
+# Gigler semantic layer — dataset definitions
+# Source of truth for all data assets on the Gigler platform.
+
+datasets:
+  - id: marketing_campaigns
+    domain: marketing
+    owner: growth-team@gigler.io
+    freshness_sla_hours: 24
+    description: >
+      Weekly-aggregated marketing campaign performance by channel, city, and profession.
+      Tracks spend, clicks, impressions, conversions, and revenue.
+    key_columns: [campaign_id, date, channel, city, spend_usd, conversions, roi]
+    pii_columns: []
+    notes: >
+      ROI is computed as (revenue_usd - spend_usd) / spend_usd.
+      Campaigns with quality_score < 3 are excluded from ROI attribution.
+
+  - id: gigler_transactions
+    domain: platform
+    owner: platform-data@gigler.io
+    freshness_sla_hours: 6
+    description: >
+      Individual gig transaction records on the Gigler marketplace.
+      One row per completed or cancelled transaction.
+    key_columns: [transaction_id, date, gig_category, amount_usd, status, rating]
+    pii_columns: [buyer_country, seller_country, seller_profession]
+    notes: >
+      platform_fee_usd = 0.20 * amount_usd for all transactions post-2024-01-01.
+      is_repeat_buyer is set if the buyer completed >=2 prior transactions.
+
+  - id: gig_prices
+    domain: marketplace
+    owner: marketplace-data@gigler.io
+    freshness_sla_hours: 24
+    description: >
+      Weekly snapshot of gig listing prices per category.
+      avg_price_usd is the mean across all active listings in the week.
+    key_columns: [date, gig_category, avg_price_usd, n_listings]
+    pii_columns: []
+
+  - id: gig_vendor_stats
+    domain: marketplace
+    owner: marketplace-data@gigler.io
+    freshness_sla_hours: 24
+    description: >
+      Weekly vendor activity statistics per gig category.
+      Covers vendor counts, profile views, ratings, and search impressions.
+    key_columns: [date, gig_category, n_active_vendors, total_profile_views, avg_vendor_rating]
+    pii_columns: []
