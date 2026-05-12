@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 _log = get_logger(__name__)
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+_AUTH_BYPASS_PATHS = frozenset(["/health"])
 
 
 def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
@@ -31,12 +32,17 @@ def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
         token = os.environ.get("DQT_DASHBOARD_TOKEN")
         if token is None:
             return await call_next(request)
-        if request.url.path in ("/health",):
+        if request.url.path in _AUTH_BYPASS_PATHS:
             return await call_next(request)
         auth = request.headers.get("Authorization", "")
         if auth == f"Bearer {token}":
             return await call_next(request)
-        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        _log.warning("dashboard_auth_denied", path=request.url.path)
+        return JSONResponse(
+            {"error": "Unauthorized"},
+            status_code=401,
+            headers={"WWW-Authenticate": 'Bearer realm="dqt dashboard"'},
+        )
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
