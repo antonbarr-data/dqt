@@ -18,8 +18,9 @@ _log = get_logger(__name__)
 _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
-def build_app(store: "ResultsStore") -> FastAPI:
+def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
     app = FastAPI(title="dqt dashboard", docs_url=None, redoc_url=None)
+    app.state.lineage_graph = lineage_graph
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
@@ -93,6 +94,32 @@ def build_app(store: "ResultsStore") -> FastAPI:
                 "title": f"dqt — incident — {check_id}",
                 "active": "incidents",
             },
+        )
+
+    @app.get("/lineage", response_class=HTMLResponse)
+    async def lineage_view(request: Request):
+        import json
+        graph = app.state.lineage_graph
+        nodes, edges = [], []
+        if graph is not None:
+            for n in graph.nodes:
+                nodes.append({
+                    "id": str(n.id),
+                    "label": str(n.label),
+                    "table": str(n.dataset),
+                })
+            for e in graph.edges:
+                edges.append({
+                    "source": str(e.source),
+                    "target": str(e.target),
+                })
+        return _TEMPLATES.TemplateResponse(
+            request, "lineage.html", {
+                "nodes_json": json.dumps(nodes),
+                "edges_json": json.dumps(edges),
+                "title": "dqt — lineage",
+                "active": "lineage",
+            }
         )
 
     @app.get("/health")

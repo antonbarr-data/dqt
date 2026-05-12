@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from dqt.store._protocol import ResultsStore
 
 
-def create_app(store: "ResultsStore | None" = None):
+def create_app(store: "ResultsStore | None" = None, lineage_graph=None):
     """Return a FastAPI application serving the local dqt dashboard.
 
     Requires: pip install 'dqtlib[dashboard]'
@@ -28,7 +28,7 @@ def create_app(store: "ResultsStore | None" = None):
     if store is None:
         from dqt.store.memory import MemoryStore
         store = MemoryStore()
-    return build_app(store)
+    return build_app(store, lineage_graph=lineage_graph)
 
 
 __all__ = ["create_app"]
