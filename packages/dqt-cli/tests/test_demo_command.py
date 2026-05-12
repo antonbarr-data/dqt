@@ -23,13 +23,14 @@ def test_demo_seed_creates_files(tmp_path: pathlib.Path, monkeypatch) -> None:
 def test_demo_seed_output_confirms_seeded(tmp_path: pathlib.Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["demo", "seed"])
-    assert "not yet implemented" not in result.output
     assert result.exit_code == 0
+    assert "Seeded demo/" in result.output
 
 
 def test_demo_seed_csv_has_rows(tmp_path: pathlib.Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    runner.invoke(app, ["demo", "seed"])
+    result = runner.invoke(app, ["demo", "seed"])
+    assert result.exit_code == 0, result.output
     import pandas as pd
 
     orders = pd.read_csv(tmp_path / "demo" / "fct_orders.csv")
