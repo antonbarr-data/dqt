@@ -76,3 +76,23 @@ print(result.details["raw_distance"])  # ~30.0 (in original USD units)
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_wasserstein_1.py`
+
+## Calibration by data shape
+
+Score = Wasserstein-1 distance normalized by reference std. Default thresholds: warn=0.20, fail=0.50.
+
+| Data shape | FPR at defaults | Notes |
+|---|---|---|
+| normal(0,1) | ~1–3% | Sampling variance of W1 even on identical distributions |
+| lognormal(0,1) | ~5–10% | Heavy tail inflates reference std estimate; normalized score noisy |
+| poisson(λ=10) | ~2% | Discrete distribution; W1 depends on quantization |
+
+**Sample size sensitivity:** With N < 200, sampling error alone can push normalized W1 above 0.20 on identical distributions. Require N ≥ 500 for the warn threshold to be reliable.
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Small N (< 200) | False alarms on identical distributions | Collect more data; use `ks_pvalue` for small samples |
+| Heavy-tailed ref distribution | std estimate is inflated; normalized score deflated | Use un-normalized W1 threshold or log-transform data |
+| Categorical columns | W1 on integer encodings has no probabilistic interpretation | Use `psi` or `chi2_drift` for categorical drift |

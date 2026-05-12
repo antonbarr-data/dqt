@@ -81,3 +81,20 @@ print(result_stable.score)         # low value, e.g. 0.32
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_ks_pvalue.py`
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Large N (> 10 000) | KS test has ~100% power — detects statistically significant but operationally irrelevant differences | Use `wasserstein_1` normalized score or PSI to measure practical magnitude |
+| Ties (integer / categorical data) | KS statistic is conservative when ties are present; exact p-value inflated | Use `chi2_drift` for categorical; `psi` for binned continuous |
+| Comparing distributions of different sizes | KS is sensitive to the minimum N of the two samples | Subsample to equal size or use PSI |
+| Multiple columns tested without correction | p-value inflation; expect one false positive per 20 columns at α=0.05 | Apply Benjamini-Hochberg (already done in `granger_pairwise`; apply manually for multi-column KS) |
+
+## FPR by significance level
+
+| significance_level | Expected FPR on identical distributions | Notes |
+|---|---|---|
+| 0.05 | ~5% | Default |
+| 0.01 | ~1% | Better for many-column tables |
+| 0.001 | ~0.1% | For very large N where tiny drifts matter |

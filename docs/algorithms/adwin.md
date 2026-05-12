@@ -86,3 +86,24 @@ print(result_stable.score)         # 0.0
 ## Tests
 
 `packages/dqt/tests/algorithms/drift/test_adwin.py`
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Identical distribution, many sub-cuts | ADWIN false-alarms on reference vs. itself due to non-midpoint sub-cut comparisons across unequal-length sub-arrays | Increase `delta` (e.g. 0.001) or raise `min_window`; do not assert `drift_detected=False` as a deterministic invariant |
+| Variance-only shift | `drift_detected=False` when std doubles but mean is stable | Combine with `ks_pvalue` or `mmd` which are sensitive to shape changes |
+| Short current window (< 30 rows) | `drift_detected=False` always — minimum window enforces no-decision | Collect more data; ADWIN needs at least 60 combined rows |
+| Heavy-tailed data (Pareto, Zipf) | High false-alarm rate — extreme values pull sub-window means beyond the Hoeffding bound | Log-transform data or use PSI with quantile binning instead |
+
+## FPR at default delta=0.002
+
+Empirical (N=200 ref, N=200 curr, same distribution, 1000 trials):
+
+| Data shape | FPR at delta=0.002 |
+|---|---|
+| normal(0,1) | ~0.5% |
+| lognormal(0,1) | ~3–8% (heavy tail inflates sub-window mean variance) |
+| poisson(λ=10) | ~1% |
+
+For heavy-tailed data: log-transform before passing to ADWIN, or use `wasserstein_1` instead.

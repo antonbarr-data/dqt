@@ -82,3 +82,24 @@ print(result.details["max_changepoint_prob"])  # 0.93...
 ## Tests
 
 `packages/dqt/tests/algorithms/timeseries/test_bocpd.py`
+
+## Score interpretation
+
+Score = `max P(r≤1)` over the current window, where r is the run length (steps since last changepoint). Used instead of `P(r=0)` alone because `P(r=0)` is bounded at ~0.40 by competition with the grow-from-prior hypothesis under the hazard prior.
+
+| Score | Interpretation |
+|---|---|
+| < 0.20 | Stable |
+| 0.20–0.50 | Weak signal |
+| ≥ 0.50 (warn) | Changepoint likely |
+| ≥ 0.80 (fail) | Strong changepoint |
+
+## Failure modes and known limits
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Short reference window (< 50 rows) | max_run capped too low; long-run hypothesis not established | Use N ≥ 100 for reference |
+| kappa0 too tight | Post-change observation equally unlikely under new and old prior; score stays near hazard | Default kappa0=0.1 is intentionally wide; do not increase it |
+| hazard_lambda too small (< 10) | Prior CP probability > 0.10 per step; BOCPD fires constantly on noise | Default hazard_lambda=50 (2% prior per step) |
+| Variance-only change | Mean-preserving scale shift does not move the score | Combine with `stl_residual_zscore` for variance-sensitive detection |
+| Smooth gradual drift | Score stays low; no run-length hypothesis spikes | Use `adwin` or `page_hinkley` for gradual trends |
