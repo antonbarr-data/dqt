@@ -113,6 +113,28 @@ class Incident:
 
 
 @dataclass
+class ProfileReport:
+    """Column-level distribution profile for a dataset snapshot."""
+    dataset_name: str
+    ran_at: datetime
+    n_rows: int
+    n_numeric_columns: int
+    columns: dict[str, dict[str, Any]]
+    report_id: UUID = field(default_factory=uuid4)
+
+
+@dataclass
+class CausalityReport:
+    """Serialised Granger pairwise causality report for a panel of metrics."""
+    dataset_name: str
+    ran_at: datetime
+    n_pairs_tested: int
+    n_significant: int
+    edges: list[dict[str, Any]]
+    report_id: UUID = field(default_factory=uuid4)
+
+
+@dataclass
 class CausalEdgeReview:
     """Human review decision for a proposed causal edge."""
     edge_id: UUID
@@ -134,3 +156,7 @@ class ResultsStore(Protocol):
     def save_causal_review(self, review: CausalEdgeReview) -> None: ...
     def list_causal_reviews(self, edge_id: UUID) -> list[CausalEdgeReview]: ...
     def causal_edge_precision(self, edge_id: UUID) -> float: ...
+    def save_profile_report(self, report: ProfileReport) -> None: ...
+    def list_profile_reports(self) -> list[ProfileReport]: ...
+    def save_causality_report(self, report: CausalityReport) -> None: ...
+    def list_causality_reports(self) -> list[CausalityReport]: ...

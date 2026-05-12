@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ title }}</title>
+  <style>
+    :root { --bg: #0e0f11; --fg: #e2e4e9; --accent: #9DD0B0; --warn: #D9B566; --fail: #E07B6E; --line: #2a2d33; --mono: 'JetBrains Mono', monospace; }
+    * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+    body { background: var(--bg); color: var(--fg); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+    nav { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--line); padding: 0 24px; height: 40px; }
+    nav .brand { font-family: var(--mono); font-weight: 300; font-size: 14px; color: var(--accent); letter-spacing: -0.04em; margin-right: 24px; }
+    nav a { font-size: 12px; color: #888; text-decoration: none; padding: 0 12px; height: 40px; display: flex; align-items: center; border-bottom: 2px solid transparent; }
+    nav a:hover { color: var(--fg); }
+    nav a.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .page { padding: 24px; }
+    h1 { font-family: var(--mono); font-weight: 300; font-size: 18px; color: var(--accent); margin-bottom: 6px; letter-spacing: -0.04em; }
+    .subtitle { font-size: 12px; color: #888; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
+    tr:hover td { background: #14161a; }
+    .arrow { color: #555; padding: 0 6px; }
+    .strong { color: var(--accent); }
+    .moderate { color: #7db8d4; }
+    .weak { color: var(--warn); }
+    .none { color: #555; }
+    .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border: 1px solid; letter-spacing: 0.05em; }
+    .badge.strong { border-color: var(--accent); }
+    .badge.moderate { border-color: #7db8d4; }
+    .badge.weak { border-color: var(--warn); }
+    .badge.none { border-color: #444; }
+    .diff-tag { font-size: 10px; color: #888; margin-left: 4px; }
+    .conf-tag { font-size: 10px; color: var(--warn); margin-left: 4px; }
+    a { color: var(--accent); text-decoration: none; }
+    .empty { color: #555; padding: 32px 0; text-align: center; }
+    .section { margin-bottom: 32px; }
+    .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 8px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">dqt</span>
+    <a href="/" class="{{ 'active' if active == 'checks' else '' }}">checks</a>
+    <a href="/profile" class="{{ 'active' if active == 'profile' else '' }}">profile</a>
+    <a href="/causality" class="{{ 'active' if active == 'causality' else '' }}">causality</a>
+  </nav>
+  <div class="page">
+    <h1>causality</h1>
+    <div class="subtitle">Granger pairwise causality — BH-FDR corrected. Evidence: <span class="strong">strong</span> p&lt;0.01 · <span class="moderate">moderate</span> p&lt;0.05 · <span class="weak">weak</span> p&lt;0.10</div>
+    {% if reports %}
+    {% set datasets = reports | map(attribute='dataset_name') | unique | list %}
+    {% for ds in datasets %}
+    {% set ds_edges = reports | selectattr('dataset_name', 'equalto', ds) | list %}
+    <div class="section">
+      <div class="section-label">{{ ds }}</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Cause</th>
+            <th></th>
+            <th>Effect</th>
+            <th>Evidence</th>
+            <th>Lag</th>
+            <th>F-stat</th>
+            <th>Adj p-value</th>
+            <th>Raw p-value</th>
+            <th>Confounders?</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in ds_edges %}
+          <tr>
+            <td>{{ e.cause }}</td>
+            <td class="arrow">→</td>
+            <td>{{ e.effect }}</td>
+            <td><span class="badge {{ e.evidence_strength }}">{{ e.evidence_strength }}</span>{% if e.get("differenced") %}<span class="diff-tag">∆</span>{% endif %}</td>
+            <td>{{ e.selected_lag }}</td>
+            <td>{{ "%.2f"|format(e.f_statistic) }}</td>
+            <td class="{{ e.evidence_strength }}">{{ "%.5f"|format(e.adjusted_p_value) }}</td>
+            <td style="color:#666">{{ "%.5f"|format(e.raw_p_value) }}</td>
+            <td>{% if e.confounder_candidates %}
+              <span class="conf-tag" title="{{ e.confounder_candidates | join(', ') }}">⚠ {{ e.confounder_candidates | length }}</span>
+              {% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="empty">No causality reports yet. Call <code>store.save_causality_report()</code> to populate.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

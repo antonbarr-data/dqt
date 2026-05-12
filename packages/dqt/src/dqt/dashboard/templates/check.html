@@ -6,57 +6,72 @@
   <style>
     :root { --bg: #0e0f11; --fg: #e2e4e9; --accent: #9DD0B0; --warn: #D9B566; --fail: #E07B6E; --line: #2a2d33; --mono: 'JetBrains Mono', monospace; }
     * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
-    body { background: var(--bg); color: var(--fg); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; padding: 24px; }
-    h1 { font-family: var(--mono); font-weight: 300; font-size: 20px; color: var(--accent); margin-bottom: 8px; letter-spacing: -0.04em; }
-    nav { margin-bottom: 24px; font-size: 12px; } nav a { color: #888; }
-    .kpi { display: flex; gap: 32px; margin-bottom: 24px; }
+    body { background: var(--bg); color: var(--fg); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+    nav { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--line); padding: 0 24px; height: 40px; }
+    nav .brand { font-family: var(--mono); font-weight: 300; font-size: 14px; color: var(--accent); letter-spacing: -0.04em; margin-right: 24px; }
+    nav a { font-size: 12px; color: #888; text-decoration: none; padding: 0 12px; height: 40px; display: flex; align-items: center; border-bottom: 2px solid transparent; }
+    nav a:hover { color: var(--fg); }
+    nav a.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .page { padding: 24px; }
+    h1 { font-family: var(--mono); font-weight: 300; font-size: 18px; color: var(--accent); margin-bottom: 8px; letter-spacing: -0.04em; word-break: break-all; }
+    .breadcrumb { font-size: 12px; color: #888; margin-bottom: 20px; }
+    .kpi { display: flex; gap: 16px; margin-bottom: 20px; }
     .kpi-item { border: 1px solid var(--line); padding: 12px 20px; }
     .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #888; }
     .kpi-value { font-family: var(--mono); font-size: 28px; font-weight: 300; }
     .pass { color: var(--accent); } .warn { color: var(--warn); } .fail { color: var(--fail); }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; }
     th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; }
     td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
-    .summary { background: #14161a; border: 1px solid var(--line); padding: 12px 16px; margin-bottom: 16px; font-family: var(--mono); font-size: 12px; }
+    .summary { background: #14161a; border: 1px solid var(--line); padding: 12px 16px; margin-bottom: 20px; font-family: var(--mono); font-size: 12px; }
+    .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 8px; }
   </style>
 </head>
 <body>
-  <nav><a href="/">← all checks</a></nav>
-  <h1>{{ check_id }}</h1>
-  {% if latest %}
-  <div class="kpi">
-    <div class="kpi-item">
-      <div class="kpi-label">Score</div>
-      <div class="kpi-value {{ latest.verdict }}">{{ "%.4f"|format(latest.score) }}</div>
+  <nav>
+    <span class="brand">dqt</span>
+    <a href="/" class="{{ 'active' if active == 'checks' else '' }}">checks</a>
+    <a href="/profile" class="{{ 'active' if active == 'profile' else '' }}">profile</a>
+    <a href="/causality" class="{{ 'active' if active == 'causality' else '' }}">causality</a>
+  </nav>
+  <div class="page">
+    <div class="breadcrumb"><a href="/">← checks</a></div>
+    <h1>{{ check_id }}</h1>
+    {% if latest %}
+    <div class="kpi">
+      <div class="kpi-item">
+        <div class="kpi-label">Score</div>
+        <div class="kpi-value {{ latest.verdict }}">{{ "%.4f"|format(latest.score) }}</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kpi-label">Verdict</div>
+        <div class="kpi-value {{ latest.verdict }}">{{ latest.verdict }}</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kpi-label">Last run</div>
+        <div class="kpi-value" style="font-size:14px;padding-top:6px">{{ latest.ran_at }}</div>
+      </div>
     </div>
-    <div class="kpi-item">
-      <div class="kpi-label">Verdict</div>
-      <div class="kpi-value {{ latest.verdict }}">{{ latest.verdict }}</div>
-    </div>
-    <div class="kpi-item">
-      <div class="kpi-label">Last run</div>
-      <div class="kpi-value" style="font-size:16px">{{ latest.ran_at }}</div>
-    </div>
+    <div class="summary">{{ latest.plain_english }}</div>
+    {% endif %}
+    <div class="section-label">Run history</div>
+    {% if runs %}
+    <table>
+      <thead><tr><th>Ran at</th><th>Score</th><th>Verdict</th><th>Summary</th></tr></thead>
+      <tbody>
+        {% for r in runs %}
+        <tr>
+          <td>{{ r.ran_at }}</td>
+          <td>{{ "%.4f"|format(r.score) }}</td>
+          <td class="{{ r.verdict }}">{{ r.verdict }}</td>
+          <td>{{ r.plain_english }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#555;padding-top:16px">No runs found for this check.</p>
+    {% endif %}
   </div>
-  <div class="summary">{{ latest.plain_english }}</div>
-  {% endif %}
-  <h2 style="font-size:13px;margin-bottom:8px;color:#888">Run history</h2>
-  {% if runs %}
-  <table>
-    <thead><tr><th>Ran at</th><th>Score</th><th>Verdict</th><th>Summary</th></tr></thead>
-    <tbody>
-      {% for r in runs %}
-      <tr>
-        <td>{{ r.ran_at }}</td>
-        <td>{{ "%.4f"|format(r.score) }}</td>
-        <td class="{{ r.verdict }}">{{ r.verdict }}</td>
-        <td>{{ r.plain_english }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p style="color:#555;padding-top:16px">No runs found for this check.</p>
-  {% endif %}
 </body>
 </html>

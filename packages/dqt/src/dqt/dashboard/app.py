@@ -22,7 +22,7 @@ def build_app(store: "ResultsStore") -> FastAPI:
     async def index(request: Request):
         runs = _get_recent_runs(store)
         return _TEMPLATES.TemplateResponse(
-            request, "index.html", {"runs": runs, "title": "dqt"}
+            request, "index.html", {"runs": runs, "title": "dqt", "active": "checks"}
         )
 
     @app.get("/checks/{check_id}", response_class=HTMLResponse)
@@ -37,7 +37,38 @@ def build_app(store: "ResultsStore") -> FastAPI:
                 "runs": runs,
                 "latest": latest,
                 "title": f"dqt — {check_id}",
+                "active": "checks",
             },
+        )
+
+    @app.get("/profile", response_class=HTMLResponse)
+    async def profile_list(request: Request):
+        reports = _get_profile_reports(store)
+        return _TEMPLATES.TemplateResponse(
+            request, "profile.html", {"reports": reports, "title": "dqt — profile", "active": "profile"}
+        )
+
+    @app.get("/profile/{dataset_name}", response_class=HTMLResponse)
+    async def profile_detail(request: Request, dataset_name: str):
+        report = _get_profile_report_by_name(store, dataset_name)
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "profile_detail.html",
+            {
+                "report": report,
+                "dataset_name": dataset_name,
+                "title": f"dqt — profile — {dataset_name}",
+                "active": "profile",
+            },
+        )
+
+    @app.get("/causality", response_class=HTMLResponse)
+    async def causality(request: Request):
+        reports = _get_causality_reports(store)
+        return _TEMPLATES.TemplateResponse(
+            request,
+            "causality.html",
+            {"reports": reports, "title": "dqt — causality", "active": "causality"},
         )
 
     @app.get("/health")
@@ -62,7 +93,8 @@ def _get_recent_runs(store: "ResultsStore") -> list[dict]:
     for check_id, run_list in runs_map.items():
         if run_list:
             cid = str(check_id)
-            seen[cid] = _run_to_dict(run_list[-1])
+            latest = max(run_list, key=lambda r: getattr(r, "finished_at", 0))
+            seen[cid] = _run_to_dict(latest)
     return sorted(seen.values(), key=lambda r: r["check_id"])
 
 
@@ -90,3 +122,61 @@ def _run_to_dict(run) -> dict:
         "plain_english": getattr(run, "plain_english", ""),
         "ran_at": str(getattr(run, "finished_at", getattr(run, "ran_at", ""))),
     }
+
+
+def _get_profile_reports(store: "ResultsStore") -> list[dict]:
+    list_fn = getattr(store, "list_profile_reports", None)
+    if list_fn is None:
+        return []
+    reports = list_fn()
+    return [
+        {
+            "report_id": str(r.report_id),
+            "dataset_name": r.dataset_name,
+            "ran_at": str(r.ran_at),
+            "n_rows": r.n_rows,
+            "n_numeric_columns": r.n_numeric_columns,
+            "n_columns": len(r.columns),
+        }
+        for r in sorted(reports, key=lambda r: r.dataset_name)
+    ]
+
+
+def _get_profile_report_by_name(store: "ResultsStore", dataset_name: str) -> dict | None:
+    list_fn = getattr(store, "list_profile_reports", None)
+    if list_fn is None:
+        return None
+    # Return the most recent report for the given dataset name
+    matches = [r for r in list_fn() if r.dataset_name == dataset_name]
+    if not matches:
+        return None
+    report = sorted(matches, key=lambda r: r.ran_at)[-1]
+    return {
+        "report_id": str(report.report_id),
+        "dataset_name": report.dataset_name,
+        "ran_at": str(report.ran_at),
+        "n_rows": report.n_rows,
+        "n_numeric_columns": report.n_numeric_columns,
+        "columns": report.columns,
+    }
+
+
+def _get_causality_reports(store: "ResultsStore") -> list[dict]:
+    list_fn = getattr(store, "list_causality_reports", None)
+    if list_fn is None:
+        return []
+    reports = list_fn()
+    # Show edges from all reports, annotated with dataset name
+    all_edges: list[dict] = []
+    for r in sorted(reports, key=lambda r: r.ran_at):
+        for edge in r.edges:
+            all_edges.append({**edge, "dataset_name": r.dataset_name, "ran_at": str(r.ran_at)})
+    # Deduplicate by (dataset, cause, effect) keeping last
+    seen: dict[tuple, dict] = {}
+    for e in all_edges:
+        seen[(e["dataset_name"], e["cause"], e["effect"])] = e
+    return sorted(seen.values(), key=lambda e: (e["dataset_name"], -_strength_order(e.get("evidence_strength", "none"))))
+
+
+def _strength_order(strength: str) -> int:
+    return {"strong": 3, "moderate": 2, "weak": 1, "none": 0}.get(strength, 0)

@@ -503,9 +503,19 @@ Or from the CLI:
 dqt dashboard --port 8080
 ```
 
-The dashboard shows all checks with their latest score and verdict, and a per-check run history page. It uses an in-memory store by default — results exist for the lifetime of the process. See [docs/dashboard.md](docs/dashboard.md) for the full guide including the Jupyter notebook pattern and Python API.
+The dashboard has three views — **checks**, **profile**, and **causality** — navigated from the top bar. It uses an in-memory store by default; results exist for the lifetime of the process. See [docs/dashboard.md](docs/dashboard.md) for the full guide including the Jupyter notebook pattern and Python API.
 
-![dqt local dashboard — checks index with score and verdict](docs/screenshots/dashboard-index.png)
+**Checks** (`/`) — one row per check showing the latest score, pass/warn/fail verdict, timestamp, and plain-English summary. Click any row to see the full run history.
+
+![dqt dashboard — checks index with latest score and verdict per check](docs/screenshots/dashboard-index.png)
+
+**Profile** (`/profile`, `/profile/<dataset>`) — column-level distribution statistics for each dataset snapshot: distribution shape (normal / skewed / heavy-tailed / multimodal / uniform), skewness, excess kurtosis, medcouple robust skewness, normality flag, and non-null count. Populated by calling `store.save_profile_report()` with the output of `profile_dataframe(df)`.
+
+![dqt dashboard — dataset distribution profile for fct_orders](docs/screenshots/dashboard-profile-detail.png)
+
+**Causality** (`/causality`) — pairwise Granger causality report with Benjamini–Hochberg FDR correction. Shows cause → effect direction, AIC-selected lag, F-statistic, adjusted and raw p-values, evidence strength (strong / moderate / weak / none), and confounder candidates. The ∆ symbol marks edges where auto-differencing was needed to achieve stationarity.
+
+![dqt dashboard — Granger causality inference with BH-FDR correction](docs/screenshots/dashboard-causality.png)
 
 ---
 
@@ -614,7 +624,7 @@ The [Gigler sample dataset](examples/gigler/) ships with the repo — four CSVs 
 ```
 dqt/
 ├── packages/
-│   ├── dqt/               # open-source library (pip: dqt)
+│   ├── dqt/               # open-source library (pip: dqtlib)
 │   ├── dqt-cli/           # dqt command-line tool
 │   └── dqt-types/         # generated TypeScript types (git-ignored)
 ├── apps/

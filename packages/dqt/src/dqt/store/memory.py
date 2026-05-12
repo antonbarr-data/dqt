@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from uuid import UUID
 
-from dqt.store._protocol import CausalEdgeReview, Incident, RunResult
+from dqt.store._protocol import CausalEdgeReview, CausalityReport, Incident, ProfileReport, RunResult
 
 
 class MemoryStore:
@@ -11,6 +11,8 @@ class MemoryStore:
         self._runs: dict[UUID, list[RunResult]] = defaultdict(list)
         self._incidents: dict[UUID, list[Incident]] = defaultdict(list)
         self._causal_reviews: list[CausalEdgeReview] = []
+        self._profile_reports: list[ProfileReport] = []
+        self._causality_reports: list[CausalityReport] = []
 
     def save_run(self, run: RunResult) -> None:
         self._runs[run.check_id].append(run)
@@ -39,3 +41,15 @@ class MemoryStore:
         if not decided:
             return float("nan")
         return sum(1 for r in decided if r.decision == "accept") / len(decided)
+
+    def save_profile_report(self, report: ProfileReport) -> None:
+        self._profile_reports.append(report)
+
+    def list_profile_reports(self) -> list[ProfileReport]:
+        return list(self._profile_reports)
+
+    def save_causality_report(self, report: CausalityReport) -> None:
+        self._causality_reports.append(report)
+
+    def list_causality_reports(self) -> list[CausalityReport]:
+        return list(self._causality_reports)

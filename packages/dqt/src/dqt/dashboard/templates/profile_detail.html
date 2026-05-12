@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ title }}</title>
+  <style>
+    :root { --bg: #0e0f11; --fg: #e2e4e9; --accent: #9DD0B0; --warn: #D9B566; --fail: #E07B6E; --line: #2a2d33; --mono: 'JetBrains Mono', monospace; }
+    * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+    body { background: var(--bg); color: var(--fg); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+    nav { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--line); padding: 0 24px; height: 40px; }
+    nav .brand { font-family: var(--mono); font-weight: 300; font-size: 14px; color: var(--accent); letter-spacing: -0.04em; margin-right: 24px; }
+    nav a { font-size: 12px; color: #888; text-decoration: none; padding: 0 12px; height: 40px; display: flex; align-items: center; border-bottom: 2px solid transparent; }
+    nav a:hover { color: var(--fg); }
+    nav a.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .page { padding: 24px; }
+    .breadcrumb { font-family: var(--mono); font-size: 11px; color: #555; margin-bottom: 16px; }
+    .breadcrumb a { color: #888; text-decoration: none; } .breadcrumb a:hover { color: var(--fg); }
+    .breadcrumb span { color: #444; margin: 0 6px; }
+    h1 { font-family: var(--mono); font-weight: 300; font-size: 18px; color: var(--accent); margin-bottom: 6px; letter-spacing: -0.04em; }
+    .meta { font-size: 12px; color: #888; margin-bottom: 20px; }
+    .kpi { display: flex; gap: 16px; margin-bottom: 20px; }
+    .kpi-item { border: 1px solid var(--line); padding: 12px 20px; }
+    .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: #888; }
+    .kpi-value { font-family: var(--mono); font-size: 24px; font-weight: 300; color: var(--fg); }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
+    tr:hover td { background: #14161a; }
+    .dist-normal { color: var(--accent); }
+    .dist-skewed_positive, .dist-skewed_negative { color: var(--warn); }
+    .dist-heavy_tailed, .dist-multimodal { color: var(--fail); }
+    .dist-uniform, .dist-unknown { color: #888; }
+    .bool-true { color: var(--accent); } .bool-false { color: #555; }
+    .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 8px; }
+    .empty { color: #555; padding: 32px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">dqt</span>
+    <a href="/" class="{{ 'active' if active == 'checks' else '' }}">checks</a>
+    <a href="/profile" class="{{ 'active' if active == 'profile' else '' }}">profile</a>
+    <a href="/causality" class="{{ 'active' if active == 'causality' else '' }}">causality</a>
+  </nav>
+  <div class="page">
+    <div class="breadcrumb">
+      <a href="/profile">profile</a><span>›</span>{{ dataset_name }}
+    </div>
+    {% if report %}
+    <h1>{{ report.dataset_name }}</h1>
+    <div class="meta">Profiled at {{ report.ran_at }}</div>
+    <div class="kpi">
+      <div class="kpi-item">
+        <div class="kpi-label">Rows</div>
+        <div class="kpi-value">{{ "{:,}".format(report.n_rows) }}</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kpi-label">Numeric columns</div>
+        <div class="kpi-value">{{ report.n_numeric_columns }}</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kpi-label">Total columns</div>
+        <div class="kpi-value">{{ report.columns | length }}</div>
+      </div>
+    </div>
+    <div class="section-label">Column distribution profiles</div>
+    {% if report.columns %}
+    <table>
+      <thead>
+        <tr>
+          <th>Column</th>
+          <th>Distribution</th>
+          <th>Skewness</th>
+          <th>Exc. kurtosis</th>
+          <th>Medcouple</th>
+          <th>Normal?</th>
+          <th>Multimodal?</th>
+          <th>N (non-null)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, info in report.columns.items() %}
+        <tr>
+          <td>{{ col }}</td>
+          {% if info.get("error") %}
+          <td colspan="7" style="color:#555">{{ info.error }} (n={{ info.n }})</td>
+          {% else %}
+          <td class="dist-{{ info.distribution_type }}">{{ info.distribution_type }}</td>
+          <td>{{ "%.4f"|format(info.skewness) }}</td>
+          <td>{{ "%.4f"|format(info.excess_kurtosis) }}</td>
+          <td>{{ "%.4f"|format(info.medcouple) }}</td>
+          <td class="bool-{{ info.is_normal | lower }}">{{ "yes" if info.is_normal else "no" }}</td>
+          <td class="bool-{{ info.is_multimodal | lower }}">{{ "yes" if info.is_multimodal else "no" }}</td>
+          <td>{{ "{:,}".format(info.n) }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No columns in this profile report.</p>
+    {% endif %}
+    {% else %}
+    <p class="empty">No profile report found for dataset <strong>{{ dataset_name }}</strong>.</p>
+    {% endif %}
+  </div>
+</body>
+</html>
