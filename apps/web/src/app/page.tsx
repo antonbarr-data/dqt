@@ -882,7 +882,7 @@ dqt dashboard --port 8080
             className="t-small border border-line px-4 py-2.5 transition-colors hover:bg-bg-2"
             style={{ color: "var(--fg-0)", textDecoration: "none" }}
           >
-            All {detectors.length} detector slugs →
+            All {detectors.length + checks.length} checks & detectors →
           </a>
         </div>
       </section>
