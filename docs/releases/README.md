@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.7.0](v0.7.0.md) | 2026-05-12 | Native Slack/Teams bot: `/dq check`, `/dq incidents`, `/dq why` slash commands |
 | [v0.6.1](v0.6.1.md) | 2026-05-12 | `explain_incident()`: Granger-based upstream causal explanation from score history |
 | [v0.6.0](v0.6.0.md) | 2026-05-12 | `deduplicate_alerts()`: causal-aware alert deduplication via lineage graph |
 | [v0.5.5](v0.5.5.md) | 2026-05-12 | Statistical primer doc; auto-generated README benchmark headline numbers |
