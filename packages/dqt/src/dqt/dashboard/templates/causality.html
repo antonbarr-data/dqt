@@ -67,6 +67,7 @@
             <th>Adj p-value</th>
             <th>Raw p-value</th>
             <th>Confounders?</th>
+            <th>Review</th>
           </tr>
         </thead>
         <tbody>
@@ -78,11 +79,27 @@
             <td><span class="badge {{ e.evidence_strength }}">{{ e.evidence_strength }}</span>{% if e.get("differenced") %}<span class="diff-tag">∆</span>{% endif %}</td>
             <td>{{ e.selected_lag }}</td>
             <td>{{ "%.2f"|format(e.f_statistic) }}</td>
-            <td class="{{ e.evidence_strength }}">{{ "%.5f"|format(e.adjusted_p_value) }}</td>
-            <td style="color:#666">{{ "%.5f"|format(e.raw_p_value) }}</td>
+            <td class="{{ e.evidence_strength }}">{% if e.get('adjusted_p_value') is not none and e.get('adjusted_p_value') != '' %}{{ "%.5f"|format(e.get('adjusted_p_value')) }}{% else %}—{% endif %}</td>
+            <td style="color:#666">{% if e.get('raw_p_value') is not none and e.get('raw_p_value') != '' %}{{ "%.5f"|format(e.get('raw_p_value')) }}{% else %}—{% endif %}</td>
             <td>{% if e.confounder_candidates %}
               <span class="conf-tag" title="{{ e.confounder_candidates | join(', ') }}">⚠ {{ e.confounder_candidates | length }}</span>
               {% else %}—{% endif %}</td>
+            <td style="white-space:nowrap">
+              <form method="post" action="/causality/review" style="display:inline">
+                <input type="hidden" name="edge_id" value="{{ e.get('edge_id', '') }}">
+                <input type="hidden" name="cause" value="{{ e.cause }}">
+                <input type="hidden" name="effect" value="{{ e.effect }}">
+                <input type="hidden" name="decision" value="accept">
+                <button type="submit" style="background:#1e3a2f;border:1px solid #9DD0B0;color:#9DD0B0;padding:2px 8px;cursor:pointer;font-size:10px;font-family:inherit">✓</button>
+              </form>
+              <form method="post" action="/causality/review" style="display:inline;margin-left:4px">
+                <input type="hidden" name="edge_id" value="{{ e.get('edge_id', '') }}">
+                <input type="hidden" name="cause" value="{{ e.cause }}">
+                <input type="hidden" name="effect" value="{{ e.effect }}">
+                <input type="hidden" name="decision" value="reject">
+                <button type="submit" style="background:#2a1414;border:1px solid #E07B6E;color:#E07B6E;padding:2px 8px;cursor:pointer;font-size:10px;font-family:inherit">✗</button>
+              </form>
+            </td>
           </tr>
           {% endfor %}
         </tbody>

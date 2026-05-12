@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from dqt.utils.logging import get_logger
@@ -74,6 +74,29 @@ def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
             "causality.html",
             {"reports": reports, "title": "dqt — causality", "active": "causality"},
         )
+
+    @app.post("/causality/review")
+    async def causality_review(
+        edge_id: str = Form(...),
+        cause: str = Form(...),
+        effect: str = Form(...),
+        decision: str = Form(...),
+        reviewer: str = Form(default="anonymous"),
+        reason: str = Form(default=""),
+    ):
+        from dqt.store._protocol import CausalEdgeReview
+        from uuid import uuid4
+        from datetime import datetime
+        try:
+            eid = UUID(edge_id)
+        except ValueError:
+            eid = uuid4()
+        store.save_causal_review(CausalEdgeReview(
+            edge_id=eid, cause=cause, effect=effect,
+            decision=decision, reviewer=reviewer,
+            reviewed_at=datetime.now(), reason=reason,
+        ))
+        return RedirectResponse("/causality", status_code=303)
 
     @app.get("/incidents", response_class=HTMLResponse)
     async def incidents_list(request: Request):
