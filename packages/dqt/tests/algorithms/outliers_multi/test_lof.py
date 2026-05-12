@@ -62,3 +62,19 @@ def test_lof_details_present(detector):
     assert "outlier_fraction" in result.details
     assert "lof_threshold" in result.details
     assert "n_rows" in result.details
+
+
+def test_lof_auto_k_selection():
+    """LOF with n_neighbors=None auto-selects k = max(5, ceil(sqrt(n)))."""
+    from dqt.algorithms.outliers_multi.lof import LOFDetector
+
+    rng = np.random.default_rng(0)
+    n = 100
+    ref = pd.DataFrame({"x": rng.normal(0, 1, n), "y": rng.normal(0, 1, n)})
+    curr = pd.DataFrame({"x": rng.normal(0, 1, 50), "y": rng.normal(0, 1, 50)})
+
+    det = LOFDetector(n_neighbors=None)
+    state = det.fit(ref)
+    result = det.score(curr, state)
+    expected_k = max(5, math.ceil(math.sqrt(n)))
+    assert result.details.get("k") == expected_k, f"Expected k={expected_k}, got {result.details.get('k')}"

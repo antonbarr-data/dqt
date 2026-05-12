@@ -3,6 +3,8 @@
 # Score = fraction of rows with LOF > reference 95th percentile LOF score.
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 from sklearn.neighbors import LocalOutlierFactor
@@ -17,17 +19,20 @@ class LOFDetector(BaseDetector):
     slug = "lof"
     group = "outliers_multi"
 
-    def __init__(self, n_neighbors: int = 20) -> None:
+    def __init__(self, n_neighbors: int | None = None) -> None:
         self._n_neighbors = n_neighbors
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         X = reference.select_dtypes(include="number").fillna(0.0).to_numpy(dtype=float)
         columns = list(reference.select_dtypes(include="number").columns)
-        clf = LocalOutlierFactor(n_neighbors=min(self._n_neighbors, len(X) - 1), novelty=True)
+        n = len(X)
+        k = self._n_neighbors if self._n_neighbors is not None else max(5, math.ceil(math.sqrt(n)))
+        k = min(k, max(1, n - 1))
+        clf = LocalOutlierFactor(n_neighbors=k, novelty=True)
         clf.fit(X)
         ref_scores = -clf.score_samples(X)
         threshold = float(np.percentile(ref_scores, 99))
-        return {"model": clf, "columns": columns, "threshold": threshold}
+        return {"model": clf, "columns": columns, "threshold": threshold, "k": k}
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         cols = state["columns"]
@@ -36,7 +41,7 @@ class LOFDetector(BaseDetector):
             return DetectorResult(
                 score=0.0, verdict=Verdict.pass_,
                 plain_english="No data to score.",
-                details={"outlier_fraction": 0.0, "lof_threshold": state["threshold"], "n_rows": 0},
+                details={"outlier_fraction": 0.0, "lof_threshold": state["threshold"], "n_rows": 0, "k": state["k"]},
             )
         lof_scores = -state["model"].score_samples(X)
         n_out = int(np.sum(lof_scores > state["threshold"]))
@@ -45,5 +50,5 @@ class LOFDetector(BaseDetector):
             score=frac,
             verdict=self._verdict(frac),
             plain_english=f"{frac:.1%} of rows with LOF score above reference 95th percentile",
-            details={"outlier_fraction": frac, "lof_threshold": state["threshold"], "n_rows": len(X)},
+            details={"outlier_fraction": frac, "lof_threshold": state["threshold"], "n_rows": len(X), "k": state["k"]},
         )
