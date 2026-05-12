@@ -52,6 +52,14 @@ _SKIP = frozenset({
     "referential_integrity_rate",
     # Requires a column literally named "outlier_fraction".
     "outlier_fraction_drift",
+    # Aggregate detectors that expect an `agg_value` key in the input.
+    "cardinality_in_range",
+    "sum_in_range",
+    "stddev_in_range",
+    "min_in_range",
+    "max_in_range",
+    "quantile_in_range",
+    "median_in_range",
     # String/regex/date detectors require non-numeric input.
     "regex_match",
     "date_format",
@@ -64,13 +72,7 @@ _SKIP = frozenset({
 })
 
 
-def _candidate_slugs() -> list[str]:
-    return sorted(
-        s for s in registry.slugs() if s not in _MULTIVARIATE and s not in _SKIP
-    )
-
-
-_SLUGS = _candidate_slugs()
+_SLUGS = sorted(s for s in registry.slugs() if s not in _MULTIVARIATE and s not in _SKIP)
 
 
 @pytest.mark.parametrize("slug", _SLUGS)
@@ -93,8 +95,8 @@ def test_detector_invariants(slug: str, values: list[float]) -> None:
     try:
         state = detector.fit(df)
         result = detector.score(df, state)
-    except Exception:
-        # Degenerate input (all-same values, zero variance, etc.) — legitimate failures OK
+    except (ValueError, ZeroDivisionError, np.linalg.LinAlgError, Warning):
+        # Degenerate input (all-same, zero variance, singular covariance) — legitimate.
         return
 
     assert result.verdict in (Verdict.pass_, Verdict.warn, Verdict.fail), (
