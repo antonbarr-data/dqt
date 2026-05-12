@@ -2,6 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ title }}</title>
   <style>
     :root { --bg: #0e0f11; --fg: #e2e4e9; --accent: #9DD0B0; --warn: #D9B566; --fail: #E07B6E; --line: #2a2d33; --mono: 'JetBrains Mono', monospace; }
@@ -20,8 +21,8 @@
     tr:hover td { background: #14161a; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    .pass { color: var(--accent); } .warn { color: var(--warn); } .fail { color: var(--fail); }
     .empty { color: #555; padding: 32px 0; text-align: center; }
-    .badge { display: inline-block; font-size: 10px; padding: 2px 6px; border: 1px solid var(--line); color: #aaa; }
   </style>
 </head>
 <body>
@@ -34,24 +35,25 @@
     <a href="/lineage" class="{{ 'active' if active == 'lineage' else '' }}">lineage</a>
   </nav>
   <div class="page">
-    <h1>profile</h1>
-    {% if reports %}
+    <h1>incidents</h1>
+    {% if incidents %}
     <table>
-      <thead><tr><th>Dataset</th><th>Rows</th><th>Numeric cols</th><th>Total cols</th><th>Profiled at</th></tr></thead>
+      <thead><tr><th>Check ID</th><th>Detector</th><th>Severity</th><th>Score</th><th>Opened</th><th>Status</th></tr></thead>
       <tbody>
-        {% for r in reports %}
+        {% for inc in incidents %}
         <tr>
-          <td><a href="/profile/{{ r.dataset_name }}">{{ r.dataset_name }}</a></td>
-          <td>{{ "{:,}".format(r.n_rows) }}</td>
-          <td>{{ r.n_numeric_columns }}</td>
-          <td>{{ r.n_columns }}</td>
-          <td>{{ r.ran_at }}</td>
+          <td><a href="/incidents/{{ inc.check_id }}">{{ inc.check_id[:12] }}…</a></td>
+          <td>{{ inc.detector_slug }}</td>
+          <td class="{{ inc.severity }}">{{ inc.severity }}</td>
+          <td>{{ "%.4f"|format(inc.score) }}</td>
+          <td>{{ inc.opened_at }}</td>
+          <td>{{ inc.status }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <p class="empty">No profile reports yet. Call <code>store.save_profile_report()</code> to populate.</p>
+    <p class="empty">No incidents recorded.</p>
     {% endif %}
   </div>
 </body>

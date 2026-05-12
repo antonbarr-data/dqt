@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ title }}</title>
+  <style>
+    :root { --bg: #0e0f11; --fg: #e2e4e9; --accent: #9DD0B0; --warn: #D9B566; --fail: #E07B6E; --line: #2a2d33; --mono: 'JetBrains Mono', monospace; }
+    * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0; }
+    body { background: var(--bg); color: var(--fg); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6; }
+    nav { display: flex; align-items: center; gap: 0; border-bottom: 1px solid var(--line); padding: 0 24px; height: 40px; }
+    nav .brand { font-family: var(--mono); font-weight: 300; font-size: 14px; color: var(--accent); letter-spacing: -0.04em; margin-right: 24px; }
+    nav a { font-size: 12px; color: #888; text-decoration: none; padding: 0 12px; height: 40px; display: flex; align-items: center; border-bottom: 2px solid transparent; }
+    nav a:hover { color: var(--fg); }
+    nav a.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .page { padding: 24px; }
+    .breadcrumb { font-family: var(--mono); font-size: 11px; color: #555; margin-bottom: 16px; }
+    .breadcrumb a { color: #888; text-decoration: none; } .breadcrumb a:hover { color: var(--fg); }
+    .breadcrumb span { color: #444; margin: 0 6px; }
+    h1 { font-family: var(--mono); font-weight: 300; font-size: 18px; color: var(--accent); margin-bottom: 20px; letter-spacing: -0.04em; word-break: break-all; }
+    .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin: 24px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
+    tr:hover td { background: #14161a; }
+    pre { background: #14161a; border: 1px solid var(--line); padding: 12px 16px; font-family: var(--mono); font-size: 11px; overflow-x: auto; margin-top: 8px; }
+    .pass { color: var(--accent); } .warn { color: var(--warn); } .fail { color: var(--fail); }
+    .empty { color: #555; padding: 16px 0; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">dqt</span>
+    <a href="/" class="{{ 'active' if active == 'checks' else '' }}">checks</a>
+    <a href="/incidents" class="{{ 'active' if active == 'incidents' else '' }}">incidents</a>
+    <a href="/profile" class="{{ 'active' if active == 'profile' else '' }}">profile</a>
+    <a href="/causality" class="{{ 'active' if active == 'causality' else '' }}">causality</a>
+    <a href="/lineage" class="{{ 'active' if active == 'lineage' else '' }}">lineage</a>
+  </nav>
+  <div class="page">
+    <div class="breadcrumb">
+      <a href="/incidents">incidents</a><span>›</span>{{ check_id }}
+    </div>
+    <h1>{{ check_id }}</h1>
+
+    <div class="section-label">Incident history</div>
+    {% if detail.incidents %}
+    <table>
+      <thead><tr><th>Detector</th><th>Severity</th><th>Score</th><th>Opened</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for inc in detail.incidents %}
+        <tr>
+          <td>{{ inc.detector_slug }}</td>
+          <td class="{{ inc.severity }}">{{ inc.severity }}</td>
+          <td>{{ "%.4f"|format(inc.score) }}</td>
+          <td>{{ inc.opened_at }}</td>
+          <td>{{ inc.status }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No incidents for this check.</p>
+    {% endif %}
+
+    <div class="section-label">Run history</div>
+    {% if detail.runs %}
+    <table>
+      <thead><tr><th>Verdict</th><th>Score</th><th>Ran at</th><th>Summary</th></tr></thead>
+      <tbody>
+        {% for run in detail.runs %}
+        <tr>
+          <td class="{{ run.verdict }}">{{ run.verdict }}</td>
+          <td>{{ "%.4f"|format(run.score) }}</td>
+          <td>{{ run.ran_at }}</td>
+          <td style="color:#aaa;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ run.plain_english }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if detail.runs[0].diagnostic_sql %}
+    <div class="section-label">Diagnostic SQL</div>
+    <pre>{{ detail.runs[0].diagnostic_sql }}</pre>
+    {% endif %}
+    {% else %}
+    <p class="empty">No runs found for this check.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

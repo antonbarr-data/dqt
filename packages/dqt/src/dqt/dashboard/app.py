@@ -71,6 +71,27 @@ def build_app(store: "ResultsStore") -> FastAPI:
             {"reports": reports, "title": "dqt — causality", "active": "causality"},
         )
 
+    @app.get("/incidents", response_class=HTMLResponse)
+    async def incidents_list(request: Request):
+        incidents = _get_all_incidents(store)
+        return _TEMPLATES.TemplateResponse(
+            request, "incidents.html",
+            {"incidents": incidents, "title": "dqt — incidents", "active": "incidents"},
+        )
+
+    @app.get("/incidents/{check_id}", response_class=HTMLResponse)
+    async def incident_detail(request: Request, check_id: str):
+        detail = _get_incident_detail(store, check_id)
+        return _TEMPLATES.TemplateResponse(
+            request, "incident_detail.html",
+            {
+                "check_id": check_id,
+                "detail": detail,
+                "title": f"dqt — incident — {check_id}",
+                "active": "incidents",
+            },
+        )
+
     @app.get("/health")
     async def health():
         return {"status": "ok"}
@@ -180,3 +201,55 @@ def _get_causality_reports(store: "ResultsStore") -> list[dict]:
 
 def _strength_order(strength: str) -> int:
     return {"strong": 3, "moderate": 2, "weak": 1, "none": 0}.get(strength, 0)
+
+
+def _get_all_incidents(store: "ResultsStore") -> list[dict]:
+    """Return all incidents across all check_ids, newest first.
+
+    Accesses MemoryStore._incidents directly (read-only); non-MemoryStore
+    backends with no public list-all API return empty until one is added.
+    """
+    incidents_map: dict = getattr(store, "_incidents", {})
+    result = []
+    for check_id, inc_list in incidents_map.items():
+        for inc in inc_list:
+            sev = getattr(inc, "severity", "fail")
+            result.append({
+                "check_id": str(check_id),
+                "incident_id": str(getattr(inc, "incident_id", "")),
+                "severity": sev.value if hasattr(sev, "value") else str(sev),
+                "score": float(getattr(inc, "score", 0.0)),
+                "opened_at": str(getattr(inc, "opened_at", "")),
+                "status": getattr(inc, "status", "open"),
+                "detector_slug": getattr(inc, "detector_slug", ""),
+            })
+    return sorted(result, key=lambda r: r["opened_at"], reverse=True)
+
+
+def _get_incident_detail(store: "ResultsStore", check_id: str) -> dict:
+    """Return runs and incidents for a single check_id string."""
+    try:
+        uid = UUID(check_id)
+    except ValueError:
+        return {"runs": [], "incidents": []}
+    runs: list[dict] = []
+    incidents: list[dict] = []
+    try:
+        runs = [_run_to_dict(r) for r in store.list_runs(uid, limit=50)]
+    except Exception:
+        pass
+    try:
+        raw_incidents = store.list_incidents(uid)
+        for inc in raw_incidents:
+            sev = getattr(inc, "severity", "fail")
+            incidents.append({
+                "incident_id": str(getattr(inc, "incident_id", "")),
+                "detector_slug": getattr(inc, "detector_slug", ""),
+                "severity": sev.value if hasattr(sev, "value") else str(sev),
+                "score": float(getattr(inc, "score", 0.0)),
+                "opened_at": str(getattr(inc, "opened_at", "")),
+                "status": getattr(inc, "status", "open"),
+            })
+    except Exception:
+        pass
+    return {"runs": runs, "incidents": incidents}
