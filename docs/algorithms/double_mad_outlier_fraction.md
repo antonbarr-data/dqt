@@ -23,7 +23,22 @@ Extends the modified Z-score approach by computing two MADs: `MAD_left` (median 
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `threshold` | `float` | `3.5` | Modified Z-score cutoff. Values on either side whose side-adjusted modified Z exceeds this are counted as outliers. |
+| `threshold` | `float` | `6.5` | Modified Z-score cutoff. Values on either side whose side-adjusted modified Z exceeds this are counted as outliers. Default 6.5 is calibrated for lognormal(0,1) revenue data. Use 3.5 for near-Gaussian data. |
+
+## Calibration by data shape
+
+Default threshold=6.5 was calibrated on lognormal(0,1) data (revenue shape).
+Iglewicz & Hoaglin's original threshold=3.5 targets near-Gaussian data.
+Use 3.5 for Gaussian KPIs; use 6.5 for heavy-tailed or skewed distributions.
+
+| Shape | FPR at threshold=6.5 |
+|---|---|
+| lognormal(0,1) — revenue | 1.040% (calibrated target) |
+| normal(0,1) — Gaussian | 0.000% (very conservative — use 3.5) |
+| poisson(λ=10) — count | 0.000% |
+| beta(0.5,0.5) — ratio | 0.000% |
+| pareto(1.5) — heavy-tail | 2.880% |
+| exponential(λ=1) | 0.060% |
 
 ## Scale (STAT_SCALES)
 

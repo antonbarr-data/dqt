@@ -24,7 +24,22 @@ Computes a modified Z-score for each value: `|xi − median| × 0.6745 / MAD`, w
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `threshold` | `float` | `3.5` | Modified Z-score cutoff. Values above this are counted as outliers. Leys et al. recommend 3.5 as the default; 2.5 is more sensitive, 3.0 is a common alternative. |
+| `threshold` | `float` | `11.0` | Modified Z-score cutoff. Values above this are counted as outliers. Default 11.0 is calibrated for lognormal(0,1) revenue data. Use 3.5 for near-Gaussian data; 2.5 for stricter alerting. |
+
+## Calibration by data shape
+
+Default threshold=11.0 was calibrated on lognormal(0,1) data (revenue shape).
+Iglewicz & Hoaglin's original threshold=3.5 targets near-Gaussian data.
+Use 3.5 for Gaussian KPIs; use 11.0 for heavy-tailed distributions.
+
+| Shape | FPR at threshold=11.0 |
+|---|---|
+| lognormal(0,1) — revenue | 1.060% (calibrated target) |
+| normal(0,1) — Gaussian | 0.000% (very conservative — use 3.5) |
+| poisson(λ=10) — count | 0.000% |
+| beta(0.5,0.5) — ratio | 0.000% |
+| pareto(1.5) — heavy-tail | 3.520% |
+| exponential(λ=1) | 0.020% |
 
 ## Scale (STAT_SCALES)
 

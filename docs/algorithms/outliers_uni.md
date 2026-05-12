@@ -28,7 +28,20 @@ det = IQRFenceDetector(k=3.0)  # outer fence; k=1.5 for inner
 
 Flags values where |0.6745 * (x − median) / MAD| > threshold. Robust to outliers in reference because MAD ignores extreme values when computing scale.
 
-**Default threshold: 11.0** — calibrated to ≤1% FPR on log-normal (revenue-shape) data. Iglewicz & Hoaglin's original 3.5 is appropriate for near-Gaussian data only; it over-flags by ~39× on lognormal data with σ=1 (reporting 3.9% on clean data with true outlier rate 0.1%). For near-Gaussian data use `MADOutlierDetector(threshold=3.5)`.
+**Default threshold: 11.0** — calibrated for lognormal(0,1) revenue/order data.
+The canonical Iglewicz & Hoaglin threshold of 3.5 targets near-Gaussian data and
+over-flags heavy-tailed distributions by ~30×.
+
+FPR at default threshold=11.0 by data shape (empirical, N=5000):
+
+| Data shape | Empirical FPR |
+|---|---|
+| lognormal(0,1) — revenue | 1.060% |
+| normal(0,1) — Gaussian | 0.000% |
+| poisson(λ=10) — count | 0.000% |
+| beta(0.5,0.5) — ratio/score | 0.000% |
+| pareto(1.5) — heavy-tail | 3.520% |
+| exponential(λ=1) — time between events | 0.020% |
 
 **Assumptions:** Approximately unimodal distribution.
 
