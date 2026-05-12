@@ -9,16 +9,11 @@
 # B5: Evidence-strength tiers ("none" / "weak" / "moderate" / "strong").
 from __future__ import annotations
 
-import datetime
 import warnings
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-
-if TYPE_CHECKING:
-    from dqt.causality.events import EventSource
 
 _MIN_ROWS = 20
 _ADF_ALPHA = 0.05  # stationarity significance level
@@ -189,8 +184,6 @@ def granger_pairwise(
     max_lag: int = 4,
     significance_level: float = 0.05,
     columns: list[str] | None = None,
-    events: "EventSource | None" = None,
-    period: "tuple[datetime.datetime, datetime.datetime] | None" = None,
 ) -> GrangerReport:
     """Run bivariate Granger causality for every ordered (X, Y) pair in df.
 
@@ -206,18 +199,17 @@ def granger_pairwise(
         BH-adjusted p-values).
     columns:
         Subset of columns to test. Defaults to all numeric columns.
-    events:
-        Optional EventSource. If provided and ``period`` is given, any deploy
-        events that overlap the test window are recorded in
-        ``GrangerReport.metadata["confounded_by_events"]`` for downstream review.
-        The edge computation is not altered.
-    period:
-        ``(start, end)`` datetime pair corresponding to the time range covered by
-        ``df``. Required for event annotation; ignored when ``events`` is None.
 
     Returns
     -------
     GrangerReport with one GrangerEdge per ordered pair that could be tested.
+
+    Note
+    ----
+    Event conditioning (EventSource) was removed in v0.4.3. The parameter
+    accepted events but did not alter the edge computation — misleading API.
+    Use ``dqt.causality.events.InMemoryEventSource`` as a standalone utility
+    to track deploy events separately from causal tests.
 
     Example
     -------
@@ -332,15 +324,5 @@ def granger_pairwise(
             if (col, edge.cause) in sig_set and (col, edge.effect) in sig_set:
                 candidates.append(col)
         edge.confounder_candidates = candidates
-
-    # --- Event confounding annotation ----------------------------------------
-    if events is not None and period is not None:
-        start, end = period
-        overlapping = events.get_events(start, end)
-        if overlapping:
-            report.metadata["confounded_by_events"] = [
-                e.description or f"{e.event_type} from {e.source} at {e.event_time}"
-                for e in overlapping
-            ]
 
     return report

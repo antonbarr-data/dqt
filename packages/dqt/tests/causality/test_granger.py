@@ -1,5 +1,7 @@
 # packages/dqt/tests/causality/test_granger.py
 # Ref: Granger (1969) Econometrica — Investigating Causal Relations
+import inspect
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -60,3 +62,17 @@ def test_granger_significant_edges_filter(causal_df):
     report = granger_pairwise(causal_df, max_lag=3)
     assert len(report.significant_edges) >= 1
     assert all(e.significant for e in report.significant_edges)
+
+
+def test_granger_pairwise_has_no_events_param():
+    """events param was removed because it annotated without conditioning — dishonest API."""
+    from dqt.causality import granger_pairwise
+    sig = inspect.signature(granger_pairwise)
+    assert "events" not in sig.parameters, (
+        "granger_pairwise must not have an 'events' parameter — "
+        "it annotated without conditioning, which is misleading"
+    )
+    assert "period" not in sig.parameters, (
+        "granger_pairwise must not have a 'period' parameter — "
+        "it was removed together with 'events' in v0.4.3"
+    )
