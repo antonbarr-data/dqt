@@ -1,6 +1,7 @@
 # packages/dqt/src/dqt/dashboard/app.py
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -20,7 +21,6 @@ _TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
     app = FastAPI(title="dqt dashboard", docs_url=None, redoc_url=None)
-    app.state.lineage_graph = lineage_graph
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
@@ -98,8 +98,7 @@ def build_app(store: "ResultsStore", lineage_graph=None) -> FastAPI:
 
     @app.get("/lineage", response_class=HTMLResponse)
     async def lineage_view(request: Request):
-        import json
-        graph = app.state.lineage_graph
+        graph = lineage_graph
         nodes, edges = [], []
         if graph is not None:
             for n in graph.nodes:
