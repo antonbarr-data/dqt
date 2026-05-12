@@ -236,6 +236,7 @@ export default function RootPage() {
         <div className="hidden md:flex items-center gap-8">
           <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Code</a>
+          <a href="#start" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Get started</a>
           <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
         </div>
 
@@ -286,6 +287,7 @@ export default function RootPage() {
         >
           <a href="#why" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Code</a>
+          <a href="#start" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Get started</a>
           <a href="#compare" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>vs. alternatives</a>
           <div className="flex gap-2 px-6 py-4">
             <a
@@ -771,6 +773,116 @@ export default function RootPage() {
           <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, marginTop: 14 }}>
             No server required. The optional FastAPI service and dashboard are there when you want them — and stay out of the way when you don&apos;t.
           </p>
+        </div>
+      </section>
+
+      {/* ── get started ── */}
+      <section id="start" className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
+        <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>From zero to first incident.</p>
+        <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
+          Getting started
+        </h2>
+        <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.7, marginBottom: 32, maxWidth: 560 }}>
+          Four steps. No database, no server. Runs in a notebook or a CI job — wherever Python runs.
+        </p>
+
+        <div className="space-y-0 border border-line" style={{ background: "var(--bg-1)" }}>
+          {/* Step 1 */}
+          <div className="border-b border-line p-6 grid grid-cols-[40px_1fr] gap-4 items-start">
+            <div style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--accent)", fontWeight: 600, paddingTop: 2 }}>01</div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-0)", marginBottom: 6 }}>Install</p>
+              <pre style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)", background: "var(--bg-0)", border: "1px solid var(--line)", padding: "10px 14px", margin: 0, overflowX: "auto" }}>
+{`pip install "dqtlib[dashboard]"`}
+              </pre>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="border-b border-line p-6 grid grid-cols-[40px_1fr] gap-4 items-start">
+            <div style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--accent)", fontWeight: 600, paddingTop: 2 }}>02</div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-0)", marginBottom: 6 }}>Run your first check</p>
+              <pre style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)", background: "var(--bg-0)", border: "1px solid var(--line)", padding: "10px 14px", margin: 0, overflowX: "auto", lineHeight: 1.75 }}>
+{`from dqt import Runner, MemoryStore
+from dqt.checks.models import Check
+from dqt.adapters.local import LocalAdapter
+import pandas as pd
+
+df    = pd.read_csv("orders.csv")
+store = MemoryStore()
+
+check = Check(
+    schema_name="public", table_name="orders",
+    column_name="amount_usd",
+    detector_slug="wasserstein_1",   # drift detection
+)
+result = Runner(store).run_in_memory(
+    check,
+    reference=df[df.date < "2024-01-01"],
+    current  =df[df.date >= "2024-01-01"],
+)
+print(result.verdict, result.plain_english)`}
+              </pre>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="border-b border-line p-6 grid grid-cols-[40px_1fr] gap-4 items-start">
+            <div style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--accent)", fontWeight: 600, paddingTop: 2 }}>03</div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-0)", marginBottom: 6 }}>Read the result</p>
+              <div className="grid grid-cols-3 gap-px mt-2" style={{ background: "var(--line)" }}>
+                {[
+                  { field: "verdict", value: "pass · warn · fail", note: "threshold decision" },
+                  { field: "score", value: "0.3142", note: "raw metric (Wasserstein distance)" },
+                  { field: "plain_english", value: '"Distance 0.31 — above warn threshold"', note: "human-readable summary" },
+                ].map(({ field, value, note }) => (
+                  <div key={field} className="p-4" style={{ background: "var(--bg-0)" }}>
+                    <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--accent)", marginBottom: 4 }}>{field}</p>
+                    <p style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)", marginBottom: 4 }}>{value}</p>
+                    <p style={{ fontSize: 11, color: "var(--fg-2)" }}>{note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Step 4 */}
+          <div className="p-6 grid grid-cols-[40px_1fr] gap-4 items-start">
+            <div style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--accent)", fontWeight: 600, paddingTop: 2 }}>04</div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-0)", marginBottom: 6 }}>Open the dashboard</p>
+              <pre style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)", background: "var(--bg-0)", border: "1px solid var(--line)", padding: "10px 14px", margin: 0, marginBottom: 10, overflowX: "auto" }}>
+{`dqt dashboard --port 8080
+# → http://127.0.0.1:8080`}
+              </pre>
+              <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7 }}>
+                Checks, column distribution profiles, and Granger causality inference — all in one place. No signup, no cloud, no persistent state beyond the process.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center gap-4">
+          <a
+            href="https://github.com/antonbarr-data/dqt/blob/main/docs/getting-started.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-5 py-3 border transition-colors hover:opacity-80"
+            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)", fontWeight: 600, fontSize: 13, textDecoration: "none" }}
+          >
+            Read the full guide →
+          </a>
+          <a
+            href="https://github.com/antonbarr-data/dqt/blob/main/docs/api/detectors.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="t-small border border-line px-4 py-2.5 transition-colors hover:bg-bg-2"
+            style={{ color: "var(--fg-0)", textDecoration: "none" }}
+          >
+            All {detectors.length} detector slugs →
+          </a>
         </div>
       </section>
 

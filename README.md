@@ -605,6 +605,7 @@ Full API reference with Gigler sample dataset examples:
 |-----|-------------|
 | [Quickstart](docs/api/quickstart.md) | End-to-end example — load a CSV, run checks, read results |
 | [Detectors reference](docs/api/detectors.md) | All 38 detectors with parameters and Gigler examples |
+| [Getting started](docs/getting-started.md) | **Start here** — first check in 5 min, drift detection, CLI, dashboard, profiling, Granger causality, quick-reference slug table |
 | [Checks & Runner API](docs/api/checks-and-runner.md) | Check model, CheckScope, CheckFilter, BaselineConfig, Runner, MemoryStore |
 | [Results & AI explanations](docs/api/results.md) | RunResult fields, Incident fields, causal discovery results, agent explanation output, MemoryStore queries |
 | [Lineage API](docs/api/lineage.md) | LineageGraph from SQL (sqlglot), dbt manifest ingestion, OpenLineage, graph queries |
