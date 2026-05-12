@@ -91,6 +91,8 @@ class ADWINDetector(BaseDetector):
                 "drift_detected": True,
                 "window_before": detected_mean0,
                 "window_after": detected_mean1,
+                "ref_mean": detected_mean0,   # alias: mean of pre-drift portion
+                "curr_mean": detected_mean1,  # alias: mean of post-drift portion
                 "n_windows_checked": n_checked,
             }
         else:

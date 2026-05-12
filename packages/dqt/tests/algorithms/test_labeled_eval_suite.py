@@ -147,10 +147,9 @@ def test_adwin_details_desync_regression(adwin_ref, adwin_curr_drift):
     assert wb != wa, (
         f"window_before={wb:.2f} == window_after={wa:.2f} — desync bug"
     )
-    # Must NOT expose the old desynced keys
-    assert "ref_mean" not in result.details, (
-        "ref_mean must not appear in drift details (desync regression)"
-    )
+    # ref_mean/curr_mean must be present as aliases (never None)
+    assert result.details.get("ref_mean") is not None, "ref_mean alias missing from drift details"
+    assert result.details.get("curr_mean") is not None, "curr_mean alias missing from drift details"
 
 
 @pytest.mark.unit

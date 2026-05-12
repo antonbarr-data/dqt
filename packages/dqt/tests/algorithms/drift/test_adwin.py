@@ -52,16 +52,38 @@ def test_adwin_details_stable(detector, normal_df):
 
 
 def test_adwin_details_drift_uses_window_means(detector, normal_df, shifted_df):
-    """When drift detected, details must use window_before/window_after — not ref/curr means."""
+    """When drift detected, details must have window_before/window_after and ref_mean/curr_mean aliases."""
     state = detector.fit(normal_df)
     result = detector.score(shifted_df, state)
     assert result.details["drift_detected"] is True
     assert "window_before" in result.details, "drift details must have window_before"
     assert "window_after" in result.details, "drift details must have window_after"
-    assert "ref_mean" not in result.details, "ref_mean must not appear in drift details"
+    assert "ref_mean" in result.details, "drift details must have ref_mean alias"
+    assert "curr_mean" in result.details, "drift details must have curr_mean alias"
     assert result.details["window_before"] != result.details["window_after"], (
         "window_before and window_after must differ on drift"
     )
+
+
+@pytest.mark.unit
+def test_adwin_details_ref_curr_mean_never_none():
+    """ref_mean and curr_mean must be present and non-None in details regardless of drift outcome."""
+    from dqt.algorithms.drift.adwin import ADWINDetector
+    rng = np.random.default_rng(99)
+    ref = pd.DataFrame({"v": rng.normal(100.0, 5.0, 200)})
+    curr_drift  = pd.DataFrame({"v": rng.normal(150.0, 5.0, 200)})
+    curr_stable = pd.DataFrame({"v": rng.normal(100.5, 5.0, 200)})
+    det = ADWINDetector()
+    state = det.fit(ref)
+
+    for curr, label in [(curr_drift, "drift"), (curr_stable, "stable")]:
+        result = det.score(curr, state)
+        assert result.details.get("ref_mean") is not None, (
+            f"details.ref_mean is None on {label} case — downstream consumers break"
+        )
+        assert result.details.get("curr_mean") is not None, (
+            f"details.curr_mean is None on {label} case — downstream consumers break"
+        )
 
 
 @pytest.mark.unit
