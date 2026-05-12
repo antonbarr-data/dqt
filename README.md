@@ -11,6 +11,10 @@
 **20 detectors** across 4 families · best F1 **0.933** (holt_winters, 30-trial 95% CI [0.933, 0.933]) · benchmarked on 8 synthetic scenarios · [full results](examples/benchmarks/results.csv)
 <!-- BENCHMARK_STATS_END -->
 
+<!-- NUMBERS_START -->
+**64 detectors · 9 adapters**
+<!-- NUMBERS_END -->
+
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
 
 ---
