@@ -1,7 +1,23 @@
+from dqt.causality.events import (
+    AirflowEventSource,
+    DagsterEventSource,
+    DbtCloudEventSource,
+    DeployEvent,
+    EventSource,
+    InMemoryEventSource,
+    NullEventSource,
+)
 from dqt.causality.granger import GrangerEdge, GrangerReport, granger_pairwise
 from dqt.causality.pcmci import PCMCIEdge, PCMCIReport, pcmci_pairwise
 
 __all__ = [
+    "EventSource",
+    "DeployEvent",
+    "NullEventSource",
+    "InMemoryEventSource",
+    "AirflowEventSource",
+    "DagsterEventSource",
+    "DbtCloudEventSource",
     "GrangerEdge", "GrangerReport", "granger_pairwise",
     "PCMCIEdge", "PCMCIReport", "pcmci_pairwise",
 ]
