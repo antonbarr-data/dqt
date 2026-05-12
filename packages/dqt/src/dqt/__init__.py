@@ -2,7 +2,7 @@
 """dqt — open-source data quality, observability, and causality library."""
 from __future__ import annotations
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 from dqt.algorithms._base import (
     BaseAggregateDetector,
@@ -19,6 +19,7 @@ from dqt.store.memory import MemoryStore
 from dqt.checks.models import BaselineConfig, Check, CheckFilter, CheckScope
 from dqt.runner.runner import Runner, SuiteResult
 from dqt.lineage.dedup import AlertGroup, DeduplicationResult, deduplicate_alerts
+from dqt.lineage.explain import CausalEvidence, IncidentExplanation, explain_incident
 
 # Import all detector groups to trigger @registry.register side effects
 import dqt.algorithms.basic           # noqa: F401
@@ -60,4 +61,7 @@ __all__ = [
     "AlertGroup",
     "DeduplicationResult",
     "deduplicate_alerts",
+    "CausalEvidence",
+    "IncidentExplanation",
+    "explain_incident",
 ]
