@@ -10,4 +10,5 @@ COPY . .
 RUN uv venv /app/.venv && \
     uv pip install --python /app/.venv/bin/python --no-cache .
 
+EXPOSE 8000
 CMD ["uvicorn", "dqt_server.main:app", "--host", "0.0.0.0", "--port", "8000"]
