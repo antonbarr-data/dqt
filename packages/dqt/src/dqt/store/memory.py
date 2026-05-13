@@ -94,3 +94,6 @@ class MemoryStore:
 
     def list_proofs(self, check_id: UUID) -> list[ProofBundle]:
         return list(self._proofs.get(check_id, []))
+
+    def list_check_ids(self) -> list[UUID]:
+        return list(self._runs.keys())

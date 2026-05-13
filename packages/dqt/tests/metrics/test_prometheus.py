@@ -68,3 +68,23 @@ def test_runs_total_counts_all_runs():
         store.save_run(_run(Verdict.pass_, 0.05, check_id=check_id))
     text = build_metrics_text(store)
     assert f'dqt_check_runs_total{{check_id="{check_id}",detector_slug="ks_pvalue"}} 5' in text
+
+
+def test_build_metrics_uses_list_check_ids():
+    """build_metrics_text must call list_check_ids(), not access _runs directly."""
+    from unittest.mock import MagicMock
+    from dqt.metrics.prometheus import build_metrics_text
+
+    mock_store = MagicMock()
+    check_id = uuid4()
+    mock_store.list_check_ids.return_value = [check_id]
+    now = datetime.now(timezone.utc)
+    mock_store.list_runs.return_value = [MagicMock(
+        detector_slug="ks_pvalue",
+        verdict=Verdict.pass_,
+        score=0.1,
+        finished_at=now,
+    )]
+    text = build_metrics_text(mock_store)
+    mock_store.list_check_ids.assert_called_once()
+    assert str(check_id) in text

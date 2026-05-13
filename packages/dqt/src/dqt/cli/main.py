@@ -179,17 +179,117 @@ def _cmd_fit(args: argparse.Namespace) -> None:
 
 def _cmd_dashboard(args: argparse.Namespace) -> None:
     """Start the local dqt dashboard (requires dqtlib[dashboard])."""
+    import os
+    import secrets
+
+    token = getattr(args, "token", None)
+    generate_token = getattr(args, "generate_token", False)
+
+    if token and generate_token:
+        print("error: --token and --generate-token are mutually exclusive", file=sys.stderr)
+        sys.exit(1)
+
+    if generate_token:
+        new_token = secrets.token_hex(32)
+        print(new_token)
+        os.environ["DQT_DASHBOARD_TOKEN"] = new_token
+    elif token:
+        os.environ["DQT_DASHBOARD_TOKEN"] = token
+
     try:
         import uvicorn
+        from dqt.dashboard.app import build_app
     except ImportError:
         print("error: dqtlib[dashboard] is required. Run: pip install 'dqtlib[dashboard]'",
               file=sys.stderr)
         sys.exit(1)
-    from dqt.dashboard import create_app
+
     from dqt.store.memory import MemoryStore
-    app = create_app(store=MemoryStore())
+    app = build_app(store=MemoryStore())
+    if not generate_token and not token:
+        print("warning: no token set -- dashboard is open to anyone on the network", file=sys.stderr)
     print(f"dqt dashboard -> http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port)
+
+
+def _cmd_wiki_sync(args: argparse.Namespace) -> None:
+    """Synthesise wiki/ entries from raw/ documents using Anthropic Claude."""
+    from pathlib import Path
+    from dqt.wiki.loader import load_raw_documents
+    from dqt.wiki.synthesizer import synthesize_entries
+    from dqt.wiki.writer import load_manifest, write_wiki
+
+    raw_path = Path(args.raw_dir)
+    wiki_path = Path(args.wiki_dir)
+
+    if not raw_path.exists():
+        print(f"error: raw_dir not found: {args.raw_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Loading documents from {args.raw_dir}")
+    docs = load_raw_documents(raw_path)
+    if not docs:
+        print("No documents found -- nothing to sync.")
+        return
+    print(f"  {len(docs)} document(s) found")
+
+    manifest = load_manifest(wiki_path, args.raw_dir, str(wiki_path))
+
+    def _progress(msg: str) -> None:
+        print(f"  > {msg}")
+
+    try:
+        entries = synthesize_entries(
+            docs, manifest,
+            model=args.model,
+            force=args.force,
+            progress=_progress,
+        )
+    except (ImportError, EnvironmentError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if not entries:
+        print("All entries up to date.")
+        return
+
+    write_wiki(entries, wiki_path, manifest)
+    print(f"Wrote {len(entries)} wiki entry/entries to {args.wiki_dir}")
+
+
+def _cmd_wiki_status(args: argparse.Namespace) -> None:
+    """Show which raw documents are synced and which need re-synthesis."""
+    from pathlib import Path
+    from dqt.wiki.loader import load_raw_documents
+    from dqt.wiki.writer import load_manifest
+    from dqt.wiki.synthesizer import _content_hash, _entry_id
+
+    raw_path = Path(args.raw_dir)
+    wiki_path = Path(args.wiki_dir)
+
+    docs = load_raw_documents(raw_path)
+    manifest = load_manifest(wiki_path, args.raw_dir, str(wiki_path))
+
+    groups: dict[str, list] = {}
+    for doc in docs:
+        parts = Path(doc.path).parts
+        group_key = parts[0] if len(parts) > 1 else "__root__"
+        groups.setdefault(group_key, []).append(doc)
+
+    for group_key, group_docs in sorted(groups.items()):
+        entry_id = _entry_id([d.path for d in group_docs])
+        hash_val = _content_hash(group_docs)
+        last_hash = manifest.entries.get(entry_id)
+        if last_hash is None:
+            status = "pending"
+        elif last_hash == hash_val:
+            status = "up to date"
+        else:
+            status = "changed"
+        print(f"  {group_key:30s} {len(group_docs):3d} docs  {status}")
+
+    if manifest.last_sync:
+        print(f"\nLast full sync: {manifest.last_sync}")
 
 
 def _cmd_demo(_args: argparse.Namespace) -> None:
@@ -283,8 +383,35 @@ def main() -> None:
     p_dashboard = sub.add_parser("dashboard", help="Start the local dqt dashboard (requires dqtlib[dashboard])")
     p_dashboard.add_argument("--port", "-p", type=int, default=8080, help="Port to listen on (default: 8080)")
     p_dashboard.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    p_dashboard.add_argument("--token", default=None,
+                             help="Bearer token to protect the dashboard")
+    p_dashboard.add_argument("--generate-token", action="store_true",
+                             help="Generate a random token, print it, and set it")
+
+    # wiki
+    wiki_parser = sub.add_parser("wiki", help="LLM wiki synthesis from raw documents")
+    wiki_sub = wiki_parser.add_subparsers(dest="wiki_command", required=True)
+
+    p_wiki_sync = wiki_sub.add_parser("sync", help="Synthesise wiki entries from raw documents")
+    p_wiki_sync.add_argument("raw_dir", help="Path to raw/ source documents folder")
+    p_wiki_sync.add_argument("wiki_dir", help="Path to wiki/ output folder")
+    p_wiki_sync.add_argument("--model", default="claude-opus-4-7",
+                             help="Anthropic model (default: claude-opus-4-7)")
+    p_wiki_sync.add_argument("--force", action="store_true",
+                             help="Re-synthesise all entries even if unchanged")
+
+    p_wiki_status = wiki_sub.add_parser("status", help="Show sync status for all raw documents")
+    p_wiki_status.add_argument("raw_dir", help="Path to raw/ source documents folder")
+    p_wiki_status.add_argument("wiki_dir", help="Path to wiki/ output folder")
 
     args = parser.parse_args()
+
+    if args.command == "wiki":
+        if args.wiki_command == "sync":
+            _cmd_wiki_sync(args)
+        elif args.wiki_command == "status":
+            _cmd_wiki_status(args)
+        return
 
     dispatch = {
         "list-detectors": _cmd_list_detectors,

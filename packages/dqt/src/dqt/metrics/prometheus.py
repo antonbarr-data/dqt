@@ -15,14 +15,7 @@ def _verdict_to_int(v: Verdict) -> int:
 def build_metrics_text(store: "ResultsStore") -> str:
     """Build Prometheus text-format metrics from the store's latest run per check.
 
-    Metrics:
-      dqt_check_score{check_id, detector_slug} -- latest score [0,1]
-      dqt_check_verdict{check_id, detector_slug} -- 0=pass, 1=warn, 2=fail
-      dqt_check_runs_total{check_id, detector_slug} -- total run count
-
-    Uses store._runs directly (MemoryStore). Stores without _runs (e.g. a future
-    PostgresStore caller) will produce no metric lines until a list_check_ids()
-    protocol method is added.
+    Uses store.list_check_ids() for store-agnostic iteration.
     """
     lines = [
         "# HELP dqt_check_score Latest score from the most recent check run",
@@ -33,17 +26,17 @@ def build_metrics_text(store: "ResultsStore") -> str:
         "# TYPE dqt_check_runs_total counter",
     ]
 
-    runs_map: dict = getattr(store, "_runs", {})
-    for check_id, run_list in runs_map.items():
-        if not run_list:
+    for check_id in store.list_check_ids():
+        runs = store.list_runs(check_id, limit=10_000)
+        if not runs:
             continue
-        latest = max(run_list, key=lambda r: getattr(r, "finished_at", 0))
+        latest = max(runs, key=lambda r: getattr(r, "finished_at", 0))
         cid = str(check_id)
         slug = latest.detector_slug
         v = _verdict_to_int(latest.verdict)
         lines.append(f'dqt_check_score{{check_id="{cid}",detector_slug="{slug}"}} {latest.score}')
         lines.append(f'dqt_check_verdict{{check_id="{cid}",detector_slug="{slug}"}} {v}')
-        lines.append(f'dqt_check_runs_total{{check_id="{cid}",detector_slug="{slug}"}} {len(run_list)}')
+        lines.append(f'dqt_check_runs_total{{check_id="{cid}",detector_slug="{slug}"}} {len(runs)}')
 
     return "\n".join(lines) + "\n"
 

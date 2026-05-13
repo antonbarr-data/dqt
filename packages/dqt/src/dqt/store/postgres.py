@@ -330,5 +330,10 @@ class PostgresStore:
     def list_causality_reports(self) -> list[CausalityReport]:
         return []
 
+    def list_check_ids(self) -> list[UUID]:
+        with self._cursor() as cur:
+            cur.execute("SELECT DISTINCT check_id FROM dqt_runs")
+            return [UUID(row["check_id"]) for row in cur.fetchall()]
+
     def close(self) -> None:
         self._conn.close()
