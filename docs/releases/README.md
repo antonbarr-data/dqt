@@ -4,6 +4,7 @@ All dqt releases, newest first.
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.0](v0.9.0.md) | 2026-05-13 | Credibility batch: 64/64 failure-mode docs, benchmark infra, live adapter tests, 20 recipes, statistical primer |
 | [v0.8.9](v0.8.9.md) | 2026-05-13 | Prometheus exporter fix: always-passing checks now visible in /metrics |
 | [v0.8.8](v0.8.8.md) | 2026-05-12 | CLI cosmetic polish: colored output, --quiet, enhanced version, /health with uptime |
 | [v0.8.7](v0.8.7.md) | 2026-05-12 | STL auto-period, Prophet NaN fix, Cramers V bias correction, LOF auto-k, Mahalanobis warning, schema rename |
