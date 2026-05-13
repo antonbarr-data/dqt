@@ -93,7 +93,7 @@ export function Sidebar() {
     <aside
       className="flex flex-col border-r border-line transition-all duration-200"
       style={{
-        width: collapsed ? 48 : 200,
+        width: collapsed ? 56 : 224,
         background: "var(--bg-1)",
         flexShrink: 0,
       }}
@@ -101,29 +101,30 @@ export function Sidebar() {
       {/* logo + version */}
       <div
         className="flex items-center justify-between border-b border-line"
-        style={{ minHeight: 44, padding: collapsed ? "0 12px" : "0 14px" }}
+        style={{ minHeight: 48, padding: collapsed ? "0 14px" : "0 16px" }}
       >
         {collapsed ? (
           <button
             onClick={() => setCollapsed(false)}
-            style={{ color: "var(--accent)", fontSize: 14, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}
+            style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}
+            title="Expand sidebar"
           >
             d
           </button>
         ) : (
           <>
-            <span style={{ color: "var(--accent)", fontSize: 15, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}>
+            <span style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}>
               dqt
             </span>
             <div className="flex items-center gap-2">
-              <span className="t-micro" style={{ color: "var(--fg-3)" }}>v{DQT_VERSION}</span>
+              <span className="t-small" style={{ color: "var(--fg-2)" }}>v{DQT_VERSION}</span>
               <button
                 onClick={() => setCollapsed(true)}
                 className="flex items-center justify-center"
-                style={{ color: "var(--fg-3)", width: 16, height: 16 }}
+                style={{ color: "var(--fg-2)", width: 18, height: 18 }}
                 aria-label="Collapse sidebar"
               >
-                <ChevronLeft size={12} strokeWidth={1.6} />
+                <ChevronLeft size={14} strokeWidth={1.6} />
               </button>
             </div>
           </>
@@ -131,13 +132,13 @@ export function Sidebar() {
       </div>
 
       {/* nav groups */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-3">
         {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="mb-3">
+          <div key={group.label} className="mb-4">
             {!collapsed && (
               <div
-                className="px-3 py-1 t-micro"
-                style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}
+                className="px-4 py-1 t-small"
+                style={{ color: "var(--fg-1)", letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 500 }}
               >
                 {group.label}
               </div>
@@ -150,30 +151,31 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href as never}
                   className={clsx(
-                    "flex items-center gap-2 px-3 py-1.5 t-small transition-colors",
+                    "flex items-center gap-3 t-body transition-colors",
+                    collapsed ? "justify-center py-3" : "px-4 py-2",
                     active
                       ? "border-l-2 border-accent"
                       : "border-l-2 border-transparent hover:bg-bg-2"
                   )}
                   style={{
-                    color: active ? "var(--fg-0)" : "var(--fg-1)",
+                    color: active ? "var(--fg-0)" : "var(--fg-0)",
                     background: active ? "var(--bg-2)" : undefined,
                   }}
                   title={collapsed ? item.label : undefined}
                 >
                   <Icon
-                    size={13}
+                    size={16}
                     strokeWidth={1.6}
-                    style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-2)" }}
+                    style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }}
                   />
                   {!collapsed && (
                     <>
                       <span className="flex-1">{item.label}</span>
                       {item.count !== null && (
                         <span
-                          className="t-micro tabular-nums"
+                          className="t-small tabular-nums"
                           style={{
-                            color: "countFail" in item && item.countFail ? "var(--fail)" : "var(--fg-3)",
+                            color: "countFail" in item && item.countFail ? "var(--fail)" : "var(--fg-2)",
                             fontFamily: "var(--font-jetbrains-mono)",
                           }}
                         >
@@ -190,19 +192,19 @@ export function Sidebar() {
 
         {/* saved views */}
         {!collapsed && (
-          <div className="mb-3">
-            <div className="px-3 py-1 t-micro" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+          <div className="mb-4">
+            <div className="px-4 py-1 t-small" style={{ color: "var(--fg-1)", letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 500 }}>
               Saved Views
             </div>
             {SAVED_VIEWS.map((v) => (
               <div
                 key={v.label}
-                className="flex items-center gap-2 px-3 py-1.5 border-l-2 border-transparent t-small transition-colors hover:bg-bg-2 cursor-pointer"
-                style={{ color: "var(--fg-1)" }}
+                className="flex items-center gap-3 px-4 py-2 border-l-2 border-transparent t-body transition-colors hover:bg-bg-2 cursor-pointer"
+                style={{ color: "var(--fg-0)" }}
               >
-                <Bookmark size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
+                <Bookmark size={14} strokeWidth={1.6} style={{ color: "var(--fg-1)", flexShrink: 0 }} />
                 <span className="flex-1 truncate">{v.label}</span>
-                <span className="t-micro tabular-nums" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>{v.count}</span>
+                <span className="t-small tabular-nums" style={{ color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)" }}>{v.count}</span>
               </div>
             ))}
           </div>
@@ -210,9 +212,9 @@ export function Sidebar() {
 
         {/* sysadmin section */}
         {sysAdmin && (
-          <div className="mb-3">
+          <div className="mb-4">
             {!collapsed && (
-              <div className="px-3 py-1 t-micro" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              <div className="px-4 py-1 t-small" style={{ color: "var(--fg-1)", letterSpacing: "0.10em", textTransform: "uppercase", fontWeight: 500 }}>
                 Admin
               </div>
             )}
@@ -224,13 +226,14 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href as never}
                   className={clsx(
-                    "flex items-center gap-2 px-3 py-1.5 t-small transition-colors",
+                    "flex items-center gap-3 t-body transition-colors",
+                    collapsed ? "justify-center py-3" : "px-4 py-2",
                     active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
                   )}
-                  style={{ color: active ? "var(--fg-0)" : "var(--fg-1)", background: active ? "var(--bg-2)" : undefined }}
+                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined }}
                   title={collapsed ? item.label : undefined}
                 >
-                  <Icon size={13} strokeWidth={1.6} style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-2)" }} />
+                  <Icon size={16} strokeWidth={1.6} style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }} />
                   {!collapsed && <span className="flex-1">{item.label}</span>}
                 </Link>
               );
@@ -242,38 +245,38 @@ export function Sidebar() {
       {/* footer — user + on-call */}
       <div className="border-t border-line">
         {collapsed ? (
-          <div className="flex flex-col items-center gap-2 py-3">
+          <div className="flex flex-col items-center gap-3 py-3">
             <div
-              className="w-6 h-6 flex items-center justify-center t-micro font-medium"
+              className="w-7 h-7 flex items-center justify-center t-small font-medium"
               style={{ background: "var(--accent-bg)", color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)" }}
             >
               {userInitials}
             </div>
-            <button onClick={() => setCollapsed(false)} style={{ color: "var(--fg-3)" }}>
-              <ChevronRight size={12} strokeWidth={1.6} />
+            <button onClick={() => setCollapsed(false)} style={{ color: "var(--fg-1)" }} title="Expand sidebar">
+              <ChevronRight size={14} strokeWidth={1.6} />
             </button>
           </div>
         ) : (
-          <div className="px-3 py-2.5 flex items-center gap-2">
+          <div className="px-4 py-3 flex items-center gap-3">
             <div
-              className="w-6 h-6 flex items-center justify-center t-micro font-medium flex-shrink-0"
+              className="w-7 h-7 flex items-center justify-center t-small font-medium flex-shrink-0"
               style={{ background: "var(--accent-bg)", color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)" }}
             >
               {userInitials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="t-small truncate" style={{ color: "var(--fg-0)" }}>{userName}</p>
-              <p className="t-micro truncate" style={{ color: "var(--pass)" }}>
+              <p className="t-body truncate" style={{ color: "var(--fg-0)" }}>{userName}</p>
+              <p className="t-small truncate" style={{ color: "var(--pass)" }}>
                 <span style={{ marginRight: 3 }}>●</span>on-call · ends 18:30
               </p>
             </div>
             <button
               onClick={handleLogout}
               className="flex-shrink-0 p-1 transition-colors hover:opacity-70"
-              style={{ color: "var(--fg-3)" }}
-              title="Settings / Sign out"
+              style={{ color: "var(--fg-1)" }}
+              title="Sign out"
             >
-              <Settings size={12} strokeWidth={1.6} />
+              <Settings size={14} strokeWidth={1.6} />
             </button>
           </div>
         )}

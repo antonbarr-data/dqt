@@ -20,9 +20,9 @@
     --line-2: #1E1E1E;
     --line-3: #2E2E2E;
     --fg-0: #F0F0F0;
-    --fg-1: #A0A0A0;
-    --fg-2: #606060;
-    --fg-3: #383838;
+    --fg-1: #C4C4C4;
+    --fg-2: #888888;
+    --fg-3: #5C5C5C;
   }
 
   [data-theme="light"] {
@@ -57,11 +57,11 @@
 .t-display { font-size: 32px; font-weight: 200; letter-spacing: -0.02em; }
 .t-h1      { font-size: 24px; font-weight: 300; letter-spacing: -0.01em; }
 .t-h2      { font-size: 18px; font-weight: 400; }
-.t-h3      { font-size: 14px; font-weight: 500; }
-.t-body    { font-size: 13px; font-weight: 400; }
-.t-small   { font-size: 12px; font-weight: 400; }
-.t-micro   { font-size: 10px; font-weight: 400; letter-spacing: 0.02em; }
-.kpi-label { font-size: 10px; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; }
+.t-h3      { font-size: 15px; font-weight: 500; }
+.t-body    { font-size: 14px; font-weight: 400; }
+.t-small   { font-size: 13px; font-weight: 400; }
+.t-micro   { font-size: 11px; font-weight: 400; letter-spacing: 0.02em; }
+.kpi-label { font-size: 11px; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; }
 .kpi-value { font-family: var(--font-jetbrains-mono); font-size: 32px; font-weight: 300; font-variant-numeric: tabular-nums; }
 
 @keyframes fadeIn {

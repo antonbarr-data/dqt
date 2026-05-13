@@ -37,7 +37,7 @@ function TrendDot({ trend }: { trend: Trend }) {
 
 export default function OverviewPage() {
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="p-6 w-full">
       <h1 className="t-h1 mb-6" style={{ color: "var(--fg-0)" }}>Overview</h1>
 
       {/* KPI band */}
