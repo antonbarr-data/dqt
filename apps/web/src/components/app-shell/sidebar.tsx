@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
@@ -13,13 +13,12 @@ import {
   AlertTriangle,
   CheckSquare,
   Bookmark,
-  Settings,
   Users,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { isSysAdmin, decodeToken, getToken, clearToken } from "@/lib/auth";
+import { isSysAdmin, decodeToken, getToken } from "@/lib/auth";
 import { DQT_VERSION } from "@/lib/version";
 
 const NAV_GROUPS = [
@@ -65,7 +64,6 @@ const SYSADMIN_NAV = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [sysAdmin, setSysAdmin] = useState(false);
   const [userInitials, setUserInitials] = useState("?");
@@ -84,11 +82,6 @@ export function Sidebar() {
     }
   }, []);
 
-  function handleLogout() {
-    clearToken();
-    router.replace("/login");
-  }
-
   return (
     <aside
       className="flex flex-col border-r border-line transition-all duration-200"
@@ -106,10 +99,10 @@ export function Sidebar() {
         {collapsed ? (
           <button
             onClick={() => setCollapsed(false)}
-            style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}
+            style={{ color: "var(--accent)", fontSize: 13, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}
             title="Expand sidebar"
           >
-            d
+            dqt
           </button>
         ) : (
           <>
@@ -270,14 +263,6 @@ export function Sidebar() {
                 <span style={{ marginRight: 3 }}>●</span>on-call · ends 18:30
               </p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex-shrink-0 p-1 transition-colors hover:opacity-70"
-              style={{ color: "var(--fg-1)" }}
-              title="Sign out"
-            >
-              <Settings size={14} strokeWidth={1.6} />
-            </button>
           </div>
         )}
       </div>

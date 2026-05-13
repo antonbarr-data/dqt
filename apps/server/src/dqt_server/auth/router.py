@@ -78,7 +78,8 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)) -> Redi
     if not user.is_active:
         return RedirectResponse(f"{frontend_url}/login?error=account_disabled")
 
-    token = service.create_token(user)
+    picture: str | None = info.get("picture")
+    token = service.create_token(user, picture=picture)
     return RedirectResponse(f"{frontend_url}/auth/callback?token={token}")
 
 

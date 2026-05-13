@@ -24,6 +24,7 @@ export interface TokenPayload {
   role: string;
   tenant: string;
   exp: number;
+  picture?: string;
 }
 
 export function decodeToken(token: string): TokenPayload | null {

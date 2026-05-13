@@ -28,7 +28,7 @@ def verify_password(password: str, hashed: str) -> bool:
     return _pwd.verify(password, hashed)
 
 
-def create_token(user: User) -> str:
+def create_token(user: User, picture: str | None = None) -> str:
     payload = {
         "sub": str(user.id),
         "email": user.email,
@@ -36,6 +36,8 @@ def create_token(user: User) -> str:
         "tenant": user.tenant_id,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=_EXPIRE_MINUTES),
     }
+    if picture:
+        payload["picture"] = picture
     return jwt.encode(payload, _secret(), algorithm=_ALGORITHM)
 
 
