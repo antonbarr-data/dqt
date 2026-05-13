@@ -22,6 +22,7 @@ dependencies = [
     "anthropic>=0.28",
     "email-validator>=2.1",
     "structlog>=24.0",
+    "dqtlib>=0.9.1",
 ]
 
 [build-system]
