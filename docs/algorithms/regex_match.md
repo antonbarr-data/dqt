@@ -80,3 +80,29 @@ check = Check(
 | Strict format column | (default) | (default) | STAT_SCALES defaults |
 | Flexible format column | 0.01 | 0.05 | Allow small fraction of format variations |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`regex_match` evaluates a POSIX regex against each value's text representation. FPR is 0% for clean data that genuinely matches the pattern. False positives come from patterns that are too strict for the actual data; false negatives come from patterns that are too permissive.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Pattern too strict for international data | International phone numbers, addresses, or names have formats the pattern does not cover | Test the pattern against a representative international sample before deploying |
+| Null counted as violation | Null values fail the regex match and inflate the violation rate | Use `null_fraction` separately; set `null_handling=exclude` on the check definition |
+| Regex catastrophic backtracking | A complex pattern on a wide text column causes warehouse query timeout | Avoid nested quantifiers in the pattern; test with `EXPLAIN` before deploying |
+| Warehouse POSIX vs Python regex dialect | The pattern uses Python-only syntax (e.g. `(?P<name>...)`) which is not valid POSIX | Use only POSIX ERE syntax; test against your target warehouse regex engine |
+| Case sensitivity | Pattern is case-sensitive (default) but data has mixed case | Add `(?i)` flag or use `ILIKE` in a `sql_assertion_violation` instead |
+| Unicode characters in value | Non-ASCII characters in the column may match or fail unexpectedly depending on warehouse collation | Test with representative Unicode samples; use `sql_assertion_violation` with explicit collation if needed |
+
+### FPR table
+
+| Scenario | Expected FPR | Notes |
+|---|---|---|
+| Correct pattern on single-format column | 0% | Fully deterministic |
+| Pattern misses 1% of legitimate formats | ~1% false positives | Every legitimate non-matching format contributes to FPR |
+
+### Threshold recommendations
+
+- Default warn=0.001 / fail=0.01 is appropriate for well-defined format columns.
+- For formats with legitimate variation (e.g. phone numbers with or without country code): calibrate from a 30-day historical violation rate and set warn at 2x the baseline rate.
+- Always anchor patterns with `^` and `$` to avoid partial matches that miss invalid prefixes or suffixes.

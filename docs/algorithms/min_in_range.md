@@ -79,3 +79,29 @@ check = Check(
 | Hard lower bound | (default) | (default) | STAT_SCALES defaults |
 | Near-zero floor | 0 | 0 | Exact zero tolerance |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`min_in_range` checks the single minimum value in the sample. Like `max_in_range`, the minimum is highly sensitive to single extreme values and to sample size. On small samples the minimum is an unstable statistic; use `quantile_in_range` at p0.1 for more stable lower-tail monitoring.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Single refund or credit creates a negative value | One legitimate credit note fires the check | If credits are valid, set min_val to the minimum allowed credit amount (e.g. -10000) |
+| Sample-size dependence | As N grows, the minimum decreases even without distribution change | Use `quantile_in_range` at p0.01 which is more stable |
+| Zero-value records from a default fill | An ETL default-fill produces zeros in an otherwise positive column | Detect at the ETL layer; or set min_val=0 and treat zeros as valid |
+| Sentinel values from upstream (e.g. -1 = "unknown") | Sentinel fires the check legitimately | Either filter sentinels upstream or use a `sql_assertion_violation` that handles sentinels explicitly |
+| Late-arriving records with early timestamps | A late-arriving record has a very old date which becomes the new minimum | Filter by loaded_at not event_at for time-based min checks |
+
+### FPR table
+
+| Data shape | Expected FPR (correct bounds) | Notes |
+|---|---|---|
+| Normal (mu=100, sigma=10) with min_val=50 (5 sigma below) | ~0% | Extremely rare for N=100k sample |
+| Uniform [0, 1] with min_val=0 | 0% | Hard floor is a domain constant |
+| Pareto (heavy left tail) | Variable | Set min_val from historical 0.01st percentile |
+
+### Threshold recommendations
+
+- For strictly positive columns (prices, durations, IDs): set min_val=0 and treat any negative as a failure.
+- For columns with a known domain floor (e.g. rating >= 1): set min_val to the domain minimum exactly.
+- For columns without a hard domain floor: derive min_val from the historical 0.1st percentile of the reference window and subtract 3 standard deviations of that statistic.

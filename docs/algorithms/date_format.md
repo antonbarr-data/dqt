@@ -80,3 +80,28 @@ check = Check(
 | Single strict format | (default) | (default) | STAT_SCALES defaults |
 | Multi-format column | N/A | N/A | Standardise upstream first |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`date_format` is a structural pattern check, not a calendar-validity check. It validates the shape of the string (digit counts, separators), not whether the date is a real calendar date. FPR on clean data is 0%. False positives come from legitimate format variation (e.g. both `YYYY-MM-DD` and `YYYY-M-D` in the same column). False negatives come from dates that match the pattern structurally but are semantically invalid (e.g. `2024-02-30`).
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Mixed format source systems | Minority format fires as violations (e.g. 5% of rows use MM/DD/YYYY while the rest use YYYY-MM-DD) | Standardise at ingest; if mixed is expected, use `sql_assertion_violation` with a CASE WHEN per format |
+| Timezone suffix not in pattern | `2024-01-15T10:30:00Z` fails `%Y-%m-%dT%H:%M:%S` because of the trailing `Z` | Include the suffix in the pattern or strip it upstream |
+| Single-digit month/day padding | `2024-1-5` fails `%Y-%m-%d` because it expects zero-padded month | Use `%Y-%-m-%-d` (platform-specific) or normalise to zero-padded form upstream |
+| Column stored as date/timestamp type | The adapter casts to text before checking; casting format varies by warehouse (e.g. Postgres uses ISO 8601, BigQuery uses a different default) | Test the cast output format in your specific warehouse before setting the format string |
+| Null counted as violation | Score numerator includes null rows; null fraction appears inside format violation rate | Use `null_fraction` separately; set `null_handling=exclude` on the check definition |
+
+### FPR table
+
+| Data shape | Expected FPR | Notes |
+|---|---|---|
+| Uniform single-format column | 0% | Fully deterministic |
+| Column with locale-dependent separators | 0% (if pattern matches) or 100% (if pattern doesn't match) | FPR is binary for structural checks |
+
+### Threshold recommendations
+
+- Default warn=0.001 / fail=0.01 is appropriate for columns with a single enforced format.
+- For columns that accept a small proportion of legacy formats, calibrate from the historical violation rate and set warn at 2x the baseline.
+- For zero-tolerance format columns (date keys, partition columns), set fail=0 via `fail_if: "> 0"` in YAML.

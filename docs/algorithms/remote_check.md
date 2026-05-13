@@ -127,3 +127,30 @@ gql_det = RemoteCheckDetector(
 | Deterministic remote rule | 0 | 0 | Remote returns pass/fail directly |
 | Statistical remote check | calibrate | calibrate | Calibrate against reference data |
 | High-frequency use | N/A | N/A | Use local check or callable_check |
+
+## Failure modes and known limits
+
+`remote_check` introduces a network dependency into every check run. The detector itself is stateless on the dqt side; all scoring logic lives in the external endpoint. Reliability and correctness are entirely dependent on the remote service.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Network timeout | Check produces `RuntimeError` and the run is marked as `error` (not `fail`) | Set `timeout` conservatively; implement retries with exponential backoff in the remote service |
+| Remote service returns non-JSON or missing `score` key | `ValueError` is raised; run is marked as `error` | Add response validation in the remote service; return `{"score": 1.0}` as a safe fallback on internal error |
+| Remote service has side effects | Repeated calls (retries, re-runs) produce duplicate writes or consume quota | Design the endpoint to be idempotent; use request IDs if needed |
+| Payload too large (> 1000 rows) | `_MAX_ROWS = 1000` truncates the payload; remote service receives a subset | Ensure the remote service is designed for samples, not full tables; implement full-table aggregation server-side |
+| Score range mismatch | Remote returns scores outside [0, 1] (e.g. a probability not normalised, or a raw count) | The detector clips to [0, 1] silently; normalise in the remote service before returning |
+| Authentication not handled | The remote endpoint requires auth but no auth headers are configured | Pass auth tokens via `params` dict and handle them in the endpoint; note the token appears in dqt's audit log |
+
+### FPR table
+
+| Remote service type | Expected FPR | Notes |
+|---|---|---|
+| Deterministic rule engine | 0% | Returns 0 or 1; no statistical approximation |
+| ML scoring model | Depends on model calibration | Calibrate against labeled reference data |
+| Statistical test endpoint | Equals the significance level used | Document which alpha the remote service targets |
+
+### Threshold recommendations
+
+- Default warn=0.5 / fail=0.75 assumes the remote service returns a fraction-like score in [0, 1].
+- Override thresholds on the Check definition to match the remote service's scoring semantics.
+- Implement a health-check endpoint on the remote service and use dqt's `freshness_seconds_behind` check to monitor it independently.

@@ -81,3 +81,30 @@ check = Check(
 | Normal bounded variance | calibrated bounds | calibrated bounds | Derive from reference window |
 | Heavy-tailed (revenue, latency) | wide bounds | wide bounds | Std is unstable; widen or use MAD |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`stddev_in_range` monitors the population standard deviation, which is the second moment and thus highly sensitive to outliers. A single extreme value can double or triple the stddev, and the stddev is intrinsically unstable for heavy-tailed distributions even with large N.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Single outlier inflates stddev | One corrupt or extreme value makes the stddev exceed the upper bound | Pair with `mad_outlier_fraction` to identify the outlier; investigate before widening the bound |
+| Heavy-tailed distribution (Pareto, lognormal) | Stddev is inherently unstable; check fires randomly even on healthy data | Use IQR (Q3 - Q1) as a robust spread measure via `sql_assertion_violation`; or widen bounds to cover the 90-day stddev range |
+| Near-constant column (stddev approaches 0) | A legitimate constant-value period (e.g. a hardcoded fee that doesn't change) fires the lower bound | Set min_val=0 for columns that may be temporarily constant; add commentary in the check description |
+| Variance explosion from data corruption | Corrupt values (NULL replaced by 0, or INT overflow) produce extreme stddev | The check will correctly fire; investigate the data source for the corruption |
+| Sample-size sensitivity | Stddev estimate has confidence interval proportional to 1/sqrt(N); small batches are unreliable | Require N >= 30 per run; use `quantile_in_range` at p25/p75 for small samples |
+
+### FPR calibration table
+
+| Data shape | Expected FPR (correctly calibrated bounds) | Notes |
+|---|---|---|
+| Normal(0,1) bounds from 30-day stddev range | ~5% | Natural variability of the stddev statistic |
+| Lognormal(0,1) same bounds | ~15-20% | Stddev is highly volatile for heavy-tailed distributions |
+| Poisson(lambda=10) | ~5% | Approximately symmetric; stddev is stable |
+| Beta(2,5) (ratio data) | ~8% | Moderate tail effects |
+
+### Threshold recommendations
+
+- Derive bounds from the historical 5th-95th percentile of the daily stddev over at least 30 days.
+- For heavy-tailed columns: widen to the 1st-99th percentile range; or switch to monitoring IQR via `sql_assertion_violation`.
+- Use `min_val > 0` to detect variance collapse (all-same values). A column with stddev=0 is either degenerate data or a pipeline that stopped varying.

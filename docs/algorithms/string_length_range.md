@@ -80,3 +80,28 @@ check = Check(
 | Fixed-length identifier | exact min=max | exact min=max | Strict equality on length |
 | Variable-length with bounds | (default) | (default) | STAT_SCALES defaults |
 | Free text | N/A | N/A | Not appropriate for this check |
+
+## Failure modes and known limits
+
+`string_length_range` measures character length (not byte length). This distinction matters for multibyte encodings (UTF-8 CJK characters, emoji). Most warehouses implement `LENGTH()` as character length, but some use byte length. Verify behaviour on your warehouse before deploying for non-ASCII columns.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Multibyte character length vs byte length | A 3-character CJK string may be 9 bytes; LENGTH() may return 9 not 3 on some warehouses | Test with a known multibyte value; use CHAR_LENGTH() explicitly if the warehouse supports it |
+| Null values counted as violations | NULL strings fail the length check if null_handling=count_as_violation | Use `null_fraction` separately; set `null_handling=exclude` on the check |
+| Trailing spaces inflate length | "USA   " has length 6, not 3; upstream ETL did not TRIM | Trim whitespace at ingest; add TRIM() in a `sql_assertion_violation` if columns are known to contain trailing spaces |
+| Bounds too tight for edge-case valid values | A username with exactly 2 characters is legitimate but min_len=3 rejects it | Review real-world edge cases before setting min_len |
+| Column type is not text | A numeric column cast to text may produce strings of variable length (e.g. "1" vs "1000") | Check whether the cast-to-text representation is stable; avoid using string_length_range on numeric columns |
+
+### FPR table
+
+| Scenario | Expected FPR | Notes |
+|---|---|---|
+| Fixed-length identifier (e.g. ISO-2 country code) | 0% | Correct bounds produce zero FPR |
+| Variable-length column with 30-day calibrated bounds | ~0% | Bounds derived from historical range eliminate FPR |
+
+### Threshold recommendations
+
+- For fixed-length identifiers (SSN, IBAN, country code): set min_len=max_len=expected_length with `fail_if: "> 0"`.
+- For variable-length columns: derive min_len from the 0.1st percentile and max_len from the 99.9th percentile of historical lengths.
+- For free-text columns (descriptions, comments): do not use this check; length variation is expected and meaningful.

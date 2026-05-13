@@ -79,3 +79,29 @@ check = Check(
 | Hard upper bound | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | N/A | N/A | Use quantile_in_range at p99 instead |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`max_in_range` checks the single maximum value in the sample. Because the maximum is the most extreme order statistic, it is highly sensitive to single outliers and to sample size. On heavy-tailed distributions the expected maximum grows with N, so static bounds will produce false positives as data volumes grow.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Single legitimate outlier | One real but valid high-value transaction fires the check | Verify the outlier is real; widen the bound or switch to `quantile_in_range` at p99 |
+| Sample-size growth raises expected max | As the table grows the maximum creeps up; check fires even though the distribution is stable | Use `quantile_in_range` at p99.9 which is more stable with N growth |
+| Data corruption introduces sentinel values | Max jumps to a garbage value (e.g. 9999999 or -1) | Set both a lower and upper bound to catch negative sentinels and overflow values |
+| Testing data leaks into production | A test record with an extreme value was not filtered | Add a WHERE clause filter via `sql_assertion_violation` to exclude test rows |
+| Stale bounds after business change | Business raised pricing limits but bounds were not updated | Review bounds after any planned pricing or scale changes |
+
+### FPR table
+
+| Data shape | Expected FPR (with correctly set bounds) | Notes |
+|---|---|---|
+| Normal (mu=100, sigma=20) with bound=200 (5 sigma) | ~0% | Extremely rare to exceed 5 sigma max |
+| Lognormal (typical revenue) with wide bound | ~0% | Set bound from historical 99.99th percentile |
+| Pareto / power-law (no natural maximum) | Variable | Do not use max_in_range; use quantile_in_range |
+
+### Threshold recommendations
+
+- For hard physical or business ceilings (percentages, ratings, fixed-range IDs): set the bound at the known maximum value. FPR is 0% by definition for clean data.
+- For columns without a natural ceiling: do not use `max_in_range`. Use `quantile_in_range` at p99 or p99.9 instead.
+- Derive the upper bound from the historical 99.99th percentile of the reference window when no domain ceiling exists.

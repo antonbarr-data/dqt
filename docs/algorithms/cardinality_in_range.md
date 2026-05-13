@@ -81,3 +81,29 @@ check = Check(
 | Low-cardinality enum | exact expected bounds | exact expected bounds | e.g. status has 4 values |
 | Growing high-cardinality | relative to row count | relative to row count | e.g. max=row_count |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`cardinality_in_range` is a deterministic range check on `COUNT(DISTINCT col)`. FPR is 0% for clean data; all false positives come from bounds that were set before the data evolved, or from sample-size effects on high-cardinality columns.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| New legitimate category introduced | Upper-bound violation fires the moment a new enum member appears | Widen bounds on business-level category changes; consider alerting to review rather than fail |
+| Category consolidation / merging | Cardinality drops below lower bound after a business reorganisation | Update lower bound after each planned consolidation |
+| Sample-size dependency on IDs | A reservoir sample of 100k rows from a 50M-row ID table will show lower distinct count than the full table | Set bounds relative to expected distinct count in the sample, not the table |
+| Aliasing / typos (e.g. "USA" vs "US") | Cardinality appears correct while data is inconsistent | Pair with `set_membership` or `regex_match` to enforce canonical values |
+| Null treated as a distinct value | Some warehouses count NULL as a distinct value; others do not | Check warehouse behaviour; use `null_fraction` to monitor nulls separately |
+
+### FPR by column type
+
+| Column type | Expected FPR | Notes |
+|---|---|---|
+| Low-cardinality stable enum (3-10 values) | 0% | Cardinality is constant between schema changes |
+| Growing dimension (new products, regions) | High if bounds are tight | Widen bounds or switch to upper=NULL (no ceiling) |
+| ID / user table (millions of distinct values) | 0% with correct sample-relative bounds | Set bounds as fraction of sample size |
+
+### Threshold recommendations
+
+- For stable enums: set min=max=expected_count for zero tolerance on category drift.
+- For slowly growing dimensions: set max = historical_max * 1.5 and review quarterly.
+- For user/session ID columns: do not use this check; use `uniqueness` instead.

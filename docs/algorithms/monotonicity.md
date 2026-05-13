@@ -80,3 +80,30 @@ check = Check(
 | Strict monotonic column | (default) | (default) | STAT_SCALES defaults |
 | Near-monotonic (late arrivals) | 0.001 | 0.01 | Small tolerance for out-of-order |
 | Non-monotonic by design | N/A | N/A | Not applicable |
+
+## Failure modes and known limits
+
+`monotonicity` checks whether the sampled column values are non-decreasing (or non-increasing) after sorting by the row order returned by the query. The check result depends critically on the ORDER BY clause in the sample query. If the query does not order by the intended sequence column, the check produces meaningless results.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Sample not ordered by sequence column | The check evaluates random row order; passes or fails non-deterministically | Always specify `ORDER BY sequence_col` in the check's sample query or adapter params |
+| Backfills / late-arriving records | A historical record is inserted after newer records; the sequence has a dip | Use `warn` instead of `fail` for tables with known late arrivals; or filter by inserted_at |
+| Time-zone offset on timestamp column | UTC timestamps ordered correctly but local-time rendering looks non-monotonic in the UI | Store and compare in UTC; do not convert timezone in the sequence column |
+| Auto-increment gaps after deletes | Sequence ID has gaps (e.g. 1, 2, 5, 6) but is still monotonic; check passes correctly | Gaps are fine - only direction matters; use `uniqueness` to detect missing IDs |
+| Cumulative metric that resets | A running total resets to zero at the start of each period | Scope the check to a single period window; or exclude reset points with a SQL filter |
+| Composite sort key needed | The natural order requires sorting by (date, id) not just id | Use a `sql_assertion_violation` with `LAG()` window function for multi-key ordering checks |
+
+### FPR table
+
+| Scenario | Expected FPR | Notes |
+|---|---|---|
+| True monotonic sequence (correct ORDER BY) | 0% | Fully deterministic |
+| Out-of-order sample (missing ORDER BY) | Unpredictable | Always specify sort order |
+| Late-arrival rate 0.5% | ~0.5% "false positive" rate | These are real violations; configure warn threshold accordingly |
+
+### Threshold recommendations
+
+- For strict sequence columns (auto-increment IDs, event IDs): set fail=0 (any violation is a real incident).
+- For tables with expected late arrivals: measure the historical late-arrival rate and set warn at 2x that rate.
+- For cumulative metrics with known resets: do not use `monotonicity`; use `value_in_range` per period instead.

@@ -116,3 +116,30 @@ print(result_shift.plain_english)  # "Normalized MI = 0.1832 — drift detected"
 | Normal continuous | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | (default) | (default) | MI is distribution-agnostic |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+Normalized Mutual Information via histogram binning has two main sources of error: bin count selection and sample size. The NMI score is not a p-value and has no analytic null distribution - the warn/fail thresholds are empirically calibrated effect-size thresholds, not significance levels.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Wrong bin count (n_bins) | Too few bins miss shape changes; too many bins produce noise | Use `n_bins=20` as default; increase to 50 for wide-range columns (e.g. amounts 0-100,000); decrease to 5-10 for narrow-range or low-cardinality columns |
+| Small sample (< 100 rows) | NMI estimate is noisy and can fluctuate widely between runs | Require N >= 100 per window; fall back to `ks_pvalue` for small samples |
+| Score direction confusion | NMI is `higher_is_better` (1.0 = no drift); alerts fire when NMI *drops* below thresholds | Ensure alerting logic reads direction=higher_is_better correctly; score=0.3 is a failure |
+| High-cardinality column | Many sparse bins inflate joint entropy; NMI drops even without drift | Use `cramers_v` for high-cardinality categoricals; use `wasserstein_1` for high-cardinality numerics |
+| Reference and current have different value ranges | Bin edges set from reference may not cover the current range; out-of-range values fall into boundary bins | NMI naturally handles this (out-of-range values accumulate in edge bins); also run `value_in_range` to catch range expansion |
+
+### FPR calibration table
+
+| Data shape | Expected FPR at warn threshold (NMI < 0.50) | Notes |
+|---|---|---|
+| Normal(0,1) with n_bins=20, N=1000 | ~5% | Histogram estimator variance |
+| Lognormal(0,1) with n_bins=20, N=1000 | ~7% | Heavier tails increase estimator variance |
+| Poisson(lambda=10) with n_bins=20, N=1000 | ~6% | Discrete distribution; some bin boundary effects |
+| Uniform [0,1] with n_bins=20, N=500 | ~10% | Small N amplifies bin variance |
+
+### Threshold recommendations
+
+- Default warn=0.50 / fail=0.30 is calibrated for N >= 500 with n_bins=20.
+- For N < 200: raise warn to 0.40 and fail to 0.20 to account for higher estimator variance.
+- For drift *detection* (not magnitude): pair with `ks_pvalue` which provides a calibrated p-value; use NMI for magnitude quantification only.

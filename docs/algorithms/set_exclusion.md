@@ -78,3 +78,28 @@ check = Check(
 | Categorical with explicit blocklist | (default) | (default) | STAT_SCALES defaults |
 | High-cardinality columns | N/A | N/A | Maintain blocklist carefully |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`set_exclusion` is a pure membership test: FPR is 0% if the forbidden set is correctly specified. All practical failure modes come from blocklist maintenance - values that should be forbidden but are not in the list, or values that were added by mistake.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Stale blocklist (new bad values not added) | New sentinel values (e.g. "N/A", "UNKNOWN") enter the table and are not caught | Audit the distinct value set quarterly; trigger a re-review when `cardinality_in_range` detects new categories |
+| Case sensitivity mismatch | "test" is forbidden but "TEST" or "Test" passes | Add all case variants to the forbidden set, or normalize case upstream |
+| Whitespace variants | "banned " (trailing space) is not caught by "banned" | Trim values upstream; add TRIM() in a `sql_assertion_violation` if the column contains whitespace variants |
+| Null is forbidden but passes | Null values are not matched by `IN (...)` in SQL - they are excluded from the violation count | Use `null_fraction` to catch nulls if they are also forbidden |
+| Blocklist too large (> 1000 values) | Performance degrades on very large IN lists on some warehouses | Switch to a separate blocklist table and use `sql_assertion_violation` with a NOT EXISTS join |
+
+### FPR table
+
+| Scenario | Expected FPR | Notes |
+|---|---|---|
+| Stable blocklist on stable categorical | 0% | Fully deterministic |
+| After schema evolution introduces new categories | 0% (but false negatives rise) | New bad values not in the list are missed |
+
+### Threshold recommendations
+
+- Default warn=0.001 / fail=0.01 is appropriate for most categorical columns.
+- For PII or compliance blocklists (e.g. test emails, known-bad account IDs): set fail=0 via `fail_if: "> 0"`.
+- For large blocklists: implement the check as a `sql_assertion_violation` with a LEFT JOIN to a blocklist table rather than a large IN list.

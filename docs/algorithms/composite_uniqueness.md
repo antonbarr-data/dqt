@@ -76,3 +76,29 @@ check = Check(
 | Composite primary key | 1.0 | 1.0 | Exact uniqueness required |
 | Near-unique composite | 0.99 | 0.95 | Small tolerance |
 | Non-unique combination | N/A | N/A | Not applicable |
+
+## Failure modes and known limits
+
+`composite_uniqueness` is a deterministic rule: FPR is 0% for truly unique composite keys. False positives come from over-strict key definitions or from sampling effects on very large tables. False negatives (missed duplicates) come from sampling - a reservoir sample of 100k rows may not catch rare duplicates.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Sampling misses rare duplicates | Duplicate fraction in sample is 0% but duplicates exist at full-table scale | Run the check against the full table for critical keys; increase sample size via `sample_size` param |
+| Null in key column | NULL values are treated as distinct by most warehouses - two rows with NULL in a key column count as unique | Use `null_fraction` on each key column first; treat any null in a key column as a violation |
+| Partial key definition (missing a column) | A key that omits a discriminating column produces false duplicate alerts on legitimately distinct rows | Verify the key definition covers all natural-key columns |
+| Late-arriving duplicates deduplicated upstream | A pipeline that deduplicates on load means no duplicates at check time, but the deduplication itself may be lossy | Add checks both upstream (before dedup) and downstream (after dedup) |
+| Reprocessed / incremental loads create temporary duplicates | Duplicate fraction spikes during a reload then drops to zero | Schedule the check after the full load completes; exclude the reload window |
+
+### FPR table
+
+| Scenario | Expected FPR | Notes |
+|---|---|---|
+| Stable table with true PK | 0% | Rule-based; no statistical approximation |
+| Incremental append table | 0% at steady state | May fire during reload windows |
+| Sample of large table | Near 0% | Very rare duplicates may be missed entirely |
+
+### Threshold recommendations
+
+- For composite primary keys: set warn=fail=0 (any duplicate is an immediate failure).
+- For near-unique combinations (e.g. `(user_id, date)` where some users have multiple records per day by design): set warn=0.001 / fail=0.01 to allow a small expected rate.
+- Do not loosen thresholds to suppress fires during reloads; instead exclude reload windows using check scheduling.

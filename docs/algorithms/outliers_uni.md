@@ -101,3 +101,28 @@ Tests for up to k outliers simultaneously, handling the masking problem.
 from dqt.algorithms.outliers_uni.grubbs import GeneralizedESDDetector
 det = GeneralizedESDDetector(max_outliers=0, alpha=0.05)  # 0 = auto (max 100)
 ```
+
+## Failure modes and known limits
+
+This section covers cross-cutting failure modes that apply to all univariate outlier detectors. For detector-specific details see the individual docs (`iqr_fence.md`, `mad_outlier_fraction.md`, `grubbs.md`, `generalized_esd.md`, `zscore_outlier_fraction.md`, `double_mad_outlier_fraction.md`, `adjusted_boxplot_fraction.md`).
+
+All univariate outlier detectors share the assumption of approximately unimodal data. When that assumption fails, every detector here will either over-flag (multimodal) or under-flag (contaminated reference).
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Multimodal reference data (e.g. B2B vs B2C mixed) | Threshold calibrated on mixture; neither mode is properly flagged | Segment by a grouping dimension; run one detector per segment |
+| Contaminated reference (outliers in reference window) | Outliers inflate reference scale (stddev, IQR); future outliers are missed | Clean the reference window; use robust estimators (MAD, adjusted boxplot) |
+| Concept drift (distribution shifts over time) | Outlier rate rises gradually; reference becomes stale | Re-fit baselines on a rolling window; trigger re-fit when `ks_pvalue` detects drift |
+| Fraction vs. single-point semantics | Fraction-based detectors (mad_outlier_fraction) report the rate of outliers; Grubbs/GESD test for individual points | Use fraction-based detectors for monitoring; use Grubbs/GESD for batch inspection |
+| Threshold confusion across detectors | Different detectors use different scales (MAD units, sigma, IQR multiples) - thresholds are not interchangeable | Always use the STAT_SCALES defaults for each detector; do not copy a threshold from one detector to another |
+
+### Detector selection guide
+
+| Data shape | Recommended detector | Avoid |
+|---|---|---|
+| Approximately normal | `zscore_outlier_fraction` or `grubbs` | MAD (overkill for Gaussian) |
+| Heavy-tailed (revenue, latency) | `mad_outlier_fraction` or `adjusted_boxplot_fraction` | Z-score (will miss outliers) |
+| Count data (non-negative integers) | `iqr_fence` | Z-score, Grubbs |
+| Ratio/score data (0-1) | `iqr_fence` or `adjusted_boxplot_fraction` | Z-score |
+| Suspected multiple outliers | `generalized_esd` | Grubbs (masks beyond 1) |
+| Unknown distribution | `mad_outlier_fraction` (default) or `auto_outlier` | None |

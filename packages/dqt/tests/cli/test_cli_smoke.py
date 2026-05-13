@@ -52,6 +52,14 @@ _SUBCOMMANDS = [
         ["version", "--help"],
         [],
     ),
+    (
+        ["healthcheck", "--help"],
+        [],
+    ),
+    (
+        ["prometheus-exporter", "--help"],
+        ["--port", "--host"],
+    ),
 ]
 
 _SUBCOMMAND_IDS = [
@@ -64,6 +72,8 @@ _SUBCOMMAND_IDS = [
     "demo-seed",
     "demo-reset",
     "version",
+    "healthcheck",
+    "prometheus-exporter",
 ]
 
 
@@ -104,7 +114,7 @@ def test_top_level_help_lists_all_subcommands() -> None:
     """Top-level --help must list every registered subcommand."""
     result = subprocess.run(_CLI + ["--help"], capture_output=True, text=True)
     assert result.returncode == 0
-    for cmd in ["run", "dashboard", "list-detectors", "report", "wiki", "demo", "version"]:
+    for cmd in ["run", "dashboard", "list-detectors", "report", "wiki", "demo", "version", "healthcheck", "prometheus-exporter"]:
         assert cmd in result.stdout, f"'{cmd}' missing from top-level --help"
 
 

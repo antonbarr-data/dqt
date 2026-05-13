@@ -107,3 +107,30 @@ print(det.score(curr_stable, state).verdict)  # pass
 | Low-cardinality categorical | (default) | (default) | STAT_SCALES defaults |
 | High-cardinality categorical | 0.05 | 0.10 | Many cells inflate V; raise threshold |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+Cramér's V is computed from a chi-squared statistic and inherits chi-squared's known sensitivities. The biggest practical risk is small samples and sparse contingency tables, which produce upward-biased V estimates. The detector uses bias-corrected V (Bergsma 2013 correction) by default, which substantially reduces this bias but does not eliminate it entirely.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Small N (< 50) | V is upward-biased even after correction; warns on distributions that haven't drifted | Require N >= 50 per window; reduce check frequency or increase window size |
+| High-cardinality column (> 50 distinct values) | Many low-count cells inflate chi-squared and therefore V | Group rare categories into an "other" bucket before running the check |
+| Unseen categories in current window | Current window has a category not in the reference; chi-squared has a zero cell for that category | Use `chi_square_drift` with `handle_unseen=add_small_count` option; unseen categories always indicate drift |
+| Reference and current have very different N | V is sensitive to minimum N; asymmetric window sizes inflate V | Subsample to equal sizes before comparing |
+| Binary column with heavy class imbalance | V overstates drift when the minority class shifts; absolute count change is small | Report alongside absolute count differences; check rare-class shift separately |
+
+### FPR by sample size
+
+| N per window | Expected FPR (no drift, 5-category column) | Notes |
+|---|---|---|
+| 30 | ~15% | Bias correction insufficient at this N |
+| 100 | ~7% | Approaching correct calibration |
+| 500 | ~5% | Well-calibrated |
+| 1000+ | ~5% | Stable at nominal alpha |
+
+### Threshold recommendations
+
+- Default warn=0.15 / fail=0.30 is calibrated for moderate-cardinality (5-20 values) columns with N >= 200.
+- For high-cardinality columns (> 50 values): raise thresholds to warn=0.05 / fail=0.10 to account for elevated baseline V.
+- For binary columns: use `chi_square_drift` instead, which gives a direct p-value without the normalisation artefacts of V.

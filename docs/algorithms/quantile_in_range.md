@@ -83,3 +83,30 @@ check = Check(
 | Normal bounded | calibrated bounds | calibrated bounds | Derive from reference window |
 | Heavy-tailed (revenue, latency) | calibrated bounds | calibrated bounds | Use p95/p99 for tail monitoring |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`quantile_in_range` is deterministic given the quantile estimate. The quantile estimator itself (PERCENTILE_CONT) is stable for moderate to large N but can fluctuate significantly for extreme quantiles (p99.9, p0.1) on small samples.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Insufficient N for extreme quantile | p99 requires ~100 rows; p99.9 requires ~1000 rows; on small tables the estimate is unreliable | Use a quantile no more extreme than 1/(0.1 * N); e.g. for N=200 use at most p95 |
+| Wrong quantile direction | Monitoring p5 (lower tail) instead of p95 (upper tail) misses the intended SLA | Verify the quantile level matches the business SLA direction |
+| Seasonal quantile drift | p95 latency is higher at peak hours; static bounds fire during expected peaks | Set bounds from the 90-day percentile-of-the-quantile to capture seasonal variation |
+| Heavy-tailed column (Pareto-like) | p95 varies widely run-to-run because extreme values dominate | Use a wider bound derived from the 30-day reference max of the quantile value |
+| Stale bounds after load change | Query volume doubles; p95 latency increases legitimately | Re-calibrate bounds after any planned load change |
+| PERCENTILE_CONT interpolation difference | Different warehouses interpolate PERCENTILE_CONT differently at the same quantile level | Verify the warehouse's interpolation method; use PERCENTILE_DISC for discrete columns |
+
+### FPR table
+
+| Data shape | Expected FPR (correct bounds) | Notes |
+|---|---|---|
+| Normal(0,1), p95, bounds calibrated from 30d history | ~0% | Quantile is stable for Gaussian data |
+| Lognormal(0,2), p95, bounds calibrated from 30d history | ~2-3% | Heavy tail makes p95 more variable |
+| Pareto(1.5), p95 | ~5-8% | Quantile at p95 is highly variable for Pareto |
+
+### Threshold recommendations
+
+- For SLA monitoring: set max_val at the SLA limit (e.g. p95 latency <= 500ms) and set min_val=0.
+- For anomaly detection on quantile drift: derive bounds from the historical min/max of the quantile statistic over the reference window, not from the raw data range.
+- Use at least N >= 100 / (1 - quantile) rows per window for reliable quantile estimation.

@@ -101,3 +101,29 @@ checks:
 | Hard business rule | (default) | (default) | STAT_SCALES defaults |
 | Soft tolerance | 0.001 | 0.01 | Allow small violation fraction |
 | Statistical assertion | calibrate | calibrate | Calibrate against reference data |
+
+## Failure modes and known limits
+
+`sql_assertion_violation` executes user-supplied SQL, so correctness depends entirely on the SQL expression provided. The detector adds no statistical machinery; it embeds the condition directly into an aggregation query. The main risks are incorrect SQL logic, dialect portability, and performance.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| NULL propagation in SQL | `amount > 0` returns NULL (not FALSE) when amount is NULL; NULL rows are not counted as violations | Use explicit null handling: `amount IS NOT NULL AND amount > 0`; or test separately with `null_fraction` |
+| SQL dialect incompatibility | A condition using DATEADD or MySQL-specific functions fails on Postgres | Write standard SQL or use warehouse-specific conditions only after testing on all target engines |
+| Full-table scan in condition | A subquery (e.g. `NOT EXISTS (SELECT ...)`) causes a full-table scan on every run | Pre-aggregate the subquery result into a summary table; or use `referential_integrity_rate` for referential checks |
+| Division by zero in condition | `amount / quantity` fails when quantity = 0 | Use `NULLIF(quantity, 0)` to avoid division by zero in the condition |
+| Condition changed after incident investigation | Condition was loosened to stop the alert; the underlying issue was not fixed | Track condition changes in the audit log; require HITL approval for condition weakening |
+| Score direction confusion | Violation fraction is `lower_is_better`; a score of 0.01 means 1% of rows fail | Ensure alerting is configured for lower_is_better; the score is NOT a pass probability |
+
+### FPR table
+
+| SQL condition type | Expected FPR | Notes |
+|---|---|---|
+| Deterministic boolean (no statistical approximation) | 0% | FPR is fully determined by the correctness of the SQL |
+| Condition involving statistical functions (e.g. STDDEV) | Depends on the function's sampling distribution | Document which statistical assumptions the SQL makes |
+
+### Threshold recommendations
+
+- For zero-tolerance business rules (no nulls in a key column, price always positive): set `fail_if: "> 0"` in YAML (fail on any violation).
+- For rules with expected edge cases: measure the historical baseline violation rate and set warn at 2x baseline.
+- Always validate the SQL against the target warehouse with a test query before deploying the check.

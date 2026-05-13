@@ -81,3 +81,29 @@ check = Check(
 | Normal bounded | (default) | (default) | STAT_SCALES defaults |
 | Heavy-tailed (revenue, latency) | calibrated bounds | calibrated bounds | Median is stable; set tight bounds |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`median_in_range` is a deterministic bound check on the median. It is the most outlier-robust of the central-tendency checks. The main risks are incorrect bound calibration and multimodal distributions where the median falls in a trough between modes.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Stale bounds after seasonal shift | Median drifts seasonally (e.g. holiday order values) but bounds were set on non-seasonal data | Set bounds from a full-year historical percentile range; widen by +/- 1 seasonal standard deviation |
+| Multimodal distribution (e.g. B2B vs B2C orders) | Median sits in a low-density region between modes; small shifts cause the median to jump between modes | Segment the check by a dimension column (B2B / B2C separately) using a `sql_assertion_violation` |
+| Sparse data (< 30 rows) | PERCENTILE_CONT estimate is noisy; median can jump significantly | Increase sample size or widen bounds for small tables |
+| Wrong column type (text cast to numeric) | Median of string-encoded numbers is computed after implicit casting; encoding errors produce NULL median | Ensure column is numeric type; use explicit CAST |
+| Bounds not updated after pricing change | A planned price change moves the median outside stale bounds | Review and update bounds as part of any planned business change |
+
+### FPR table
+
+| Data shape | Expected FPR (with 30-day calibrated bounds) | Notes |
+|---|---|---|
+| Normal (symmetric) | ~0% | Median equals mean; bounds from 30-day range cover natural variation |
+| Lognormal (revenue, latency) | ~0% | Median is stable even in heavy-tailed distributions |
+| Bimodal | Variable | Median falls between modes; bounds calibration is unreliable |
+
+### Threshold recommendations
+
+- Derive bounds from the historical 5th-95th percentile of the column's daily median over at least 30 days.
+- For seasonal columns: use the 2nd-98th percentile range over a full year.
+- Do not use the raw min/max of the column as bounds - use percentiles of the *median* statistic over time.

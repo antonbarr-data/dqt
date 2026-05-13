@@ -82,3 +82,31 @@ check = Check(
 | Deterministic relationship | (default) | (default) | STAT_SCALES defaults |
 | Statistical relationship | 0.05 | 0.01 | p-value thresholds |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`column_pair_comparison` evaluates a row-level comparison rule and returns the violation fraction. The check is deterministic (FPR 0%) for exact rules; the main risk is choosing an operator that does not match the business intent, or having nulls silently excluded when they should be treated as violations.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Nulls excluded from denominator | Null rows in either column are skipped; violation rate appears lower than reality | Use `null_fraction` on each column first; treat any null in a mandatory pair as a violation |
+| Timezone-offset comparisons | `shipped_at >= created_at` passes when both timestamps are in UTC but fails when one is in local time | Normalise timestamps to UTC at ingest; assert `AT TIME ZONE 'UTC'` in the condition |
+| Type mismatch between col_a and col_b | Implicit casting may silently succeed (numeric vs text) or fail with a warehouse error | Ensure both columns are the same type; add explicit CAST in a `sql_assertion_violation` if needed |
+| Reversed operator intent | Using `col_a > col_b` when `>=` is correct flags legitimate equal values | Verify operator semantics against the business rule before deploying |
+| Clock skew on near-simultaneous events | `shipped_at >= created_at` fires because system clocks differ by milliseconds | Add a grace window via `sql_assertion_violation` with `shipped_at >= created_at - INTERVAL '1 second'` |
+
+### FPR table
+
+All scores are 0% FPR on clean data because this is a deterministic rule evaluation. The only source of false positives is incorrect operator configuration.
+
+| Operator | FPR on clean data | FPR when nulls ignored |
+|---|---|---|
+| `>=` (ordering) | 0% | 0% (nulls excluded) |
+| `=` (equality) | 0% | 0% (nulls excluded) |
+| `!=` (inequality) | 0% | 0% (nulls excluded) |
+
+### Threshold recommendations
+
+- Default warn=0.001 / fail=0.01 is appropriate for critical ordering rules.
+- For zero-tolerance business invariants (e.g. `shipped_at >= created_at` must always hold), set fail=0 via `fail_if: "> 0"` in YAML.
+- For soft cross-column correlations that occasionally break, calibrate thresholds from a 30-day historical violation rate.

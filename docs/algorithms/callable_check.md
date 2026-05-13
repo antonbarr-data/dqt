@@ -125,3 +125,30 @@ print(result.details)        # {"score": 0.28, "ref_score": 0.09}
 | User-defined logic | user-defined | user-defined | Set thresholds in the callable |
 | Deterministic rule | 0 | 0 | No statistical threshold needed |
 | Statistical custom check | calibrate | calibrate | Calibrate against reference data |
+
+## Failure modes and known limits
+
+`callable_check` wraps arbitrary Python logic so its failure modes are almost entirely determined by the user-supplied function. The detector adds no statistical machinery of its own; it only clips the returned value to [0, 1] and routes it through the standard verdict table. The main risks are non-determinism, hidden side effects, and incorrect score normalisation.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Non-deterministic callable | Different runs produce different verdicts on identical data | Make the callable pure (no random seeds, no external state reads at score time) |
+| Score outside [0, 1] | Score is silently clipped; actual logic may return values like 500 | Normalise the return value explicitly inside the callable |
+| Exception inside callable | Check produces `DetectorError` rather than a verdict | Add try/except inside the callable and return 1.0 (fail-safe) on unexpected inputs |
+| Callable reads from the warehouse | Violates the read-once sampling contract; cost and latency are unpredictable | Move warehouse queries to the adapter's `sample()` call; callable receives an already-sampled DataFrame |
+| Reference score used as threshold | `ref_score` is stored informational only - it does not shift the verdict band automatically | If you need adaptive thresholds, compute them inside the callable using the reference data passed at fit time |
+| Not serialisable to YAML | Check cannot be persisted to a YAML check file | Use `sql_assertion_violation` or `remote_check` for portable, serialisable checks |
+
+### FPR by callable type
+
+| Callable type | Expected FPR | Notes |
+|---|---|---|
+| Deterministic rule (returns 0 or 1 only) | 0% | No statistical approximation |
+| Statistical test returning p-value | Equals the significance level used | Document which alpha the callable targets |
+| ML model score | Depends on model calibration | Calibrate against held-out reference data before deploying |
+
+### Threshold recommendations
+
+- Default warn=0.5 / fail=0.75 assumes the callable returns a fraction in [0, 1] where higher means worse. Override on the Check definition if your callable uses a different scale.
+- For deterministic pass/fail callables set warn=0 and fail=0 so any non-zero score is immediately a failure.
+- Calibrate thresholds against at least 30 days of reference runs before enabling alerting.

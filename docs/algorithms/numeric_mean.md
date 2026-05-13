@@ -76,3 +76,30 @@ check = Check(
 | Normal bounded | tight bounds | tight bounds | e.g. expected mean ± 10% |
 | Heavy-tailed (revenue, latency) | wide bounds | wide bounds | Or use median_in_range instead |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`numeric_mean` reports a Z-score: how many baseline standard deviations the current mean has moved. The check inherits the well-known over-sensitivity of Z-score monitors on non-Gaussian data and the masking problem when outliers are present in the reference.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| Outliers in reference inflate baseline stddev | The baseline stddev is large, so real mean shifts score below 2.0 and go undetected | Use a robust baseline: fit on a cleaned reference window with outliers removed |
+| Outliers in current inflate current mean | One large transaction moves the mean outside the band even though the bulk of data is healthy | Switch to `median_in_range` for heavy-tailed columns |
+| Seasonal mean drift | The mean drifts seasonally but is not a real data quality issue | Re-fit baseline seasonally; or use a drift detector (`ks_pvalue`, `wasserstein_1`) that compares same-period windows |
+| Near-zero baseline stddev | If stddev approaches zero (near-constant column), the Z-score becomes infinite for any deviation | Add a minimum stddev guard; use `value_in_range` for near-constant columns |
+| Small current window (< 30 rows) | Sample mean has high variance; the Z-score fires on noise | Require N >= 30 per current window; or widen thresholds for small-batch tables |
+
+### FPR calibration table
+
+| Data shape | Expected FPR at warn=2.0 sigma | Notes |
+|---|---|---|
+| Normal(0,1) | ~4.6% | Theoretical two-sided 2-sigma FPR |
+| Lognormal(0,1) (typical revenue) | ~8-12% | Right-skew inflates upward false positives |
+| Poisson(lambda=10) | ~5% | Approximately normal for large lambda |
+| Pareto(1.5) | ~15-20% | Heavy tail; mean is volatile; use median instead |
+
+### Threshold recommendations
+
+- Default warn=2.0 sigma / fail=3.0 sigma is calibrated for near-Gaussian columns.
+- For heavy-tailed columns: use `median_in_range` instead; `numeric_mean` will generate excessive alerts.
+- Re-fit the baseline whenever there is a known planned change to the mean (e.g. a pricing update, a new product launch).

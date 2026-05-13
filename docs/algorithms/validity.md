@@ -108,3 +108,30 @@ print(result_ok.score)     # ~0.9998
 | Strict validity rule | (default) | (default) | STAT_SCALES defaults |
 | Partial validity allowed | 0.01 | 0.05 | Tolerance for edge-case values |
 | Sparse / high-null | N/A | N/A | Use null_fraction first |
+
+## Failure modes and known limits
+
+`validity` pushes two SQL aggregations to the warehouse. The predicates are user-supplied SQL and inherit the same failure modes as `sql_assertion_violation`. The score is `validity_rate` (higher is better), unlike most detectors which report a violation fraction.
+
+| Failure mode | Symptom | Fix |
+|---|---|---|
+| NULL propagation | `status IN ('a','b')` returns NULL (not FALSE) for NULL values; null rows are not counted as invalid by default | Add `status IS NOT NULL AND status IN ('a','b')` if nulls should also fail |
+| Predicate too broad | An overly permissive predicate (e.g. `amount >= 0` when amount should be > 0) misses edge cases | Test the predicate against known-invalid rows before deploying |
+| Predicate too strict | A strict predicate fires on legitimate edge cases (e.g. `status = 'active'` when 'pending_review' is also valid) | Enumerate all valid values explicitly; audit with the owning team |
+| Baseline validity rate not 100% | If the reference window already had invalid rows, the baseline rate is < 1.0; the check's warn/fail band shifts accordingly | Investigate pre-existing invalidity before fitting the baseline; or set a fixed reference rate of 1.0 |
+| Warehouse dialect incompatibility | A predicate using REGEXP or JSON functions fails on a different warehouse engine | Use standard SQL in predicates; test on all target engines |
+| Score direction confusion | Score is `higher_is_better` (validity rate, not violation fraction); a score of 0.90 is a failure | Ensure alerting and dashboards read direction=higher_is_better correctly |
+
+### FPR calibration table
+
+| Predicate type | Expected FPR | Notes |
+|---|---|---|
+| Exact set membership (IN list) | 0% | Deterministic; no statistical approximation |
+| Range check (amount BETWEEN 1 AND 100) | 0% | Deterministic |
+| Statistical predicate (involves STDDEV or PERCENTILE) | Depends on estimator | Rare; use dedicated statistical detectors instead |
+
+### Threshold recommendations
+
+- Default warn=0.95 / fail=0.90 (validity rate) matches STAT_SCALES. This means up to 5% invalid rows triggers a warning.
+- For critical columns where any invalidity is a serious issue: lower fail threshold to 0.999 or set `fail_if: "< 1.0"` in YAML.
+- For new deployments on columns with known historical invalidity: start with fail=0.80 and tighten after root-cause investigation.

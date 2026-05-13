@@ -214,9 +214,103 @@ sampling might miss rare events, increase `sample_n` in the check definition.
 
 ---
 
+## Methodology design choices
+
+### Why double-MAD over MAD for revenue data
+
+MAD (Median Absolute Deviation) is the standard robust spread estimator.
+For heavy-tailed, right-skewed distributions (revenue, latency, spend),
+the distribution above the median is much heavier than below.
+Double-MAD computes separate left and right MADs, giving
+`threshold_right = median + k * MAD_right`. This avoids flagging legitimate
+spikes on the right tail while still catching pathological outliers. Default
+k=3.5 on the right, catching roughly the same FPR on symmetric data but far
+fewer false positives on log-normal revenue data.
+
+Reference: Leys et al. (2013), "Detecting outliers: Do not use standard
+deviation around the mean, use absolute deviation around the median."
+
+### Why Wasserstein-1 over KS for tail drift
+
+KS measures the maximum pointwise CDF distance - sensitive to the middle of
+the distribution. Wasserstein-1 (earth mover's distance) measures the area
+between CDFs - sensitive to the full shape including tails. For revenue and
+latency monitoring where tail behavior matters most (P95, P99 shifts),
+Wasserstein-1 detects economically meaningful drift that KS misses. KS remains
+the default for categorical counts and for normality testing.
+
+Reference: Ramdas et al. (2015), "On Wasserstein Two-Sample Testing and Related
+Families of Nonparametric Tests."
+
+### Why PCMCI+ over bivariate Granger for causal discovery
+
+Bivariate Granger tests every pair of metrics independently, leading to
+spurious edges from common causes (confounder inflation). PCMCI+ (Runge et al.
+2019) runs a conditional independence skeleton search first, then orients
+edges, controlling for all other metrics simultaneously. On a 20-metric panel,
+PCMCI+ typically finds 15-40% fewer spurious edges than bivariate Granger at
+the same alpha. Cost: O(p^2 x T) vs. O(p x T) - worthwhile for panels up to
+roughly 100 metrics.
+
+Reference: Runge et al. (2019), "Detecting and quantifying causal associations
+in large nonlinear time series datasets."
+
+### Why BH-FDR over Bonferroni for multiple comparisons
+
+Running 64 checks on 100 columns produces up to 6400 simultaneous tests.
+Bonferroni divides alpha by 6400 (alpha/6400 = 0.0000078 per test) - so
+conservative that real drift is missed. Benjamini-Hochberg (BH) controls the
+False Discovery Rate at level alpha. At alpha=0.05 with 100 independent tests,
+BH expects no more than 5 false positives on average. For data quality
+monitoring, a 5% FDR is appropriate: catching more real drift at the cost of
+occasionally investigating a false alarm is better than missing regressions.
+
+Reference: Benjamini and Hochberg (1995), "Controlling the False Discovery Rate."
+
+### Why E-values over p-values for causal edge sensitivity
+
+An E-value quantifies how strong unmeasured confounding would need to be to
+explain away an observed causal edge. E-value = 1.0 means any unmeasured
+confounder could explain it; E-value = 3.0 means the confounder would need
+a risk ratio of 3.0 with both exposure and outcome. dqt flags edges with
+E-value < 1.5 as "fragile" in the causality UI.
+
+Reference: VanderWeele and Ding (2017), "Sensitivity Analysis in Observational
+Research: Introducing the E-Value."
+
+### Why STL+CUSUM combo for time-series anomalies
+
+STL (Seasonal-Trend decomposition using LOESS) handles seasonality and trend
+before anomaly scoring. CUSUM (Cumulative Sum) then detects sustained small
+shifts in the residuals that point-wise tests miss. Using them together catches
+both spike anomalies (STL residual z-scoring) and gradual level shifts (CUSUM
+on residuals). STL alone misses gradual drift; CUSUM alone is confused by
+seasonality.
+
+### Why heavy-tailed default threshold is 11.0 instead of textbook 3.5
+
+Textbook MAD threshold k=3.5 assumes roughly normal data. Lognormal data with
+sigma=1 has a median at exp(0) and MAD approximately 1.18. The 99.9th percentile
+is at exp(3) approximately 20. At k=3.5 on lognormal, the threshold is
+approximately 5.1 - cutting off the 95th percentile (5% FPR on healthy data).
+At k=11.0 on lognormal, the threshold catches the 99.9th percentile, matching
+the intent of a 0.1% FPR. Rule of thumb: for right-skewed data, multiply
+textbook k by 3.
+
+### Why bootstrap CIs for threshold calibration
+
+Empirical percentile bootstrap gives distribution-free confidence intervals
+for any quantile of the score distribution. Score distributions are rarely
+normal - they're often bounded at 0 or 1 and can be bimodal. Traditional
+z-based CIs on non-normal score distributions produce thresholds that are too
+tight at the tails. Bootstrap CIs are slower (1000 resamples) but honest.
+
+Reference: Efron and Tibshirani (1993), "An Introduction to the Bootstrap."
+
+---
+
 ## Further reading
 
 - [Detector benchmark results](../examples/benchmarks/results.csv)
-- [Full benchmark methodology](benchmarks.md)
-- [Algorithm reference docs](algorithms/) — one-paragraph entry per detector with the canonical reference
+- [Algorithm reference docs](algorithms/) - one-paragraph entry per detector with the canonical reference
 - [Check YAML format](checks/)
