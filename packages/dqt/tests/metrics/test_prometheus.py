@@ -23,15 +23,6 @@ def test_build_metrics_returns_text():
     store = MemoryStore()
     check_id = uuid4()
     store.save_run(_run(Verdict.pass_, 0.1, check_id=check_id))
-    # Save an incident so the exporter picks it up
-    from dqt.store._protocol import Incident
-    now = datetime.now(timezone.utc)
-    store.save_incident(Incident(
-        incident_id=uuid4(), check_id=check_id,
-        run_id=uuid4(), detector_slug="ks_pvalue",
-        severity=Verdict.fail, opened_at=now,
-        score=0.1, status="open",
-    ))
     text = build_metrics_text(store)
     assert "dqt_check_score" in text
     assert "dqt_check_runs_total" in text

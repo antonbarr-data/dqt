@@ -124,7 +124,6 @@ addopts = [
     "--strict-markers",
     "--tb=short",
 ]
-asyncio_mode = "auto"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:pkg_resources",
