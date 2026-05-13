@@ -52,3 +52,28 @@ def test_build_metrics_empty_store():
     text = build_metrics_text(store)
     assert isinstance(text, str)
     assert "# HELP dqt_check_score" in text
+
+
+def test_always_passing_check_appears_in_metrics():
+    """Checks with no incidents must still appear in Prometheus output."""
+    from dqt.metrics.prometheus import build_metrics_text
+    store = MemoryStore()
+    check_id = uuid4()
+    store.save_run(_run(Verdict.pass_, 0.1, check_id=check_id))
+    # No incident saved — this is the always-passing case
+    text = build_metrics_text(store)
+    assert str(check_id) in text
+    assert "dqt_check_score" in text
+    assert "dqt_check_verdict" in text
+    assert f'dqt_check_verdict{{check_id="{check_id}",detector_slug="ks_pvalue"}} 0' in text
+
+
+def test_runs_total_counts_all_runs():
+    """dqt_check_runs_total must reflect the actual number of saved runs."""
+    from dqt.metrics.prometheus import build_metrics_text
+    store = MemoryStore()
+    check_id = uuid4()
+    for _ in range(5):
+        store.save_run(_run(Verdict.pass_, 0.05, check_id=check_id))
+    text = build_metrics_text(store)
+    assert f'dqt_check_runs_total{{check_id="{check_id}",detector_slug="ks_pvalue"}} 5' in text

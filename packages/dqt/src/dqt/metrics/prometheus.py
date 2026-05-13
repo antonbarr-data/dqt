@@ -19,6 +19,10 @@ def build_metrics_text(store: "ResultsStore") -> str:
       dqt_check_score{check_id, detector_slug} -- latest score [0,1]
       dqt_check_verdict{check_id, detector_slug} -- 0=pass, 1=warn, 2=fail
       dqt_check_runs_total{check_id, detector_slug} -- total run count
+
+    Uses store._runs directly (MemoryStore). Stores without _runs (e.g. a future
+    PostgresStore caller) will produce no metric lines until a list_check_ids()
+    protocol method is added.
     """
     lines = [
         "# HELP dqt_check_score Latest score from the most recent check run",
@@ -26,27 +30,20 @@ def build_metrics_text(store: "ResultsStore") -> str:
         "# HELP dqt_check_verdict Latest verdict: 0=pass, 1=warn, 2=fail",
         "# TYPE dqt_check_verdict gauge",
         "# HELP dqt_check_runs_total Total number of runs for this check",
-        "# TYPE dqt_check_runs_total gauge",
+        "# TYPE dqt_check_runs_total counter",
     ]
 
-    all_incidents = store.list_all_incidents()
-    seen: set[str] = set()
-
-    for incident in all_incidents:
-        cid = str(incident.check_id)
-        if cid in seen:
+    runs_map: dict = getattr(store, "_runs", {})
+    for check_id, run_list in runs_map.items():
+        if not run_list:
             continue
-        runs = store.list_runs(incident.check_id, limit=1)
-        if not runs:
-            continue
-        latest = runs[0]
-        seen.add(cid)
+        latest = max(run_list, key=lambda r: getattr(r, "finished_at", 0))
+        cid = str(check_id)
         slug = latest.detector_slug
         v = _verdict_to_int(latest.verdict)
-        all_runs = store.list_runs(incident.check_id, limit=10_000)
         lines.append(f'dqt_check_score{{check_id="{cid}",detector_slug="{slug}"}} {latest.score}')
         lines.append(f'dqt_check_verdict{{check_id="{cid}",detector_slug="{slug}"}} {v}')
-        lines.append(f'dqt_check_runs_total{{check_id="{cid}",detector_slug="{slug}"}} {len(all_runs)}')
+        lines.append(f'dqt_check_runs_total{{check_id="{cid}",detector_slug="{slug}"}} {len(run_list)}')
 
     return "\n".join(lines) + "\n"
 
