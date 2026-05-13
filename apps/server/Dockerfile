@@ -4,10 +4,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv
 
-COPY pyproject.toml ./
+COPY . .
 RUN uv venv /app/.venv && \
     uv pip install --python /app/.venv/bin/python --no-cache .
 
-COPY . .
-
-CMD /app/.venv/bin/uvicorn dqt_server.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD sh -c '/app/.venv/bin/uvicorn dqt_server.main:app --host 0.0.0.0 --port $PORT'

@@ -2,7 +2,6 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "sh -c '/app/.venv/bin/uvicorn dqt_server.main:app --host 0.0.0.0 --port $PORT'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
 
