@@ -17,49 +17,64 @@ START_MARKER = "<!-- BENCHMARK_STATS_START -->"
 END_MARKER = "<!-- BENCHMARK_STATS_END -->"
 
 
-def _parse_csv(path: Path) -> tuple[list[dict], list[dict]]:
-    """Return (detector_rows, baseline_rows) as dicts."""
+FAMILY_MAP: dict[str, str] = {
+    "adwin": "drift", "chi_square_drift": "drift", "js_divergence": "drift",
+    "kl_divergence": "drift", "ks_pvalue": "drift", "mmd": "drift",
+    "outlier_fraction_drift": "drift", "psi": "drift", "wasserstein_1": "drift",
+    "bocpd": "timeseries", "cusum": "timeseries", "holt_winters": "timeseries",
+    "matrix_profile": "timeseries", "monotonicity": "timeseries",
+    "page_hinkley": "timeseries", "prophet_anomaly": "timeseries",
+    "stl_residual_zscore": "timeseries",
+    "adjusted_boxplot_fraction": "outlier", "auto_outlier": "outlier",
+    "double_mad_outlier_fraction": "outlier", "ecod": "outlier",
+    "generalized_esd": "outlier", "grubbs": "outlier", "hbos": "outlier",
+    "iqr_fence": "outlier", "isolation_forest_fraction": "outlier",
+    "lof": "outlier", "mad_outlier_fraction": "outlier",
+    "mahalanobis_distance": "outlier", "one_class_svm": "outlier",
+    "zscore_outlier_fraction": "outlier",
+    "benford_law_fit": "distribution", "cramers_v": "distribution",
+    "mutual_information": "distribution",
+}
+
+
+def _parse_csv(path: Path) -> list[dict]:
+    """Return per-detector aggregated rows (avg f1 across datasets)."""
     import csv
-    detectors, baselines = [], []
+    from collections import defaultdict
+    by_slug: dict[str, list[float]] = defaultdict(list)
     with path.open(encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            if row["family"] == "baseline":
-                baselines.append(row)
-            else:
-                detectors.append(row)
-    return detectors, baselines
+            slug = row["detector_slug"]
+            try:
+                by_slug[slug].append(float(row["f1"]))
+            except (ValueError, KeyError):
+                pass
+    rows = []
+    for slug, f1_vals in by_slug.items():
+        avg_f1 = sum(f1_vals) / len(f1_vals)
+        rows.append({"slug": slug, "f1_mean": avg_f1,
+                     "family": FAMILY_MAP.get(slug, "rule")})
+    return rows
 
 
-def _safe_float(value: str) -> float | None:
+def _safe_float(value) -> float | None:
     try:
         return float(value)
     except (ValueError, TypeError):
         return None
 
 
-def build_stats_line(detectors: list[dict], baselines: list[dict]) -> str:
+def build_stats_line(rows: list[dict]) -> str:
+    detectors = [r for r in rows if not r["slug"].startswith("_")]
     n_detectors = len(detectors)
-
-    # Best single F1 across all non-baseline detectors
-    best_row = max(
-        detectors,
-        key=lambda r: _safe_float(r["f1_mean"]) or 0.0,
-    )
-    best_f1 = _safe_float(best_row["f1_mean"]) or 0.0
+    best_row = max(detectors, key=lambda r: r["f1_mean"])
+    best_f1 = best_row["f1_mean"]
     best_slug = best_row["slug"]
-    best_lo = _safe_float(best_row["f1_ci_lo"]) or best_f1
-    best_hi = _safe_float(best_row["f1_ci_hi"]) or best_f1
-    n_trials = best_row.get("n_trials", "30")
-
-    # Count families
     families = {r["family"] for r in detectors}
     n_families = len(families)
-
     line = (
         f"**{n_detectors} detectors** across {n_families} families"
-        f" · best F1 **{best_f1:.3f}** ({best_slug}, {n_trials}-trial 95% CI"
-        f" [{best_lo:.3f}, {best_hi:.3f}])"
-        f" · benchmarked on 8 synthetic scenarios"
+        f" · best F1 **{best_f1:.3f}** ({best_slug})"
         f" · [full results](examples/benchmarks/results.csv)"
     )
     return line
@@ -94,12 +109,12 @@ def main() -> None:
         )
         sys.exit(1)
 
-    detectors, baselines = _parse_csv(CSV_PATH)
+    detectors = _parse_csv(CSV_PATH)
     if not detectors:
         print("ERROR: no detector rows found in CSV.", file=sys.stderr)
         sys.exit(1)
 
-    stats_line = build_stats_line(detectors, baselines)
+    stats_line = build_stats_line(detectors)
     update_readme(stats_line)
 
 

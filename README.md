@@ -5,14 +5,14 @@
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
-[![Release notes](https://img.shields.io/badge/release%20notes-v0.5.4-blue?style=flat-square)](docs/releases/v0.5.4.md)
+[![Release notes](https://img.shields.io/badge/release%20notes-v1.0.0-blue?style=flat-square)](docs/releases/README.md)
 
 <!-- BENCHMARK_STATS_START -->
-**20 detectors** across 4 families · best F1 **0.933** (holt_winters, 30-trial 95% CI [0.933, 0.933]) · benchmarked on 8 synthetic scenarios · [full results](examples/benchmarks/results.csv)
+**64 detectors** across 5 families (drift, outlier, time series, distribution, rule) · best F1 **0.933** (holt_winters / wasserstein_1) · [full results](examples/benchmarks/results.csv)
 <!-- BENCHMARK_STATS_END -->
 
 <!-- NUMBERS_START -->
-**64 detectors · 9 adapters**
+**64 detectors · 6 adapters**
 <!-- NUMBERS_END -->
 
 Inspired by **Great Expectations** · **Soda** · **Elementary** · **Google Dataplex** — and goes further than each.
@@ -331,11 +331,10 @@ See [docs/wiki.md](docs/wiki.md) for the full guide, Python API, and CI/CD integ
 
 | Type | Supported |
 |------|-----------|
-| Files | CSV, Parquet (via DuckDB) |
-| OLTP databases | PostgreSQL, MySQL |
-| Analytical databases | ClickHouse, DuckDB |
-| Cloud data warehouses | BigQuery, Snowflake, Redshift, Databricks SQL |
-| Data lakes | Any Parquet/CSV on S3, GCS, Azure Blob (via DuckDB/ibis) |
+| OLTP databases | PostgreSQL |
+| Analytical databases | ClickHouse |
+| Cloud data warehouses | BigQuery, Snowflake, Databricks SQL |
+| Local files | CSV, Parquet (local adapter) |
 | dbt projects | dbt Cloud + Core artifact ingestion |
 | OpenLineage | Event stream ingestion |
 
@@ -734,7 +733,7 @@ dqt/
 
 ## Adapter integration tests
 
-The nightly CI workflow (`.github/workflows/integration-tests.yml`) runs adapter tests for each supported warehouse engine. Postgres and ClickHouse run unconditionally via testcontainers. Cloud adapters are skipped unless the corresponding repository variable and secret are set:
+The nightly CI workflow (`.github/workflows/live-adapter-tests.yml`) runs adapter tests against live warehouse credentials. All four cloud adapters are skipped unless the corresponding secret is set:
 
 | Adapter | Enable variable | Secret(s) |
 |---|---|---|
@@ -742,7 +741,7 @@ The nightly CI workflow (`.github/workflows/integration-tests.yml`) runs adapter
 | BigQuery | `DQT_BIGQUERY_ENABLED=true` | `DQT_BIGQUERY_PROJECT`, `DQT_BIGQUERY_DATASET`, `DQT_GCP_SERVICE_ACCOUNT_KEY` |
 | Databricks | `DQT_DATABRICKS_ENABLED=true` | `DQT_DATABRICKS_HOST`, `DQT_DATABRICKS_TOKEN`, `DQT_DATABRICKS_HTTP_PATH`, `DQT_DATABRICKS_CATALOG` |
 
-To run adapter tests locally: `uv run pytest packages/dqt/tests/adapters/ -m adapter`.
+To run adapter tests locally: `pytest tests/adapters/ -m adapter`.
 
 ---
 

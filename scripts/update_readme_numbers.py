@@ -19,8 +19,7 @@ _START = "<!-- NUMBERS_START -->"
 _END = "<!-- NUMBERS_END -->"
 
 _ADAPTERS = [
-    "postgresql", "mysql", "clickhouse", "bigquery",
-    "snowflake", "redshift", "databricks", "duckdb", "trino",
+    "postgres", "clickhouse", "bigquery", "snowflake", "databricks", "local",
 ]
 
 
