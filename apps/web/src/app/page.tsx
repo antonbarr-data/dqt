@@ -317,18 +317,24 @@ export default function RootPage() {
       {/* ── hero ── */}
       <section className="px-4 md:px-8 pt-10 pb-8 max-w-5xl mx-auto">
         <div className="flex items-center gap-3 mb-5">
-          <span
+          <a
+            href="https://github.com/antonbarr-data/dqt/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-2.5 py-1 border t-small"
-            style={{ color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
+            style={{ color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, textDecoration: "none" }}
           >
             Open source · MIT licensed
-          </span>
-          <span
+          </a>
+          <a
+            href="https://github.com/antonbarr-data/dqt/blob/main/docs/releases/README.md"
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-2.5 py-1 border t-small"
-            style={{ color: "var(--accent)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11 }}
+            style={{ color: "var(--accent)", borderColor: "var(--line-2)", background: "var(--bg-2)", fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, textDecoration: "none" }}
           >
             v{DQT_VERSION}
-          </span>
+          </a>
           <button
             onClick={copyInstall}
             className="px-2.5 py-1 border flex items-center gap-2 transition-colors hover:opacity-80"
@@ -377,7 +383,7 @@ export default function RootPage() {
           <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)" }}>BigQuery</span>
           <span>first.</span>
           <span style={{ color: "var(--line-2)" }}>·</span>
-          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--warn)", borderColor: "var(--warn)", background: "rgba(217,181,102,0.07)" }}>Postgres · Snowflake · others — WIP</span>
+          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--warn)", borderColor: "var(--warn)", background: "rgba(217,181,102,0.07)" }}>Snowflake · Databricks · others — WIP</span>
           <a
             href={GITHUB_URL}
             target="_blank"

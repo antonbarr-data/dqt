@@ -20,7 +20,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install dqtlib
-        run: pip install -e 'packages/dqt[causal]' numpy pandas scipy scikit-learn statsmodels stumpy
+        run: pip install -e packages/dqt numpy pandas scipy scikit-learn statsmodels
 
       - name: Run benchmark suite (quick)
         run: python scripts/run_benchmark_suite.py --quick
