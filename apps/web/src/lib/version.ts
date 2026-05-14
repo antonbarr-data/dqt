@@ -1,1 +1,1 @@
-export const DQT_VERSION = "0.9.6";
+export const DQT_VERSION = "1.0.0";
