@@ -8,6 +8,13 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-05-14
+
+### Fixed
+- **sdist packaging**: added `[tool.hatch.build.targets.sdist.force-include]` to ship `scripts/`, `examples/benchmarks/`, `tests/adapters/`, `tests/benchmarks/`, `STABILITY.md`, and `CHANGELOG.md` inside the PyPI sdist. Previously only `src/dqt/` was packaged; all repo-root artifacts were absent from the installable distribution.
+- **`scripts/generate_benchmark_summary.py`**: changed hard crash to a warning when `NUMBERS_START` markers are absent from the README, so the script completes cleanly even if the README no longer carries those markers.
+- **`examples/benchmarks/results_summary.md`**: generated and committed — GitHub URL the PyPI README links to now resolves.
+
 ## [1.0.2] - 2026-05-14
 
 ### Fixed

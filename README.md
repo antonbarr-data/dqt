@@ -5,7 +5,7 @@
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![PyPI](https://img.shields.io/badge/pip%20install-dqtlib-orange?style=flat-square)](https://pypi.org/project/dqtlib/)
-[![Release notes](https://img.shields.io/badge/release%20notes-v1.0.2-blue?style=flat-square)](docs/releases/README.md)
+[![Release notes](https://img.shields.io/badge/release%20notes-v1.0.3-blue?style=flat-square)](docs/releases/README.md)
 
 <!-- BENCHMARK_STATS_START -->
 **64 detectors** across 5 families (drift, outlier, time series, distribution, rule) · best F1 **0.933** (holt_winters / wasserstein_1) · [full results](examples/benchmarks/results.csv)

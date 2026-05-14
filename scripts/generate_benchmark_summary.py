@@ -175,9 +175,8 @@ def update_readme(median_f1: float, count_ge_08: int, count_ge_06: int, total: i
     replacement = r"\g<1>" + new_numbers_line + r"\g<2>"
     updated, count = re.subn(pattern, replacement, content)
     if count == 0:
-        raise RuntimeError(
-            f"Could not find {NUMBERS_START} ... {NUMBERS_END} markers in {README_PATH}"
-        )
+        print(f"Warning: {NUMBERS_START} markers not found in {README_PATH} — skipping README update")
+        return
     README_PATH.write_text(updated, encoding="utf-8")
 
 
