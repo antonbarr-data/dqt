@@ -1,0 +1,34 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 4 * * 1'  # weekly Monday 4am UTC
+  workflow_dispatch:
+
+jobs:
+  benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dqtlib
+        run: pip install -e 'packages/dqt[causal]' numpy pandas scipy scikit-learn statsmodels stumpy
+
+      - name: Run benchmark suite (quick)
+        run: python scripts/run_benchmark_suite.py --quick
+
+      - name: Run completeness tests
+        run: python -m pytest tests/benchmarks/ -v
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: examples/benchmarks/results.csv
