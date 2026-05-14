@@ -1337,6 +1337,7 @@ dependencies = [
     { name = "arq" },
     { name = "asyncpg" },
     { name = "cryptography" },
+    { name = "dqtlib" },
     { name = "email-validator" },
     { name = "fastapi" },
     { name = "gunicorn" },
@@ -1347,6 +1348,7 @@ dependencies = [
     { name = "redis", extra = ["hiredis"] },
     { name = "slowapi" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1357,6 +1359,7 @@ requires-dist = [
     { name = "arq", specifier = ">=0.26" },
     { name = "asyncpg", specifier = ">=0.29" },
     { name = "cryptography", specifier = ">=42.0" },
+    { name = "dqtlib", editable = "packages/dqt" },
     { name = "email-validator", specifier = ">=2.1" },
     { name = "fastapi", specifier = ">=0.111" },
     { name = "gunicorn", specifier = ">=22.0" },
@@ -1367,6 +1370,7 @@ requires-dist = [
     { name = "redis", extras = ["hiredis"], specifier = ">=5.0" },
     { name = "slowapi", specifier = ">=0.1" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "structlog", specifier = ">=24.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
 
@@ -1430,7 +1434,7 @@ dev = [
 
 [[package]]
 name = "dqtlib"
-version = "0.4.9"
+version = "0.9.4"
 source = { editable = "packages/dqt" }
 dependencies = [
     { name = "diptest" },
