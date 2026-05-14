@@ -127,3 +127,8 @@ site/
 *.zip
 *.tar.gz
 !reference_data/**/*.zip
+
+# --- Benchmark data fixtures (generated, not committed) ---
+data/data_shapes/
+data/orders_dirty.csv
+data/daily_metrics_dirty.csv

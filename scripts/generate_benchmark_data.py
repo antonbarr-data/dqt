@@ -16,13 +16,12 @@ RNG_SEED = 42
 
 
 def _inject_anomalies(
-    arr: np.ndarray, frac: float = 0.01, rng: np.random.Generator = None
+    arr: np.ndarray, rng: np.random.Generator, frac: float = 0.01
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (arr_with_anomalies, is_anomaly bool array).
 
     Anomaly value = mean + 10 * std  (extreme enough for all threshold-based detectors).
     """
-    rng = rng or np.random.default_rng(RNG_SEED)
     n = len(arr)
     n_anom = max(1, int(n * frac))
     idx = rng.choice(n, size=n_anom, replace=False)
@@ -75,7 +74,7 @@ def generate_orders_dirty(out_dir: Path) -> None:
             "order_id": [f"O{i:06d}" for i in range(N)],
             "amount": amounts.round(2),
             "quantity": rng.integers(1, 20, size=N),
-            "customer_id": [f"C{rng.integers(1, 5000):05d}" for _ in range(N)],
+            "customer_id": [f"C{i:05d}" for i in rng.integers(1, 5000, size=N)],
             "created_at": pd.date_range(
                 "2024-01-01", periods=N, freq="2min"
             ).astype(str),
@@ -91,7 +90,7 @@ def generate_daily_metrics(out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(RNG_SEED + 2)
     N = 180
-    CHANGEPOINTS = [30, 60, 120, 150]
+    CHANGEPOINTS = frozenset({30, 60, 120, 150})
     values = np.zeros(N)
     level = 100.0
     for i in range(N):
