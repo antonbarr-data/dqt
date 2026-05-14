@@ -19,8 +19,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install benchmark dependencies
-        run: pip install numpy pandas scipy scikit-learn statsmodels pytest
+      - name: Install dqtlib (base deps only) and pytest
+        run: pip install -e packages/dqt pytest
 
       - name: Run benchmark suite (quick)
         run: python scripts/run_benchmark_suite.py --quick
