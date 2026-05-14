@@ -1,26 +1,38 @@
 """
-Asserts every detector registered in the dqt registry has a doc page at
-docs/algorithms/<group>/<slug>.md with all 9 required sections.
-Run: pytest packages/dqt/tests/docs/test_docs_completeness.py
+Asserts every detector registered in the dqt registry has a doc page with
+all 9 required sections.
+
+Doc resolution order:
+  1. Installed package: dqt/algorithms/docs/<group>/<slug>.md  (ships in the wheel)
+  2. Dev repo:          <repo-root>/docs/algorithms/<group>/<slug>.md
+
+This means `pytest packages/dqt/tests/docs/test_docs_completeness.py` passes
+both from a local checkout and after `pip install dqtlib`.
 """
+import importlib.resources
 import pathlib
 
 import pytest
 
 # Import all algorithm groups to populate the registry before calling slugs().
-import dqt.algorithms.basic  # noqa: F401
-import dqt.algorithms.custom  # noqa: F401
-import dqt.algorithms.drift  # noqa: F401
-import dqt.algorithms.info  # noqa: F401
-import dqt.algorithms.outliers_multi  # noqa: F401
-import dqt.algorithms.outliers_uni  # noqa: F401
-import dqt.algorithms.pattern  # noqa: F401
-import dqt.algorithms.referential  # noqa: F401
-import dqt.algorithms.schema  # noqa: F401
-import dqt.algorithms.timeseries  # noqa: F401
+import dqt.algorithms.basic          # noqa: F401
+import dqt.algorithms.custom         # noqa: F401
+import dqt.algorithms.drift          # noqa: F401
+import dqt.algorithms.info           # noqa: F401
+import dqt.algorithms.outliers_multi # noqa: F401
+import dqt.algorithms.outliers_uni   # noqa: F401
+import dqt.algorithms.pattern        # noqa: F401
+import dqt.algorithms.referential    # noqa: F401
+import dqt.algorithms.schema         # noqa: F401
+import dqt.algorithms.timeseries     # noqa: F401
 from dqt.algorithms._registry import registry
 
-DOCS_ROOT = pathlib.Path(__file__).parents[4] / "docs" / "algorithms"
+# Docs ship inside the wheel at dqt/algorithms/docs/.
+_PKG_DOCS = pathlib.Path(importlib.resources.files("dqt") / "algorithms" / "docs")  # type: ignore[arg-type]
+# Fall back to the repo layout for developers running from a checkout.
+_REPO_DOCS = pathlib.Path(__file__).parents[4] / "docs" / "algorithms"
+
+DOCS_ROOT: pathlib.Path = _PKG_DOCS if _PKG_DOCS.exists() else _REPO_DOCS
 
 REQUIRED_SECTIONS = [
     "## What it computes",
@@ -47,7 +59,7 @@ def _find_doc(slug: str) -> pathlib.Path | None:
 def test_doc_exists(slug: str) -> None:
     doc = _find_doc(slug)
     assert doc is not None, (
-        f"No doc page for '{slug}' — create docs/algorithms/<group>/{slug}.md"
+        f"No doc page for '{slug}' — create dqt/algorithms/docs/<group>/{slug}.md"
     )
 
 
