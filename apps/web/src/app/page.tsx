@@ -383,7 +383,7 @@ export default function RootPage() {
           <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--fg-0)", borderColor: "var(--line-2)", background: "var(--bg-2)" }}>BigQuery</span>
           <span>first.</span>
           <span style={{ color: "var(--line-2)" }}>·</span>
-          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--warn)", borderColor: "var(--warn)", background: "rgba(217,181,102,0.07)" }}>Snowflake · Databricks · others — WIP</span>
+          <span className="px-2 py-0.5 border" style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: "var(--warn)", borderColor: "var(--warn)", background: "rgba(217,181,102,0.07)" }}>Snowflake - Databricks - others - wip</span>
           <a
             href={GITHUB_URL}
             target="_blank"
