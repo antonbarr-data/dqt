@@ -6,7 +6,6 @@ export const metadata = {
   title: "dqt / quality",
   description:
     "Per-detector precision, recall, and F1 benchmarks for the dqt library. Updated on each release.",
-  icons: { icon: "/favicon.svg" },
 };
 
 export type DetectorRow = {
