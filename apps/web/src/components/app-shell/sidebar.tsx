@@ -16,6 +16,11 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
+  Shield,
+  ScrollText,
+  Phone,
+  ClipboardList,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { isSysAdmin, decodeToken, getToken } from "@/lib/auth";
@@ -31,23 +36,38 @@ const NAV_GROUPS = [
   {
     label: "Warehouse",
     items: [
-      { label: "Sources", href: "/sources", icon: Database, count: 5 },
-      { label: "Datasets", href: "/datasets", icon: Table2, count: 64 },
+      { label: "Sources", href: "/sources", icon: Database, count: null },
+      { label: "Datasets", href: "/datasets", icon: Table2, count: null },
       { label: "Lineage", href: "/lineage", icon: GitBranch, count: null },
     ],
   },
   {
     label: "Semantic Layer",
     items: [
-      { label: "Metrics", href: "/metrics", icon: BarChart2, count: 24 },
+      { label: "Metrics", href: "/metrics", icon: BarChart2, count: null },
       { label: "Causality", href: "/causality", icon: Network, count: null },
     ],
   },
   {
     label: "Watch",
     items: [
-      { label: "Incidents", href: "/incidents", icon: AlertTriangle, count: 6 as number | null, countFail: true },
-      { label: "Tests", href: "/tests", icon: CheckSquare, count: 734 },
+      { label: "Incidents", href: "/incidents", icon: AlertTriangle, count: null, countFail: true },
+      { label: "Tests", href: "/tests", icon: CheckSquare, count: null },
+    ],
+  },
+  {
+    label: "Govern",
+    items: [
+      { label: "Catalog", href: "/catalog", icon: BookOpen, count: null },
+      { label: "Policies", href: "/policies", icon: Shield, count: null },
+      { label: "Audit", href: "/audit", icon: ScrollText, count: null },
+    ],
+  },
+  {
+    label: "Team",
+    items: [
+      { label: "On-call", href: "/oncall", icon: Phone, count: null },
+      { label: "Tasks", href: "/tasks", icon: ClipboardList, count: null },
     ],
   },
 ];

@@ -2,14 +2,15 @@
 """
 Load Gigler CSV data into ClickHouse on Railway.
 
-Setup (Windows PowerShell):
-    pip install clickhouse-connect pandas
-    $env:CLICKHOUSE_PASSWORD = "<password from Railway Variables tab>"
+Setup:
+    pip install clickhouse-connect pandas python-dotenv
 
 Run:
     python load_gigler.py
 
-Re-running is safe: each table is dropped and recreated before loading.
+Reads CLICKHOUSE_HOST / CLICKHOUSE_PORT / CLICKHOUSE_USER / CLICKHOUSE_PASSWORD
+from the repo root .env file automatically. Re-running is safe: each table is
+dropped and recreated before loading.
 """
 
 import os
@@ -18,6 +19,17 @@ from pathlib import Path
 
 import pandas as pd
 import clickhouse_connect
+
+# --- Load .env from repo root -------------------------------------------
+_env_path = Path(__file__).parents[3] / '.env'
+if _env_path.exists():
+    for _line in _env_path.read_text(encoding='utf-8').splitlines():
+        _line = _line.strip()
+        if not _line or _line.startswith('#') or '=' not in _line:
+            continue
+        _k, _, _v = _line.partition('=')
+        _k, _v = _k.strip(), _v.strip().strip('"').strip("'")
+        os.environ.setdefault(_k, _v)
 
 # --- Connection ---------------------------------------------------------
 HOST     = os.environ.get('CLICKHOUSE_HOST',

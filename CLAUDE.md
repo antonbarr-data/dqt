@@ -1,5 +1,3 @@
-NB This file is copied to CLAUDE.md and .ai/rules/overview.mdc
-
 # App overview
 - **Product**: `dqt` — open-source data quality, observability, semantic, and causality library + service. Watches dbt-built warehouses (and any SQL warehouse) for statistical drift, anomalies, silent regressions, and explains *why* metrics moved.
 - **Positioning**: pip-installable Python library at the core (open-source, MIT). `apps/server` (FastAPI) exposes it as a multi-tenant service. `apps/web` (Next.js) is the power-user UI. Library is usable standalone in notebooks, CI pipelines, and Airflow/Dagster/Prefect tasks without the server.
@@ -25,6 +23,7 @@ NB This file is copied to CLAUDE.md and .ai/rules/overview.mdc
 - Don't create a dedicated documentation file for each fix/fixture, only for substantial architecture issues and after checking with the user. Algorithm reference is the exception — every detector gets a one-paragraph entry in `docs/algorithms/`.
 - After writing any front-end code check `pnpm build` and fix errors and warnings.
 - Library code (`packages/dqt/`) must remain importable without the server, without Redis, and without Postgres. The library degrades to in-memory results store if no Postgres is configured. **This is a hard rule — never import server-only modules from the library.**
+- Do not use long dashes in any front end content including the marketing web site pages or the GitHub documents.
 
 # Architecture
 
