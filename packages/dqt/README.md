@@ -32,6 +32,20 @@ python scripts/run_benchmark_suite.py --quick
 python scripts/generate_benchmark_summary.py
 ```
 
+## Adapters
+
+| Adapter | Nightly Tests |
+|---------|--------------|
+| PostgreSQL | ![postgres](https://img.shields.io/badge/postgres-tested-7FB394) |
+| ClickHouse | ![clickhouse](https://github.com/antonbarr-data/dqt/actions/workflows/live-adapter-tests.yml/badge.svg?job=clickhouse) |
+| Snowflake | ![snowflake](https://github.com/antonbarr-data/dqt/actions/workflows/live-adapter-tests.yml/badge.svg?job=snowflake) |
+| BigQuery | ![bigquery](https://github.com/antonbarr-data/dqt/actions/workflows/live-adapter-tests.yml/badge.svg?job=bigquery) |
+| Databricks | ![databricks](https://github.com/antonbarr-data/dqt/actions/workflows/live-adapter-tests.yml/badge.svg?job=databricks) |
+| MySQL | ![mysql](https://img.shields.io/badge/mysql-tested-7FB394) |
+| Redshift | ![redshift](https://img.shields.io/badge/redshift-tested-7FB394) |
+| DuckDB | ![duckdb](https://img.shields.io/badge/duckdb-tested-7FB394) |
+| Trino | ![trino](https://img.shields.io/badge/trino-tested-7FB394) |
+
 ## Detector documentation
 
 64 statistical detectors across 10 groups — drift, outliers, time series, distribution, information theory, pattern, referential, schema, basic, and custom.

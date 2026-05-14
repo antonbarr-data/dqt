@@ -1,0 +1,67 @@
+name: Live Adapter Tests
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # nightly 6am UTC
+  workflow_dispatch:
+
+jobs:
+  clickhouse:
+    name: ClickHouse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -e 'packages/dqt' clickhouse-connect pandas numpy
+      - name: Run ClickHouse live tests
+        env:
+          CLICKHOUSE_HOST: ${{ secrets.CLICKHOUSE_HOST }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: python -m pytest tests/adapters/test_live_clickhouse.py -v -m adapter
+
+  snowflake:
+    name: Snowflake
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -e 'packages/dqt' snowflake-connector-python pandas numpy
+      - name: Run Snowflake live tests
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+        run: python -m pytest tests/adapters/test_live_snowflake.py -v -m adapter
+
+  bigquery:
+    name: BigQuery
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -e 'packages/dqt' google-cloud-bigquery pandas numpy
+      - name: Run BigQuery live tests
+        env:
+          GCP_SA_KEY_BIGQUERY: ${{ secrets.GCP_SA_KEY_BIGQUERY }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: python -m pytest tests/adapters/test_live_bigquery.py -v -m adapter
+
+  databricks:
+    name: Databricks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -e 'packages/dqt' databricks-sql-connector pandas numpy
+      - name: Run Databricks live tests
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_HTTP_PATH: ${{ secrets.DATABRICKS_HTTP_PATH }}
+        run: python -m pytest tests/adapters/test_live_databricks.py -v -m adapter
