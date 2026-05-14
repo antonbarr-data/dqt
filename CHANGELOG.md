@@ -8,6 +8,13 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-05-14
+
+### Fixed
+- **packages/dqt/README.md** (PyPI package description): removed MySQL, Redshift, DuckDB, and Trino from the adapter table — those adapters do not exist in this release. Only the 6 real adapters are listed now.
+- **packages/dqt/README.md**: changed relative link `examples/benchmarks/results_summary.md` to an absolute GitHub URL so it resolves on PyPI.
+- **packages/dqt/README.md**: clarified that benchmark scripts require cloning the repo, not a pip install.
+
 ## [1.0.1] - 2026-05-14
 
 ### Fixed
