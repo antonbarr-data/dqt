@@ -16,6 +16,22 @@ from dqt import Check, Runner, MemoryStore
 
 Full documentation and examples: https://github.com/antonbarr-data/dqt
 
+## Quality
+
+All 64 detectors are benchmarked against labeled synthetic datasets. Results are reproducible by anyone:
+
+<!-- NUMBERS_START -->
+Median F1: 1.00 | Detectors with F1 >= 0.8: 52/64 | Detectors with F1 >= 0.6: 58/64
+<!-- NUMBERS_END -->
+
+Per-detector breakdown: [examples/benchmarks/results_summary.md](examples/benchmarks/results_summary.md)
+
+Reproduce locally:
+```bash
+python scripts/run_benchmark_suite.py --quick
+python scripts/generate_benchmark_summary.py
+```
+
 ## Detector documentation
 
 64 statistical detectors across 10 groups — drift, outliers, time series, distribution, information theory, pattern, referential, schema, basic, and custom.
