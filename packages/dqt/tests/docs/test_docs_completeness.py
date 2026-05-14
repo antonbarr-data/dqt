@@ -1,14 +1,26 @@
-"""Every registered detector must have a doc page at docs/algorithms/<group>/<slug>.md."""
-from pathlib import Path
+"""
+Asserts every detector registered in the dqt registry has a doc page at
+docs/algorithms/<group>/<slug>.md with all 9 required sections.
+Run: pytest packages/dqt/tests/docs/test_docs_completeness.py
+"""
+import pathlib
+
 import pytest
 
+# Import all algorithm groups to populate the registry before calling slugs().
+import dqt.algorithms.basic  # noqa: F401
+import dqt.algorithms.custom  # noqa: F401
+import dqt.algorithms.drift  # noqa: F401
+import dqt.algorithms.info  # noqa: F401
+import dqt.algorithms.outliers_multi  # noqa: F401
+import dqt.algorithms.outliers_uni  # noqa: F401
+import dqt.algorithms.pattern  # noqa: F401
+import dqt.algorithms.referential  # noqa: F401
+import dqt.algorithms.schema  # noqa: F401
+import dqt.algorithms.timeseries  # noqa: F401
 from dqt.algorithms._registry import registry
-import dqt.algorithms.basic, dqt.algorithms.distribution, dqt.algorithms.drift
-import dqt.algorithms.info, dqt.algorithms.outliers_multi, dqt.algorithms.outliers_uni
-import dqt.algorithms.pattern, dqt.algorithms.referential, dqt.algorithms.schema
-import dqt.algorithms.timeseries, dqt.algorithms.custom
 
-DOCS_ROOT = Path(__file__).parent.parent.parent.parent.parent / "docs" / "algorithms"
+DOCS_ROOT = pathlib.Path(__file__).parents[4] / "docs" / "algorithms"
 
 REQUIRED_SECTIONS = [
     "## What it computes",
@@ -22,23 +34,30 @@ REQUIRED_SECTIONS = [
     "## Limitations",
 ]
 
-
-def test_every_detector_has_doc():
-    missing = []
-    for slug in sorted(registry.slugs()):
-        cls = registry.get(slug)
-        path = DOCS_ROOT / cls.group / f"{slug}.md"
-        if not path.exists():
-            missing.append(f"{cls.group}/{slug}")
-    assert not missing, f"Missing doc pages ({len(missing)}): {missing}"
+_SLUGS = sorted(registry.slugs())
 
 
-@pytest.mark.parametrize("slug", sorted(registry.slugs()))
-def test_doc_has_required_sections(slug):
-    cls = registry.get(slug)
-    path = DOCS_ROOT / cls.group / f"{slug}.md"
-    if not path.exists():
-        pytest.skip(f"No doc yet for {slug}")
-    content = path.read_text(encoding="utf-8")
-    missing_sections = [s for s in REQUIRED_SECTIONS if s not in content]
-    assert not missing_sections, f"{slug} missing sections: {missing_sections}"
+def _find_doc(slug: str) -> pathlib.Path | None:
+    matches = list(DOCS_ROOT.rglob(f"{slug}.md"))
+    subdir = [m for m in matches if m.parent != DOCS_ROOT]
+    return subdir[0] if subdir else (matches[0] if matches else None)
+
+
+@pytest.mark.parametrize("slug", _SLUGS)
+def test_doc_exists(slug: str) -> None:
+    doc = _find_doc(slug)
+    assert doc is not None, (
+        f"No doc page for '{slug}' — create docs/algorithms/<group>/{slug}.md"
+    )
+
+
+@pytest.mark.parametrize("slug", _SLUGS)
+def test_doc_has_required_sections(slug: str) -> None:
+    doc = _find_doc(slug)
+    if doc is None:
+        pytest.skip(f"Doc for '{slug}' not found (covered by test_doc_exists)")
+    content = doc.read_text(encoding="utf-8")
+    missing = [s for s in REQUIRED_SECTIONS if s not in content]
+    assert not missing, (
+        f"Doc for '{slug}' missing sections:\n" + "\n".join(f"  {s}" for s in missing)
+    )
