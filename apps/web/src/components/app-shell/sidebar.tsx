@@ -265,9 +265,7 @@ export function Sidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="t-body truncate" style={{ color: "var(--fg-0)" }}>{userName}</p>
-              <p className="t-small truncate" style={{ color: "var(--pass)" }}>
-                <span style={{ marginRight: 3 }}>●</span>on-call · ends 18:30
-              </p>
+              <p className="t-small truncate" style={{ color: "var(--fg-3)" }}>{userName}@freightos.com</p>
             </div>
           </div>
         )}

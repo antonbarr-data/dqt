@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Sparkles, ChevronRight } from "lucide-react";
+import { Check, Sparkles, ChevronRight, X } from "lucide-react";
 import { clsx } from "clsx";
 
 /* ───────────── mock data ───────────── */
@@ -101,9 +101,203 @@ function YamlBlock({ code }: { code: string }) {
   );
 }
 
+/* ───────────── check edit modal ───────────── */
+
+interface CheckEditModalProps {
+  check: MockCheck;
+  onClose: () => void;
+  onSave: (updated: MockCheck) => void;
+}
+
+function CheckEditModal({ check, onClose, onSave }: CheckEditModalProps) {
+  const [dataset, setDataset] = useState(check.dataset);
+  const [column, setColumn] = useState(check.column);
+  const [detector, setDetector] = useState(check.check);
+  const [warnThreshold, setWarnThreshold] = useState("0.05");
+  const [failThreshold, setFailThreshold] = useState("0.10");
+  const [baseline, setBaseline] = useState("14d");
+  const [enabled, setEnabled] = useState(true);
+
+  function handleSave() {
+    onSave({ ...check, dataset, column, check: detector });
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.55)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="border border-line"
+        style={{ background: "var(--bg-1)", width: 480, maxHeight: "90vh", overflow: "auto" }}
+      >
+        {/* header */}
+        <div
+          className="flex items-center justify-between px-4 py-3 border-b border-line"
+          style={{ flexShrink: 0 }}
+        >
+          <span className="t-h3" style={{ color: "var(--fg-0)" }}>Edit Check</span>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-6 h-6 border border-line hover:bg-bg-2 transition-colors"
+            style={{ color: "var(--fg-2)" }}
+          >
+            <X size={12} strokeWidth={1.6} />
+          </button>
+        </div>
+
+        {/* form */}
+        <div className="p-4 space-y-4">
+          <label className="block space-y-1">
+            <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Detector
+            </span>
+            <input
+              className="w-full px-3 py-1.5 border border-line t-small outline-none font-mono"
+              style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              value={detector}
+              onChange={(e) => setDetector(e.target.value)}
+            />
+          </label>
+
+          <label className="block space-y-1">
+            <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Dataset
+            </span>
+            <input
+              className="w-full px-3 py-1.5 border border-line t-small outline-none font-mono"
+              style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              value={dataset}
+              onChange={(e) => setDataset(e.target.value)}
+            />
+          </label>
+
+          <label className="block space-y-1">
+            <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Column
+            </span>
+            <input
+              className="w-full px-3 py-1.5 border border-line t-small outline-none font-mono"
+              style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              value={column}
+              onChange={(e) => setColumn(e.target.value)}
+            />
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Warn threshold
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                className="w-full px-3 py-1.5 border border-line t-small outline-none font-mono"
+                style={{ background: "var(--bg-2)", color: "var(--warn)" }}
+                value={warnThreshold}
+                onChange={(e) => setWarnThreshold(e.target.value)}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Fail threshold
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                className="w-full px-3 py-1.5 border border-line t-small outline-none font-mono"
+                style={{ background: "var(--bg-2)", color: "var(--fail)" }}
+                value={failThreshold}
+                onChange={(e) => setFailThreshold(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <label className="block space-y-1">
+            <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Baseline window
+            </span>
+            <input
+              className="w-full px-3 py-1.5 border border-line t-small outline-none font-mono"
+              style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              placeholder="e.g. 14d"
+              value={baseline}
+              onChange={(e) => setBaseline(e.target.value)}
+            />
+          </label>
+
+          <div className="flex items-center justify-between py-1">
+            <span className="t-small" style={{ color: "var(--fg-1)" }}>Enabled</span>
+            <button
+              onClick={() => setEnabled((v) => !v)}
+              className="relative border border-line transition-colors"
+              style={{
+                width: 36,
+                height: 20,
+                background: enabled ? "var(--accent)" : "var(--bg-2)",
+                borderColor: enabled ? "var(--accent)" : "var(--line)",
+                flexShrink: 0,
+              }}
+              aria-label={enabled ? "Disable check" : "Enable check"}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: enabled ? 18 : 2,
+                  width: 14,
+                  height: 14,
+                  background: enabled ? "var(--bg-0)" : "var(--fg-3)",
+                  transition: "left 0.15s",
+                }}
+              />
+            </button>
+          </div>
+
+          {/* YAML preview */}
+          <div>
+            <p className="t-micro mb-1.5" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Preview
+            </p>
+            <pre
+              className="t-micro font-mono p-2.5 overflow-x-auto"
+              style={{ background: "var(--bg-0)", color: "var(--fg-1)", border: "1px solid var(--line)", lineHeight: 1.6 }}
+            >
+              {`check: ${detector}\ntable: ${dataset}\ncolumn: ${column}\nthreshold:\n  warn: ${warnThreshold}\n  fail: ${failThreshold}\nbaseline: ${baseline}\nenabled: ${enabled}`}
+            </pre>
+          </div>
+        </div>
+
+        {/* actions */}
+        <div
+          className="flex items-center justify-end gap-2 px-4 py-3 border-t border-line"
+          style={{ flexShrink: 0 }}
+        >
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 t-small border border-line hover:bg-bg-2 transition-colors"
+            style={{ color: "var(--fg-1)" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-3 py-1.5 t-small border transition-colors hover:opacity-90"
+            style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ───────────── right detail panel ───────────── */
 
-function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
+function RightPanel({ selectedCheckId, onEditCheck }: { selectedCheckId: string | null; onEditCheck: (id: string) => void }) {
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
@@ -133,12 +327,23 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
     if (!chk) return null;
     return (
       <div className="p-4 space-y-3">
-        <p className="t-h3" style={{ color: "var(--fg-0)" }}>{chk.check}</p>
-        <p className="t-small font-mono" style={{ color: "var(--fg-1)" }}>
-          {chk.dataset}.{chk.column}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="t-h3" style={{ color: "var(--fg-0)" }}>{chk.check}</p>
+            <p className="t-small font-mono mt-0.5" style={{ color: "var(--fg-1)" }}>
+              {chk.dataset}.{chk.column}
+            </p>
+          </div>
+          <button
+            onClick={() => onEditCheck(chk.id)}
+            className="px-2.5 py-1 t-micro border border-line hover:border-accent transition-colors flex-shrink-0"
+            style={{ color: "var(--fg-1)" }}
+          >
+            Edit
+          </button>
+        </div>
         <YamlBlock
-          code={`check: ${chk.check}\ntable: ${chk.dataset}\ncolumn: ${chk.column}`}
+          code={`check: ${chk.check}\ntable: ${chk.dataset}\ncolumn: ${chk.column}\nthreshold:\n  warn: 0.05\n  fail: 0.10\nbaseline: 14d`}
         />
       </div>
     );
@@ -239,15 +444,31 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
 export default function TestsPage() {
   const [activeCategory, setActiveCategory] = useState<CategoryLabel>("Basic");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
+  const [checks, setChecks] = useState<MockCheck[]>(MOCK_CHECKS);
 
   const cat = CATEGORIES.find((c) => c.label === activeCategory)!;
   const visibleChecks =
     cat.group === null
-      ? MOCK_CHECKS
-      : MOCK_CHECKS.filter((c) => c.group === cat.group);
+      ? checks
+      : checks.filter((c) => c.group === cat.group);
+
+  const editingCheck = editingCheckId ? checks.find((c) => c.id === editingCheckId) ?? null : null;
+
+  function handleSaveCheck(updated: MockCheck) {
+    setChecks((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+  }
 
   return (
     <div className="flex" style={{ height: "calc(100vh - 44px)", overflow: "hidden" }}>
+
+      {editingCheck && (
+        <CheckEditModal
+          check={editingCheck}
+          onClose={() => setEditingCheckId(null)}
+          onSave={handleSaveCheck}
+        />
+      )}
 
       {/* left — category nav */}
       <div
@@ -314,9 +535,9 @@ export default function TestsPage() {
             <table className="w-full" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr className="border-b border-line" style={{ background: "var(--bg-1)" }}>
-                  {["", "Dataset.Column", "Check", "Score"].map((h) => (
+                  {["", "Dataset.Column", "Check", "Score", ""].map((h, i) => (
                     <th
-                      key={h}
+                      key={i}
                       className="px-3 py-2 text-left t-micro"
                       style={{
                         color: "var(--fg-2)",
@@ -360,6 +581,15 @@ export default function TestsPage() {
                       <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-1)" }}>
                         {chk.score}
                       </td>
+                      <td className="px-3 py-2 w-12 text-right">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingCheckId(chk.id); }}
+                          className="t-micro px-2 py-0.5 border border-line hover:border-accent transition-colors"
+                          style={{ color: "var(--fg-2)" }}
+                        >
+                          Edit
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -374,7 +604,7 @@ export default function TestsPage() {
         className="overflow-y-auto flex-shrink-0"
         style={{ width: 400, background: "var(--bg-1)" }}
       >
-        <RightPanel selectedCheckId={selectedId} />
+        <RightPanel selectedCheckId={selectedId} onEditCheck={setEditingCheckId} />
       </div>
     </div>
   );
