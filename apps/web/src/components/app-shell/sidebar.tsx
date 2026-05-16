@@ -110,22 +110,23 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
         {NAV_GROUPS.map((group) => (
           <div key={group.label ?? "__overview"} className="mb-2">
-            {/* section label — always rendered at fixed height; opacity hides it when closed */}
-            <div
-              className="px-4 t-small whitespace-nowrap overflow-hidden"
-              style={{
-                color: "var(--fg-1)",
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                fontWeight: 500,
-                height: LABEL_H,
-                lineHeight: `${LABEL_H}px`,
-                opacity: group.label && open ? 1 : 0,
-                transition: "opacity 0.1s ease",
-              }}
-            >
-              {group.label ?? ""}
-            </div>
+            {group.label !== null && (
+              <div
+                className="px-4 t-small whitespace-nowrap overflow-hidden"
+                style={{
+                  color: "var(--fg-1)",
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  fontWeight: 500,
+                  height: LABEL_H,
+                  lineHeight: `${LABEL_H}px`,
+                  opacity: open ? 1 : 0,
+                  transition: "opacity 0.1s ease",
+                }}
+              >
+                {group.label}
+              </div>
+            )}
             {group.items.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
