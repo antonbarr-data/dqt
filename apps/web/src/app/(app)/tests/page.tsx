@@ -17,14 +17,21 @@ interface MockCheck {
 }
 
 const MOCK_CHECKS: MockCheck[] = [
-  { id: "1", group: "basic", dataset: "marketing_campaigns", column: "spend_usd", check: "value_in_range", score: 0.0, verdict: "pass" },
-  { id: "2", group: "basic", dataset: "gigler_transactions", column: "amount_usd", check: "value_in_range", score: 0.023, verdict: "warn" },
-  { id: "3", group: "basic", dataset: "gigler_transactions", column: "platform_fee_usd", check: "null_fraction", score: 0.087, verdict: "fail" },
-  { id: "4", group: "basic", dataset: "gig_vendor_stats", column: "total_profile_views", check: "null_fraction", score: 0.031, verdict: "warn" },
-  { id: "5", group: "outliers", dataset: "gigler_transactions", column: "amount_usd", check: "mad_outlier_fraction", score: 0.008, verdict: "pass" },
-  { id: "6", group: "outliers", dataset: "gig_vendor_stats", column: "click_through_rate", check: "adjusted_boxplot_fraction", score: 0.002, verdict: "pass" },
-  { id: "7", group: "distribution", dataset: "gig_prices", column: "avg_price_usd", check: "ks2sample", score: 0.032, verdict: "pass" },
-  { id: "8", group: "basic", dataset: "marketing_campaigns", column: "quality_score", check: "completeness", score: 0.94, verdict: "warn" },
+  { id: "1",  group: "validity",      dataset: "marketing_campaigns",  column: "spend_usd",             check: "value_in_range",            score: 0.000, verdict: "pass" },
+  { id: "2",  group: "validity",      dataset: "gigler_transactions",  column: "amount_usd",            check: "value_in_range",            score: 0.023, verdict: "warn" },
+  { id: "3",  group: "completeness",  dataset: "gigler_transactions",  column: "platform_fee_usd",      check: "null_fraction",             score: 0.087, verdict: "fail" },
+  { id: "4",  group: "completeness",  dataset: "gig_vendor_stats",     column: "total_profile_views",   check: "null_fraction",             score: 0.031, verdict: "warn" },
+  { id: "5",  group: "completeness",  dataset: "marketing_campaigns",  column: "quality_score",         check: "completeness",              score: 0.940, verdict: "warn" },
+  { id: "6",  group: "outliers_uni",  dataset: "gigler_transactions",  column: "amount_usd",            check: "mad_outlier_fraction",      score: 0.008, verdict: "pass" },
+  { id: "7",  group: "outliers_uni",  dataset: "gig_vendor_stats",     column: "click_through_rate",    check: "adjusted_boxplot_fraction", score: 0.002, verdict: "pass" },
+  { id: "8",  group: "outliers_multi",dataset: "gigler_transactions",  column: "(amount,fee)",          check: "mahalanobis_fraction",      score: 0.011, verdict: "pass" },
+  { id: "9",  group: "drift",         dataset: "gig_prices",           column: "avg_price_usd",         check: "ks2sample",                 score: 0.032, verdict: "pass" },
+  { id: "10", group: "drift",         dataset: "gigler_transactions",  column: "amount_usd",            check: "psi",                       score: 0.041, verdict: "warn" },
+  { id: "11", group: "timeseries",    dataset: "gig_vendor_stats",     column: "daily_active_vendors",  check: "stl_residual_zscore",       score: 3.210, verdict: "fail" },
+  { id: "12", group: "timeseries",    dataset: "marketing_campaigns",  column: "impressions",           check: "bocpd",                     score: 0.001, verdict: "pass" },
+  { id: "13", group: "integrity",     dataset: "gigler_transactions",  column: "platform_fee_usd",      check: "referential_integrity",     score: 0.000, verdict: "pass" },
+  { id: "14", group: "schema",        dataset: "gig_prices",           column: "(table)",               check: "schema_changed",            score: 0.000, verdict: "pass" },
+  { id: "15", group: "custom",        dataset: "gigler_transactions",  column: "(table)",               check: "row_count_in_range",        score: 0.000, verdict: "pass" },
 ];
 
 const AI_SUGGESTIONS = [
@@ -55,13 +62,16 @@ const AI_SUGGESTIONS = [
 ];
 
 const CATEGORIES = [
-  { label: "Auto-baselined", group: null },
-  { label: "Distribution", group: "distribution" },
-  { label: "Time series", group: "timeseries" },
-  { label: "Outliers", group: "outliers" },
-  { label: "Dependencies", group: "dependencies" },
-  { label: "Schema", group: "schema" },
-  { label: "Basic", group: "basic" },
+  { label: "All",                  group: null,            hint: "Every check across all categories" },
+  { label: "Completeness",         group: "completeness",  hint: "Is the data there?" },
+  { label: "Validity",             group: "validity",      hint: "Does it match the rules?" },
+  { label: "Integrity",            group: "integrity",     hint: "Is it internally consistent?" },
+  { label: "Schema",               group: "schema",        hint: "Has the shape changed?" },
+  { label: "Univariate outliers",  group: "outliers_uni",  hint: "Are individual values unusual?" },
+  { label: "Multivariate outliers",group: "outliers_multi",hint: "Are rows unusual in combination?" },
+  { label: "Drift",                group: "drift",         hint: "Has the distribution shifted?" },
+  { label: "Time series",          group: "timeseries",    hint: "Did the temporal pattern change?" },
+  { label: "Custom",               group: "custom",        hint: "Specialized cases" },
 ] as const;
 
 type CategoryLabel = typeof CATEGORIES[number]["label"];
@@ -442,16 +452,13 @@ function RightPanel({ selectedCheckId, onEditCheck }: { selectedCheckId: string 
 /* ───────────── main page ───────────── */
 
 export default function TestsPage() {
-  const [activeCategory, setActiveCategory] = useState<CategoryLabel>("Basic");
+  const [activeCategory, setActiveCategory] = useState<CategoryLabel>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
   const [checks, setChecks] = useState<MockCheck[]>(MOCK_CHECKS);
 
   const cat = CATEGORIES.find((c) => c.label === activeCategory)!;
-  const visibleChecks =
-    cat.group === null
-      ? checks
-      : checks.filter((c) => c.group === cat.group);
+  const visibleChecks = cat.group === null ? checks : checks.filter((c) => c.group === cat.group);
 
   const editingCheck = editingCheckId ? checks.find((c) => c.id === editingCheckId) ?? null : null;
 
@@ -473,7 +480,7 @@ export default function TestsPage() {
       {/* left — category nav */}
       <div
         className="flex-shrink-0 border-r border-line overflow-y-auto"
-        style={{ width: 180, background: "var(--bg-1)" }}
+        style={{ width: 200, background: "var(--bg-1)" }}
       >
         <div
           className="px-3 py-2 t-micro border-b border-line"
@@ -483,7 +490,7 @@ export default function TestsPage() {
         </div>
         {CATEGORIES.map((cat) => {
           const active = activeCategory === cat.label;
-          const groupChecks = cat.group === null ? MOCK_CHECKS : MOCK_CHECKS.filter((c) => c.group === cat.group);
+          const groupChecks = cat.group === null ? checks : checks.filter((c) => c.group === cat.group);
           const failCount = groupChecks.filter((c) => c.verdict === "fail").length;
           const warnCount = groupChecks.filter((c) => c.verdict === "warn").length;
           return (
@@ -491,22 +498,24 @@ export default function TestsPage() {
               key={cat.label}
               onClick={() => { setActiveCategory(cat.label); setSelectedId(null); }}
               className={clsx(
-                "w-full flex items-center justify-between px-3 py-2 t-small text-left transition-colors border-l-2",
+                "w-full px-3 py-2 text-left transition-colors border-l-2",
                 active ? "border-accent" : "border-transparent hover:bg-bg-2"
               )}
               style={{
-                color: active ? "var(--fg-0)" : "var(--fg-1)",
                 background: active ? "var(--bg-2)" : "transparent",
               }}
             >
-              <span>{cat.label}</span>
-              {failCount > 0 ? (
-                <span className="t-micro font-mono" style={{ color: "var(--fail)" }}>{failCount}</span>
-              ) : warnCount > 0 ? (
-                <span className="t-micro font-mono" style={{ color: "var(--warn)" }}>{warnCount}</span>
-              ) : groupChecks.length > 0 ? (
-                <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{groupChecks.length}</span>
-              ) : null}
+              <div className="flex items-center justify-between">
+                <span className="t-small" style={{ color: active ? "var(--fg-0)" : "var(--fg-1)" }}>{cat.label}</span>
+                {failCount > 0 ? (
+                  <span className="t-micro font-mono" style={{ color: "var(--fail)" }}>{failCount}</span>
+                ) : warnCount > 0 ? (
+                  <span className="t-micro font-mono" style={{ color: "var(--warn)" }}>{warnCount}</span>
+                ) : groupChecks.length > 0 ? (
+                  <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{groupChecks.length}</span>
+                ) : null}
+              </div>
+              <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)", lineHeight: 1.3 }}>{cat.hint}</p>
             </button>
           );
         })}
