@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ReconciliationBar } from "./reconciliation-bar";
+import { EvidenceTable } from "./evidence-table";
+import { SeriesChart } from "./series-chart";
 
 interface DataIssue {
   detector_slug: string;
@@ -147,6 +149,31 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
         />
       )}
 
+      {(state.dataIssues.length > 0 || state.businessDrivers.length > 0) && (
+        <EvidenceTable
+          rows={[
+            ...state.dataIssues.map((issue) => ({
+              source: `check:${issue.detector_slug}`,
+              signal_type: "failed_check",
+              magnitude: (issue.contribution_low + issue.contribution_high) / 2,
+              magnitude_low: issue.contribution_low,
+              magnitude_high: issue.contribution_high,
+              evidence_strength: issue.verdict === "fail" ? "strong" : "moderate",
+              detail: { plain_english: issue.plain_english },
+            })),
+            ...state.businessDrivers.map((d) => ({
+              source: `granger:${d.cause}`,
+              signal_type: "causal_edge",
+              magnitude: (d.contribution_low + d.contribution_high) / 2,
+              magnitude_low: d.contribution_low,
+              magnitude_high: d.contribution_high,
+              evidence_strength: d.evidence_strength,
+              detail: { p_value: d.p_value, lag: d.lag },
+            })),
+          ]}
+        />
+      )}
+
       {state.dataIssues.length > 0 && (
         <div className="mb-6">
           <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
@@ -210,6 +237,8 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
           </div>
         </details>
       )}
+
+      <SeriesChart fqn={fqn} />
     </div>
   );
 }
