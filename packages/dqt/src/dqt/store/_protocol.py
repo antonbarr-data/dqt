@@ -155,6 +155,16 @@ class CausalEdgeReview:
     review_id: UUID = field(default_factory=uuid4)
 
 
+@dataclass
+class MetricRun:
+    """Time series snapshot of a metric value."""
+    metric_fqn: str
+    run_at: datetime
+    value: float
+    verdict: str           # "pass" | "warn" | "fail"
+    run_id: UUID = field(default_factory=uuid4)
+
+
 @runtime_checkable
 class ResultsStore(Protocol):
     def save_run(self, run: RunResult) -> None: ...
@@ -180,3 +190,5 @@ class ResultsStore(Protocol):
     def save_proof(self, proof: "ProofBundle") -> None: ...
     def list_proofs(self, check_id: UUID) -> "list[ProofBundle]": ...
     def list_check_ids(self) -> list[UUID]: ...
+    def save_metric_run(self, run: MetricRun) -> None: ...
+    def list_metric_runs(self, metric_fqn: str, lookback_days: int = 30) -> list[MetricRun]: ...

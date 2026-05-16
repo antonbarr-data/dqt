@@ -41,3 +41,28 @@ def test_movement_explanation_primary_channel_valid():
 def test_ruled_out_item():
     item = RuledOutItem(candidate_fqn="test.orders.ad_spend", reason="p_value=0.42 (not significant)")
     assert item.reason
+
+
+from datetime import timedelta
+from dqt.store.memory import MemoryStore
+from dqt.store._protocol import MetricRun
+
+
+def test_save_and_list_metric_runs():
+    store = MemoryStore()
+    now = datetime.now(timezone.utc)
+    run = MetricRun(metric_fqn="prod.public.orders.revenue", run_at=now, value=1250.0, verdict="pass")
+    store.save_metric_run(run)
+    runs = store.list_metric_runs("prod.public.orders.revenue", lookback_days=7)
+    assert len(runs) == 1
+    assert runs[0].value == 1250.0
+
+
+def test_list_metric_runs_filters_by_lookback():
+    store = MemoryStore()
+    now = datetime.now(timezone.utc)
+    store.save_metric_run(MetricRun("m", run_at=now - timedelta(days=10), value=1.0, verdict="pass"))
+    store.save_metric_run(MetricRun("m", run_at=now - timedelta(days=2), value=2.0, verdict="pass"))
+    runs = store.list_metric_runs("m", lookback_days=7)
+    assert len(runs) == 1
+    assert runs[0].value == 2.0

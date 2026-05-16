@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from dqt.store._protocol import CausalEdgeReview, CausalityReport, Incident, ProfileReport, RunResult
+from dqt.store._protocol import CausalEdgeReview, CausalityReport, Incident, MetricRun, ProfileReport, RunResult
 
 from typing import TYPE_CHECKING
 
@@ -21,6 +21,7 @@ class MemoryStore:
         self._profile_reports: list[ProfileReport] = []
         self._causality_reports: list[CausalityReport] = []
         self._proofs: dict[UUID, list[ProofBundle]] = defaultdict(list)
+        self._metric_runs: dict[str, list[MetricRun]] = {}
 
     def save_run(self, run: RunResult) -> None:
         self._runs[run.check_id].append(run)
@@ -97,3 +98,14 @@ class MemoryStore:
 
     def list_check_ids(self) -> list[UUID]:
         return list(self._runs.keys())
+
+    def save_metric_run(self, run: MetricRun) -> None:
+        self._metric_runs.setdefault(run.metric_fqn, []).append(run)
+
+    def list_metric_runs(self, metric_fqn: str, lookback_days: int = 30) -> list[MetricRun]:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+        runs = self._metric_runs.get(metric_fqn, [])
+        return sorted(
+            [r for r in runs if r.run_at >= cutoff],
+            key=lambda r: r.run_at,
+        )
