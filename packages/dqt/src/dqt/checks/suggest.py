@@ -7,12 +7,14 @@ _ISO3166_CODES: list[str] = []
 try:
     import pycountry as _pc
     _ISO3166_CODES = [c.alpha_2 for c in _pc.countries]
-except Exception:
+except ImportError:
     _ISO3166_CODES = [
         "US", "GB", "DE", "FR", "CA", "AU", "JP", "IN", "BR", "MX",
         "CN", "KR", "SG", "NL", "SE", "NO", "DK", "FI", "CH", "ES",
         "IT", "PL", "RU", "ZA", "NG", "EG", "AR", "CL", "CO", "PE",
     ]
+
+_NOW_SENTINEL = "__now__"
 
 
 @dataclass
@@ -65,18 +67,14 @@ def suggest_checks_for_column(
             confidence=confidence, sample_size_used=profile.sample_size_used,
         ))
 
-    # Baseline: every column gets null fraction check
-    add("null_fraction", {"fail_threshold": 0.5},
-        "Tracks what fraction of rows are NULL in this column.", 0.6)
-
+    # Baseline null_fraction — threshold depends on whether this is a PK
     if profile.is_likely_pk:
-        # Override to near-zero threshold for PKs
-        suggestions[-1] = SuggestedCheck(
-            detector_slug="null_fraction", params={"fail_threshold": 0.0001},
-            rationale="Primary keys must be non-null; any NULL is a data issue.",
-            confidence=0.95, sample_size_used=profile.sample_size_used,
-        )
+        add("null_fraction", {"fail_threshold": 0.0001},
+            "Primary keys must be non-null; any NULL is a data issue.", 0.95)
         add("uniqueness", {}, "Primary keys must be unique across all rows.", 0.95)
+    else:
+        add("null_fraction", {"fail_threshold": 0.5},
+            "Tracks what fraction of rows are NULL in this column.", 0.6)
 
     if profile.is_likely_fk:
         add("referential_integrity", {},
@@ -93,7 +91,7 @@ def suggest_checks_for_column(
     if profile.is_likely_timestamp or _is_ts(profile.data_type):
         add("freshness_seconds_behind", {"warn_threshold": 3600, "fail_threshold": 86400},
             "Timestamp column should be refreshed regularly; detect stale data.", 0.80)
-        add("value_in_range", {"max_value": "__now__"},
+        add("value_in_range", {"max_value": _NOW_SENTINEL},
             "Timestamp values should not be in the future.", 0.70)
 
     if profile.is_likely_currency:
