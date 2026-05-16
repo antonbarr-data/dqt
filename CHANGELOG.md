@@ -8,6 +8,27 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.1.0-RC] - 2026-05-16 (Phase 2, Milestone 1)
+
+### Added (dqt library)
+- `dqt.checks.suggest` -- heuristic + LLM-augmented check suggestion engine. `ColumnProfile`, `SuggestedCheck`, `suggest_checks_for_column()`. Covers PKs, FKs, email, enums, timestamps, currencies, country codes, numeric outlier detection. LLM layer is opt-in, no-ops gracefully without `ANTHROPIC_API_KEY`.
+- `dqt.metrics.Metric` -- dataclass for semantic metric definitions (fqn, display_name, kind, dataset, description, owners, tags, thresholds).
+- `dqt.metrics.MetricRegistry` -- in-memory registry with `get`, `search`, `list`, `reload`. Optional rapidfuzz fuzzy search with substring fallback.
+
+### Added (server)
+- `GET /api/v1/datasets/{dataset_id}/columns/{column}/suggest` -- returns ranked `[{detector_slug, params, rationale, confidence}]` for any column. `use_llm=false` by default.
+
+### Added (web)
+- AI check suggestions panel in the column profile view (`/datasets/{id}/{column}`). Fetches suggestions from the API, shows detector slug, confidence badge, rationale, accept button.
+
+### Changed (web)
+- Metrics page (`/metrics`) archived -- replaced with v1.1 placeholder. Full metric insight page with two-channel reconciliation arrives in v1.1.0.
+
+### Notes
+- 64 detector docs unchanged (v1.x stability contract holds)
+- v0.4.3 CI eval suite: zero regressions on Phase 2 branch
+- Suggestion eval gate: 30/30 fixtures pass (100%, gate is >=70%)
+
 ## [1.0.3] - 2026-05-14
 
 ### Fixed
