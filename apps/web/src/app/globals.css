@@ -69,3 +69,6 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .fade-in { animation: fadeIn 220ms ease-out; }
+
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

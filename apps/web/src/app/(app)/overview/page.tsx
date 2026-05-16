@@ -3,14 +3,14 @@ import Link from "next/link";
 const FLEET_KPIS = [
   { label: "Open Incidents", value: "3", trend: "fail" },
   { label: "Datasets Watched", value: "6", trend: null },
-  { label: "Checks Running", value: "46", trend: null },
+  { label: "Tests Running", value: "46", trend: null },
   { label: "Auto-explained", value: "2", trend: "pass" },
 ] as const;
 
 const ACTIVITY = [
   { time: "2 min ago", text: "gigler_transactions.platform_fee_usd failed null_fraction", kind: "fail" },
   { time: "5 min ago", text: "gig_vendor_stats baseline re-fit completed", kind: "pass" },
-  { time: "12 min ago", text: "fct_orders freshness check passed", kind: "pass" },
+  { time: "12 min ago", text: "fct_orders freshness test passed", kind: "pass" },
   { time: "1h ago", text: "gig_prices ks2sample warned — distribution shift detected", kind: "warn" },
   { time: "2h ago", text: "AI agent explained incident #41 — conversion drop traced to fee changes", kind: "info" },
 ] as const;

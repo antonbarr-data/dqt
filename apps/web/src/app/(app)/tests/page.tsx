@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Sparkles, ChevronRight, X } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -62,7 +62,7 @@ const AI_SUGGESTIONS = [
 ];
 
 const CATEGORIES = [
-  { label: "All",                  group: null,            hint: "Every check across all categories" },
+  { label: "All",                  group: null,            hint: "Every test across all categories" },
   { label: "Completeness",         group: "completeness",  hint: "Is the data there?" },
   { label: "Validity",             group: "validity",      hint: "Does it match the rules?" },
   { label: "Integrity",            group: "integrity",     hint: "Is it internally consistent?" },
@@ -148,7 +148,7 @@ function CheckEditModal({ check, onClose, onSave }: CheckEditModalProps) {
           className="flex items-center justify-between px-4 py-3 border-b border-line"
           style={{ flexShrink: 0 }}
         >
-          <span className="t-h3" style={{ color: "var(--fg-0)" }}>Edit Check</span>
+          <span className="t-h3" style={{ color: "var(--fg-0)" }}>Edit Test</span>
           <button
             onClick={onClose}
             className="flex items-center justify-center w-6 h-6 border border-line hover:bg-bg-2 transition-colors"
@@ -250,7 +250,7 @@ function CheckEditModal({ check, onClose, onSave }: CheckEditModalProps) {
                 borderColor: enabled ? "var(--accent)" : "var(--line)",
                 flexShrink: 0,
               }}
-              aria-label={enabled ? "Disable check" : "Enable check"}
+              aria-label={enabled ? "Disable test" : "Enable test"}
             >
               <span
                 style={{
@@ -423,11 +423,11 @@ function RightPanel({ selectedCheckId, onEditCheck }: { selectedCheckId: string 
       </div>
 
       <div className="border-t border-line pt-5 space-y-3">
-        <p className="t-h3" style={{ color: "var(--fg-0)" }}>Author a Check</p>
+        <p className="t-h3" style={{ color: "var(--fg-0)" }}>Author a Test</p>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Describe a check in plain English..."
+          placeholder="Describe a test in plain English..."
           rows={3}
           className="w-full px-3 py-2 border border-line t-small outline-none resize-none"
           style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
@@ -449,6 +449,30 @@ function RightPanel({ selectedCheckId, onEditCheck }: { selectedCheckId: string 
   );
 }
 
+const DETECTOR_GROUP: Record<string, string> = {
+  null_fraction: "completeness", completeness: "completeness", row_count_in_range: "custom",
+  value_in_range: "validity", referential_integrity: "integrity",
+  schema_changed: "schema", column_added: "schema", column_removed: "schema",
+  mad_outlier_fraction: "outliers_uni", adjusted_boxplot_fraction: "outliers_uni",
+  zscore_fraction: "outliers_uni", grubbs: "outliers_uni", generalized_esd: "outliers_uni",
+  mahalanobis_fraction: "outliers_multi", isolation_forest: "outliers_multi", lof: "outliers_multi",
+  ks2sample: "drift", psi: "drift", wasserstein: "drift", jensenshannon: "drift",
+  stl_residual_zscore: "timeseries", bocpd: "timeseries", cusum: "timeseries",
+  holt_winters: "timeseries", prophet: "timeseries",
+};
+
+function apiToMock(raw: { id: number; dataset_id: string; column: string | null; detector: string; verdict: string; score?: number }): MockCheck {
+  return {
+    id: String(raw.id),
+    group: DETECTOR_GROUP[raw.detector] ?? "custom",
+    dataset: raw.dataset_id,
+    column: raw.column ?? "(table)",
+    check: raw.detector,
+    score: raw.score ?? 0,
+    verdict: (raw.verdict as Verdict) ?? "pass",
+  };
+}
+
 /* ───────────── main page ───────────── */
 
 export default function TestsPage() {
@@ -456,6 +480,13 @@ export default function TestsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingCheckId, setEditingCheckId] = useState<string | null>(null);
   const [checks, setChecks] = useState<MockCheck[]>(MOCK_CHECKS);
+
+  useEffect(() => {
+    fetch("/api/v1/checks")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.length) setChecks(data.map(apiToMock)); })
+      .catch(() => null);
+  }, []);
 
   const cat = CATEGORIES.find((c) => c.label === activeCategory)!;
   const visibleChecks = cat.group === null ? checks : checks.filter((c) => c.group === cat.group);
@@ -491,8 +522,9 @@ export default function TestsPage() {
         {CATEGORIES.map((cat) => {
           const active = activeCategory === cat.label;
           const groupChecks = cat.group === null ? checks : checks.filter((c) => c.group === cat.group);
-          const failCount = groupChecks.filter((c) => c.verdict === "fail").length;
+          const passCount = groupChecks.filter((c) => c.verdict === "pass").length;
           const warnCount = groupChecks.filter((c) => c.verdict === "warn").length;
+          const failCount = groupChecks.filter((c) => c.verdict === "fail").length;
           return (
             <button
               key={cat.label}
@@ -501,19 +533,30 @@ export default function TestsPage() {
                 "w-full px-3 py-2 text-left transition-colors border-l-2",
                 active ? "border-accent" : "border-transparent hover:bg-bg-2"
               )}
-              style={{
-                background: active ? "var(--bg-2)" : "transparent",
-              }}
+              style={{ background: active ? "var(--bg-2)" : "transparent" }}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="t-small" style={{ color: active ? "var(--fg-0)" : "var(--fg-1)" }}>{cat.label}</span>
-                {failCount > 0 ? (
-                  <span className="t-micro font-mono" style={{ color: "var(--fail)" }}>{failCount}</span>
-                ) : warnCount > 0 ? (
-                  <span className="t-micro font-mono" style={{ color: "var(--warn)" }}>{warnCount}</span>
-                ) : groupChecks.length > 0 ? (
-                  <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{groupChecks.length}</span>
-                ) : null}
+                {groupChecks.length > 0 && (
+                  <span className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="flex items-center gap-0.5">
+                      <span style={{ display: "inline-block", width: 5, height: 5, background: "var(--pass)", flexShrink: 0 }} />
+                      <span className="t-micro font-mono" style={{ color: "var(--pass)" }}>{passCount}</span>
+                    </span>
+                    {warnCount > 0 && (
+                      <span className="flex items-center gap-0.5">
+                        <span style={{ display: "inline-block", width: 5, height: 5, background: "var(--warn)", flexShrink: 0 }} />
+                        <span className="t-micro font-mono" style={{ color: "var(--warn)" }}>{warnCount}</span>
+                      </span>
+                    )}
+                    {failCount > 0 && (
+                      <span className="flex items-center gap-0.5">
+                        <span style={{ display: "inline-block", width: 5, height: 5, background: "var(--fail)", flexShrink: 0 }} />
+                        <span className="t-micro font-mono" style={{ color: "var(--fail)" }}>{failCount}</span>
+                      </span>
+                    )}
+                  </span>
+                )}
               </div>
               <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)", lineHeight: 1.3 }}>{cat.hint}</p>
             </button>
@@ -531,20 +574,20 @@ export default function TestsPage() {
             {activeCategory}
           </span>
           <span className="font-mono" style={{ color: "var(--fg-3)" }}>
-            {visibleChecks.length} check{visibleChecks.length !== 1 ? "s" : ""}
+            {visibleChecks.length} test{visibleChecks.length !== 1 ? "s" : ""}
           </span>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {visibleChecks.length === 0 ? (
             <div className="px-4 py-8 t-small text-center" style={{ color: "var(--fg-2)" }}>
-              No checks in this category
+              No tests in this category
             </div>
           ) : (
             <table className="w-full" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr className="border-b border-line" style={{ background: "var(--bg-1)" }}>
-                  {["", "Dataset.Column", "Check", "Score", ""].map((h, i) => (
+                  {["", "Dataset.Column", "Test", "Score", ""].map((h, i) => (
                     <th
                       key={i}
                       className="px-3 py-2 text-left t-micro"

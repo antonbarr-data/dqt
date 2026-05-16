@@ -43,7 +43,7 @@ export default function DatasetsPage() {
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line">
-              {["Dataset", "Source", "Rows", "Columns", "Checks", "Status", "Last Run"].map((h) => (
+              {["Dataset", "Source", "Rows", "Columns", "Tests", "Status", "Last Run"].map((h) => (
                 <th
                   key={h}
                   className="px-3 py-2 text-left t-micro"

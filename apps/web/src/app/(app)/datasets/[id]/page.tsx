@@ -176,7 +176,7 @@ export default async function DatasetDetailPage({
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line">
-              {["Column", "Verdict", "Null fraction", "Null / Total", "Checked"].map((h) => (
+              {["Column", "Verdict", "Null fraction", "Null / Total", "Tested"].map((h) => (
                 <th
                   key={h}
                   className="px-3 py-2 text-left t-micro"

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Bell } from "lucide-react";
 import { getToken, decodeToken, clearToken } from "@/lib/auth";
 import Image from "next/image";
+import { CommandPalette } from "./command-palette";
 
 interface TestCounts { pass: number; warn: number; fail: number }
 
@@ -30,6 +31,7 @@ export function Topbar() {
   const router = useRouter();
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [accountOpen, setAccountOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const testCounts = useTestCounts();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -65,6 +67,27 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [accountOpen]);
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+
+  function handlePictureUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setUserPicture(url);
+    setAccountOpen(false);
+  }
+
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -78,13 +101,15 @@ export function Topbar() {
   }
 
   return (
+    <>
+    <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     <header
       className="flex items-center gap-3 border-b border-line"
       style={{ height: 44, background: "var(--bg-1)", flexShrink: 0, paddingRight: 16 }}
     >
       {/* logo — left-aligned, same width as sidebar */}
       <div
-        className="flex items-center gap-2 border-r border-line px-4"
+        className="flex items-center gap-2 px-4"
         style={{ width: 224, flexShrink: 0, height: "100%" }}
       >
         <div
@@ -100,30 +125,28 @@ export function Topbar() {
         </span>
       </div>
 
-      {/* centered search */}
+      {/* centered search — opens command palette */}
       <div className="flex-1 flex justify-center">
-      <div
-        className="flex items-center gap-2 border border-line px-2.5 py-1"
-        style={{ background: "var(--bg-2)", width: 360 }}
-      >
-        <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
-        <input
-          type="text"
-          placeholder="Search datasets, incidents, tests…"
-          className="flex-1 bg-transparent t-small outline-none"
-          style={{ color: "var(--fg-1)" }}
-        />
-        <kbd
-          className="t-micro px-1 border border-line"
-          style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="flex items-center gap-2 border border-line px-2.5 py-1 transition-colors hover:border-accent"
+          style={{ background: "var(--bg-2)", width: 360 }}
         >
-          ⌘K
-        </kbd>
-      </div>
+          <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
+          <span className="flex-1 text-left t-small" style={{ color: "var(--fg-3)" }}>
+            Search datasets, incidents, tests…
+          </span>
+          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}>
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
       {/* tests status */}
-      <div className="flex items-center gap-3">
+      <div
+        className="flex items-center gap-3"
+        title={testCounts ? `pass ${testCounts.pass} · warn ${testCounts.warn} · fail ${testCounts.fail}` : undefined}
+      >
         <span className="t-micro" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tests</span>
         {testCounts ? (
           <>
@@ -220,6 +243,20 @@ export function Topbar() {
                 <p className="t-micro truncate" style={{ color: "var(--fg-3)" }}>{userEmail}</p>
               </div>
             </div>
+            <input
+              ref={pictureInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePictureUpload}
+            />
+            <button
+              className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
+              style={{ color: "var(--fg-0)" }}
+              onClick={() => pictureInputRef.current?.click()}
+            >
+              Upload picture
+            </button>
             <button
               className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
               style={{ color: "var(--fg-0)" }}
@@ -238,5 +275,6 @@ export function Topbar() {
         )}
       </div>
     </header>
+    </>
   );
 }
