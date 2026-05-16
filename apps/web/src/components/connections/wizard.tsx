@@ -25,6 +25,8 @@ type Step = 1 | 2 | 3;
 
 interface WizardProps {
   engine: string;
+  initialValues?: Record<string, string>;
+  mode?: "create" | "edit";
 }
 
 export function Wizard({ engine }: WizardProps) {
