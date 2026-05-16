@@ -1434,7 +1434,7 @@ dev = [
 
 [[package]]
 name = "dqtlib"
-version = "0.9.4"
+version = "1.0.3"
 source = { editable = "packages/dqt" }
 dependencies = [
     { name = "diptest" },
