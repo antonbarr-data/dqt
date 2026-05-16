@@ -46,8 +46,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from dqt_server.api.v1.suggest import router as suggest_router
+
 app.include_router(auth_router)
 app.include_router(dashboard_router)
+app.include_router(suggest_router)
 
 
 @app.get("/health", tags=["ops"])
