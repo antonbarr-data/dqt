@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ReconciliationBar } from "./reconciliation-bar";
 import { EvidenceTable } from "./evidence-table";
 import { SeriesChart } from "./series-chart";
+import { AuditDrawer } from "./audit-drawer";
 
 interface DataIssue {
   detector_slug: string;
@@ -51,6 +52,9 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
   const [state, setState] = useState<StreamState>(INITIAL_STATE);
   const [lookback, setLookback] = useState(7);
   const abortRef = useRef<AbortController | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditSentenceId, setAuditSentenceId] = useState<string | null>(null);
+  const [serverCitations, setServerCitations] = useState<Record<string, string[]>>({});
 
   async function runExplain(days: number) {
     abortRef.current?.abort();
@@ -83,6 +87,9 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
           try {
             const evt = JSON.parse(line.slice(6));
             setState((prev) => applyEvent(prev, evt));
+            if (evt.type === "done" && evt.citations) {
+              setServerCitations(evt.citations as Record<string, string[]>);
+            }
           } catch { /* malformed chunk */ }
         }
       }
@@ -137,7 +144,19 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
           <p className="t-small" style={{ color: "var(--fail)" }}>Error: {state.error}</p>
         )}
         {state.summary && (
-          <p className="t-body" style={{ color: "var(--fg-0)", lineHeight: 1.7 }}>{state.summary}</p>
+          <p className="t-body" style={{ color: "var(--fg-0)", lineHeight: 1.7 }}>
+            {state.summary.split(/\. /).map((sentence, i) => (
+              <span
+                key={i}
+                onClick={() => { setAuditSentenceId(`s${i}`); setAuditOpen(true); }}
+                className="cursor-pointer hover:bg-bg-2 transition-colors"
+                title="Click to see evidence"
+                style={{ borderBottom: "1px dotted var(--line)" }}
+              >
+                {sentence}{" "}
+              </span>
+            ))}
+          </p>
         )}
       </div>
 
@@ -239,6 +258,13 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
       )}
 
       <SeriesChart fqn={fqn} />
+
+      <AuditDrawer
+        open={auditOpen}
+        sentenceId={auditSentenceId}
+        citations={serverCitations}
+        onClose={() => setAuditOpen(false)}
+      />
     </div>
   );
 }
