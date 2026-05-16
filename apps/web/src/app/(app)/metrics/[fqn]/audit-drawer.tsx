@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 interface AuditDrawerProps {
   open: boolean;
@@ -10,8 +10,6 @@ interface AuditDrawerProps {
 }
 
 export function AuditDrawer({ open, sentenceId, citations, onClose }: AuditDrawerProps) {
-  const drawerRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
     if (open) document.addEventListener("keydown", onKey);
@@ -30,7 +28,6 @@ export function AuditDrawer({ open, sentenceId, citations, onClose }: AuditDrawe
         onClick={onClose}
       />
       <div
-        ref={drawerRef}
         className="fixed top-0 right-0 h-full z-50 flex flex-col"
         style={{ width: 360, background: "var(--bg-1)", borderLeft: "1px solid var(--line)",
                  boxShadow: "-4px 0 24px rgba(0,0,0,0.3)" }}

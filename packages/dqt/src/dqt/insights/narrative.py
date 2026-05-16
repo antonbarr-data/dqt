@@ -31,8 +31,8 @@ def generate(explanation: MovementExplanation) -> MovementExplanation:
     for attempt in range(_MAX_RETRIES):
         try:
             prose = _call_llm(explanation, evidence_by_id, api_key)
-            citations, ok = _post_process_citations(prose, evidence_by_id)
-            if ok or attempt == _MAX_RETRIES - 1:
+            citations, valid_citations = _post_process_citations(prose, evidence_by_id)
+            if valid_citations or attempt == _MAX_RETRIES - 1:
                 explanation.summary_paragraph = _strip_citations(prose)
                 explanation.citations = citations
                 return explanation

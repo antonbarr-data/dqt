@@ -66,7 +66,10 @@ async def list_metrics() -> list[dict]:
 
 @router.get("/metrics/{fqn:path}/series")
 async def metric_series(fqn: str, lookback_days: int = 30) -> list[dict]:
-    """Return time series snapshots for the metric (empty list when no data stored)."""
+    """Return time series snapshots for the metric (empty list when no data stored).
+
+    TODO: wire to MetricRun store once Postgres store is injected via dependency.
+    """
     return []
 
 

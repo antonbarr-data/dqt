@@ -8,7 +8,7 @@ Returns RankedCause list sorted by causal evidence strength.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 import pandas as pd
@@ -144,7 +144,7 @@ def _run_pcmci(
     try:
         from dqt.causality import pcmci_pairwise
         report = pcmci_pairwise(panel, significance_level=0.05)
-    except Exception as exc:
+    except Exception:
         return _run_granger(target_col, panel, candidates)
 
     for edge in report.edges:

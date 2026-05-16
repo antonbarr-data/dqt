@@ -24,7 +24,11 @@ def scan(
     window_end: datetime,
     store: ResultsStore,
 ) -> list[DataIssue]:
-    """Return DataIssues for every non-passing check run in the window."""
+    """Return DataIssues for non-passing check runs in the window.
+
+    NOTE: RunResult has no metric_fqn field, so results are currently global across all
+    metrics. Filtering will be added once check runs carry a metric FK in the store.
+    """
     runs = store.query_runs(since=window_start, until=window_end, limit=500)
     issues: list[DataIssue] = []
     for run in runs:
