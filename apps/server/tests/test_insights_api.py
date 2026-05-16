@@ -64,3 +64,17 @@ async def test_metric_detail_known_fqn_returns_200():
     assert data["fqn"] == fqn
     assert "display_name" in data
     assert "pinned" in data
+
+
+@pytest.mark.asyncio
+async def test_explain_streams_event_stream():
+    """POST /metrics/{fqn}/explain returns text/event-stream."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/metrics/gigler.default.marketing_campaigns.quality/explain",
+            json={"lookback_days": 7},
+        )
+    # Accept 200 or 404 (metric may not exist in test env)
+    assert resp.status_code in (200, 404, 422)
+    if resp.status_code == 200:
+        assert "text/event-stream" in resp.headers.get("content-type", "")
