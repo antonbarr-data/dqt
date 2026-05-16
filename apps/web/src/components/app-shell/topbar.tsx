@@ -137,12 +137,10 @@ export function Topbar() {
                 <span className="t-small font-mono" style={{ color: "var(--warn)" }}>{testCounts.warn}</span>
               </span>
             )}
-            {testCounts.fail > 0 && (
-              <span className="flex items-center gap-1">
-                <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--fail)", flexShrink: 0 }} />
-                <span className="t-small font-mono" style={{ color: "var(--fail)" }}>{testCounts.fail}</span>
-              </span>
-            )}
+            <span className="flex items-center gap-1">
+              <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--fail)", flexShrink: 0 }} />
+              <span className="t-small font-mono" style={{ color: testCounts.fail > 0 ? "var(--fail)" : "var(--fg-3)" }}>{testCounts.fail}</span>
+            </span>
           </>
         ) : (
           <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>--</span>
@@ -202,33 +200,32 @@ export function Topbar() {
         {accountOpen && (
           <div
             className="absolute right-0 top-full mt-1 border border-line z-50"
-            style={{ background: "var(--bg-1)", width: 200, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}
+            style={{ background: "var(--bg-1)", width: 220, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}
           >
-            {/* user info header */}
-            <div className="px-3 py-2.5 border-b border-line">
-              {userPicture && (
-                <div className="mb-2">
-                  <Image
-                    src={userPicture}
-                    alt={userName}
-                    width={36}
-                    height={36}
-                    className="object-cover border border-line"
-                    unoptimized
-                  />
-                </div>
-              )}
-              <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>{userName}</p>
-              <p className="t-micro mt-0.5 truncate" style={{ color: "var(--fg-2)" }}>{userEmail}</p>
+            <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-line">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{ width: 28, height: 28, background: "var(--accent-bg)", border: "1px solid var(--line)", overflow: "hidden" }}
+              >
+                {userPicture ? (
+                  <Image src={userPicture} alt={userName} width={28} height={28} className="w-full h-full object-cover" unoptimized />
+                ) : (
+                  <span className="t-small font-medium" style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)" }}>
+                    {userInitials}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="t-small truncate" style={{ color: "var(--fg-0)", fontWeight: 500 }}>{userName}</p>
+                <p className="t-micro truncate" style={{ color: "var(--fg-3)" }}>{userEmail}</p>
+              </div>
             </div>
-
-            {/* menu items */}
             <button
               className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
               style={{ color: "var(--fg-0)" }}
               onClick={() => { setAccountOpen(false); router.push("/settings" as never); }}
             >
-              Account
+              Account settings
             </button>
             <button
               className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2 border-t border-line"
