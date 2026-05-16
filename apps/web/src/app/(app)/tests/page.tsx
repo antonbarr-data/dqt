@@ -31,7 +31,7 @@ const AI_SUGGESTIONS = [
   {
     id: "s1",
     title: "Row count SLA: gig_vendor_stats",
-    reason: "Expected 500–2,000 rows/day based on historical pattern. No volume check exists.",
+    reason: "Expected 500-2,000 rows/day based on historical pattern. No volume check exists.",
     yaml: `check: row_count_in_range\ntable: gig_vendor_stats\nparams:\n  date_col: date\n  min_rows: 500\n  max_rows: 2000`,
   },
   {
@@ -54,19 +54,17 @@ const AI_SUGGESTIONS = [
   },
 ];
 
-const TABS = ["Auto-baselined", "Distribution", "Time series", "Outliers", "Dependencies", "Schema", "Basic"] as const;
-type Tab = typeof TABS[number];
+const CATEGORIES = [
+  { label: "Auto-baselined", group: null },
+  { label: "Distribution", group: "distribution" },
+  { label: "Time series", group: "timeseries" },
+  { label: "Outliers", group: "outliers" },
+  { label: "Dependencies", group: "dependencies" },
+  { label: "Schema", group: "schema" },
+  { label: "Basic", group: "basic" },
+] as const;
 
-const TAB_GROUP_MAP: Record<Tab, string | null> = {
-  "Auto-baselined": null,
-  "Distribution": "distribution",
-  "Time series": "timeseries",
-  "Outliers": "outliers",
-  "Dependencies": "dependencies",
-  "Schema": "schema",
-  "Basic": "basic",
-};
-
+type CategoryLabel = typeof CATEGORIES[number]["label"];
 type Verdict = "pass" | "warn" | "fail";
 
 function StatusDot({ verdict }: { verdict: Verdict }) {
@@ -103,7 +101,7 @@ function YamlBlock({ code }: { code: string }) {
   );
 }
 
-/* ───────────── right panel ───────────── */
+/* ───────────── right detail panel ───────────── */
 
 function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
@@ -148,7 +146,6 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
 
   return (
     <div className="p-4 space-y-5 overflow-y-auto h-full">
-      {/* toast */}
       {toastMsg && (
         <div
           className="fixed bottom-5 right-5 px-4 py-2 t-small border border-line z-50"
@@ -159,17 +156,14 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
         </div>
       )}
 
-      {/* AI suggestions header */}
       <div className="flex items-center gap-2">
         <Sparkles size={13} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
         <span className="t-h3" style={{ color: "var(--fg-0)" }}>AI Suggestions</span>
       </div>
 
-      {/* suggestion cards */}
       <div className="space-y-3">
         {AI_SUGGESTIONS.map((s) => {
           const isAccepted = accepted.has(s.id);
-          const isEditing = editingId === s.id;
           return (
             <div
               key={s.id}
@@ -179,18 +173,15 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
                 borderColor: isAccepted ? "var(--pass)" : "var(--line)",
               }}
             >
-              <div className="flex items-start justify-between gap-2">
-                <p className="t-small font-medium" style={{ color: isAccepted ? "var(--pass)" : "var(--fg-0)" }}>
-                  {isAccepted && <Check size={11} strokeWidth={2.5} style={{ display: "inline", marginRight: 4 }} />}
-                  {s.title}
-                </p>
-              </div>
+              <p className="t-small font-medium" style={{ color: isAccepted ? "var(--pass)" : "var(--fg-0)" }}>
+                {isAccepted && <Check size={11} strokeWidth={2.5} style={{ display: "inline", marginRight: 4 }} />}
+                {s.title}
+              </p>
               <p className="t-micro" style={{ color: "var(--fg-2)", lineHeight: 1.5 }}>
                 {s.reason}
               </p>
-              {isEditing && <YamlBlock code={s.yaml} />}
-              {!isEditing && !isAccepted && <YamlBlock code={s.yaml} />}
-              {isAccepted && !isEditing && (
+              {!isAccepted && <YamlBlock code={s.yaml} />}
+              {isAccepted && (
                 <p className="t-micro" style={{ color: "var(--pass)" }}>Added to suite</p>
               )}
               {!isAccepted && (
@@ -203,7 +194,7 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
                     Accept <ChevronRight size={10} strokeWidth={2} />
                   </button>
                   <button
-                    onClick={() => setEditingId(isEditing ? null : s.id)}
+                    onClick={() => setEditingId(editingId === s.id ? null : s.id)}
                     className="px-2.5 py-1 t-micro border border-line transition-colors hover:bg-bg-2"
                     style={{ color: "var(--fg-1)" }}
                   >
@@ -216,7 +207,6 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
         })}
       </div>
 
-      {/* plain-english authoring */}
       <div className="border-t border-line pt-5 space-y-3">
         <p className="t-h3" style={{ color: "var(--fg-0)" }}>Author a Check</p>
         <textarea
@@ -247,41 +237,74 @@ function RightPanel({ selectedCheckId }: { selectedCheckId: string | null }) {
 /* ───────────── main page ───────────── */
 
 export default function TestsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("Basic");
+  const [activeCategory, setActiveCategory] = useState<CategoryLabel>("Basic");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const groupFilter = TAB_GROUP_MAP[activeTab];
+  const cat = CATEGORIES.find((c) => c.label === activeCategory)!;
   const visibleChecks =
-    groupFilter === null
+    cat.group === null
       ? MOCK_CHECKS
-      : MOCK_CHECKS.filter((c) => c.group === groupFilter);
+      : MOCK_CHECKS.filter((c) => c.group === cat.group);
 
   return (
-    <div className="flex h-full" style={{ height: "calc(100vh - 44px)" }}>
-      {/* left panel */}
+    <div className="flex" style={{ height: "calc(100vh - 44px)", overflow: "hidden" }}>
+
+      {/* left — category nav */}
+      <div
+        className="flex-shrink-0 border-r border-line overflow-y-auto"
+        style={{ width: 180, background: "var(--bg-1)" }}
+      >
+        <div
+          className="px-3 py-2 t-micro border-b border-line"
+          style={{ color: "var(--fg-3)", letterSpacing: "0.10em", textTransform: "uppercase" }}
+        >
+          Category
+        </div>
+        {CATEGORIES.map((cat) => {
+          const active = activeCategory === cat.label;
+          const groupChecks = cat.group === null ? MOCK_CHECKS : MOCK_CHECKS.filter((c) => c.group === cat.group);
+          const failCount = groupChecks.filter((c) => c.verdict === "fail").length;
+          const warnCount = groupChecks.filter((c) => c.verdict === "warn").length;
+          return (
+            <button
+              key={cat.label}
+              onClick={() => { setActiveCategory(cat.label); setSelectedId(null); }}
+              className={clsx(
+                "w-full flex items-center justify-between px-3 py-2 t-small text-left transition-colors border-l-2",
+                active ? "border-accent" : "border-transparent hover:bg-bg-2"
+              )}
+              style={{
+                color: active ? "var(--fg-0)" : "var(--fg-1)",
+                background: active ? "var(--bg-2)" : "transparent",
+              }}
+            >
+              <span>{cat.label}</span>
+              {failCount > 0 ? (
+                <span className="t-micro font-mono" style={{ color: "var(--fail)" }}>{failCount}</span>
+              ) : warnCount > 0 ? (
+                <span className="t-micro font-mono" style={{ color: "var(--warn)" }}>{warnCount}</span>
+              ) : groupChecks.length > 0 ? (
+                <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{groupChecks.length}</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* center — check list */}
       <div className="flex flex-col flex-1 border-r border-line overflow-hidden">
-        {/* tab bar */}
-        <div className="flex border-b border-line overflow-x-auto" style={{ flexShrink: 0 }}>
-          {TABS.map((tab) => {
-            const active = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => { setActiveTab(tab); setSelectedId(null); }}
-                className="px-4 py-2.5 t-small whitespace-nowrap border-b-2 transition-colors"
-                style={{
-                  borderBottomColor: active ? "var(--accent)" : "transparent",
-                  color: active ? "var(--fg-0)" : "var(--fg-2)",
-                  background: active ? "var(--bg-1)" : "transparent",
-                }}
-              >
-                {tab}
-              </button>
-            );
-          })}
+        <div
+          className="px-3 py-2 border-b border-line t-micro flex items-center justify-between"
+          style={{ background: "var(--bg-1)", flexShrink: 0 }}
+        >
+          <span style={{ color: "var(--fg-3)", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+            {activeCategory}
+          </span>
+          <span className="font-mono" style={{ color: "var(--fg-3)" }}>
+            {visibleChecks.length} check{visibleChecks.length !== 1 ? "s" : ""}
+          </span>
         </div>
 
-        {/* check list */}
         <div className="flex-1 overflow-y-auto">
           {visibleChecks.length === 0 ? (
             <div className="px-4 py-8 t-small text-center" style={{ color: "var(--fg-2)" }}>
@@ -315,16 +338,12 @@ export default function TestsPage() {
                       key={chk.id}
                       onClick={() => setSelectedId(selected ? null : chk.id)}
                       className="border-b border-line last:border-0 cursor-pointer transition-colors"
-                      style={{
-                        background: selected ? "var(--bg-2)" : undefined,
-                      }}
+                      style={{ background: selected ? "var(--bg-2)" : undefined }}
                       onMouseEnter={(e) => {
-                        if (!selected)
-                          (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-2)";
+                        if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-2)";
                       }}
                       onMouseLeave={(e) => {
-                        if (!selected)
-                          (e.currentTarget as HTMLTableRowElement).style.background = "";
+                        if (!selected) (e.currentTarget as HTMLTableRowElement).style.background = "";
                       }}
                     >
                       <td className="px-3 py-2 w-8">
@@ -350,10 +369,10 @@ export default function TestsPage() {
         </div>
       </div>
 
-      {/* right panel — 420px */}
+      {/* right — detail / suggestions */}
       <div
         className="overflow-y-auto flex-shrink-0"
-        style={{ width: 420, background: "var(--bg-1)" }}
+        style={{ width: 400, background: "var(--bg-1)" }}
       >
         <RightPanel selectedCheckId={selectedId} />
       </div>

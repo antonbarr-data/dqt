@@ -111,37 +111,23 @@ export function Sidebar() {
         flexShrink: 0,
       }}
     >
-      {/* logo + version */}
+      {/* collapse control — aligns with topbar logo height */}
       <div
-        className="flex items-center justify-between border-b border-line"
-        style={{ minHeight: 48, padding: collapsed ? "0 14px" : "0 16px" }}
+        className="flex items-center border-b border-line"
+        style={{ height: 44, padding: collapsed ? "0 14px" : "0 12px 0 16px", justifyContent: collapsed ? "center" : "space-between", flexShrink: 0 }}
       >
-        {collapsed ? (
-          <button
-            onClick={() => setCollapsed(false)}
-            style={{ color: "var(--accent)", fontSize: 13, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}
-            title="Expand sidebar"
-          >
-            dqt
-          </button>
-        ) : (
-          <>
-            <span style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}>
-              dqt
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="t-small" style={{ color: "var(--fg-2)" }}>v{DQT_VERSION}</span>
-              <button
-                onClick={() => setCollapsed(true)}
-                className="flex items-center justify-center"
-                style={{ color: "var(--fg-2)", width: 18, height: 18 }}
-                aria-label="Collapse sidebar"
-              >
-                <ChevronLeft size={14} strokeWidth={1.6} />
-              </button>
-            </div>
-          </>
+        {!collapsed && (
+          <span className="t-micro" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>v{DQT_VERSION}</span>
         )}
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex items-center justify-center"
+          style={{ color: "var(--fg-2)", width: 22, height: 22 }}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand" : "Collapse"}
+        >
+          {collapsed ? <ChevronRight size={14} strokeWidth={1.6} /> : <ChevronLeft size={14} strokeWidth={1.6} />}
+        </button>
       </div>
 
       {/* nav groups */}

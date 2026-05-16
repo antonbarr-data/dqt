@@ -6,11 +6,31 @@ import { Search, Bell } from "lucide-react";
 import { getToken, decodeToken, clearToken } from "@/lib/auth";
 import Image from "next/image";
 
+interface TestCounts { pass: number; warn: number; fail: number }
+
+function useTestCounts(): TestCounts | null {
+  const [counts, setCounts] = useState<TestCounts | null>(null);
+  useEffect(() => {
+    fetch("/api/v1/checks")
+      .then((r) => r.ok ? r.json() : null)
+      .then((checks: Array<{ verdict: string }> | null) => {
+        if (!checks) return;
+        setCounts({
+          pass: checks.filter((c) => c.verdict === "pass").length,
+          warn: checks.filter((c) => c.verdict === "warn").length,
+          fail: checks.filter((c) => c.verdict === "fail").length,
+        });
+      })
+      .catch(() => null);
+  }, []);
+  return counts;
+}
+
 export function Topbar() {
   const router = useRouter();
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [statusText] = useState("9.4k tests/min · all engines healthy");
   const [accountOpen, setAccountOpen] = useState(false);
+  const testCounts = useTestCounts();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userInitials, setUserInitials] = useState("?");
@@ -59,12 +79,31 @@ export function Topbar() {
 
   return (
     <header
-      className="relative flex items-center gap-3 px-4 border-b border-line"
-      style={{ height: 44, background: "var(--bg-1)", flexShrink: 0 }}
+      className="flex items-center gap-3 border-b border-line"
+      style={{ height: 44, background: "var(--bg-1)", flexShrink: 0, paddingRight: 16 }}
     >
-      {/* centered search */}
+      {/* logo — left-aligned, same width as sidebar */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 border border-line px-2.5 py-1"
+        className="flex items-center gap-2 border-r border-line px-4"
+        style={{ width: 224, flexShrink: 0, height: "100%" }}
+      >
+        <div
+          className="flex items-center justify-center"
+          style={{ width: 24, height: 24, background: "var(--accent)", flexShrink: 0 }}
+        >
+          <span style={{ fontSize: 14, fontFamily: "'Hiragino Sans','Yu Gothic','Noto Sans JP',system-ui,sans-serif", fontWeight: 600, color: "#0E0F10", lineHeight: 1 }}>
+            質
+          </span>
+        </div>
+        <span style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}>
+          dqt
+        </span>
+      </div>
+
+      {/* centered search */}
+      <div className="flex-1 flex justify-center">
+      <div
+        className="flex items-center gap-2 border border-line px-2.5 py-1"
         style={{ background: "var(--bg-2)", width: 360 }}
       >
         <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
@@ -81,13 +120,33 @@ export function Topbar() {
           ⌘K
         </kbd>
       </div>
+      </div>
 
-      <div className="flex-1" />
-
-      {/* status pill */}
-      <div className="flex items-center gap-2">
-        <span className="t-micro" style={{ color: "var(--pass)" }}>●</span>
-        <span className="t-small" style={{ color: "var(--fg-1)" }}>{statusText}</span>
+      {/* tests status */}
+      <div className="flex items-center gap-3">
+        <span className="t-micro" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tests</span>
+        {testCounts ? (
+          <>
+            <span className="flex items-center gap-1">
+              <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--pass)", flexShrink: 0 }} />
+              <span className="t-small font-mono" style={{ color: "var(--pass)" }}>{testCounts.pass}</span>
+            </span>
+            {testCounts.warn > 0 && (
+              <span className="flex items-center gap-1">
+                <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--warn)", flexShrink: 0 }} />
+                <span className="t-small font-mono" style={{ color: "var(--warn)" }}>{testCounts.warn}</span>
+              </span>
+            )}
+            {testCounts.fail > 0 && (
+              <span className="flex items-center gap-1">
+                <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--fail)", flexShrink: 0 }} />
+                <span className="t-small font-mono" style={{ color: "var(--fail)" }}>{testCounts.fail}</span>
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>--</span>
+        )}
       </div>
 
       <div className="w-px self-stretch" style={{ background: "var(--line)", margin: "10px 0" }} />
