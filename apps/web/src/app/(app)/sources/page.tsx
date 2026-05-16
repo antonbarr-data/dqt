@@ -3,29 +3,9 @@ import { RefreshCw, Plus } from "lucide-react";
 
 const MOCK_SOURCES = [
   {
-    id: "analytics-prod", alias: "c_pg_prod",
-    engine: "PostgreSQL", endpoint: "db.prod.internal:5432/analytics",
-    tables: 184, lastSync: "2m ago", status: "pass",
-  },
-  {
-    id: "acme-prod-1", alias: "c_bq_main",
-    engine: "BigQuery", endpoint: "us · acme-prod-1.analytics",
-    tables: 421, lastSync: "14m ago", status: "pass",
-  },
-  {
-    id: "events-cluster", alias: "c_ch_events",
-    engine: "ClickHouse", endpoint: "tenant.clickhouse.cloud:9440/events",
-    tables: 38, lastSync: "1h ago", status: "warn",
-  },
-  {
-    id: "legacy-orders", alias: "c_my_legacy",
-    engine: "MySQL", endpoint: "mysql.prod.internal:3306/orders",
-    tables: 64, lastSync: "3h ago", status: "warn",
-  },
-  {
-    id: "staging", alias: "c_pg_stage",
-    engine: "PostgreSQL", endpoint: "db.staging.internal:5432/analytics",
-    tables: 173, lastSync: "failed", status: "fail",
+    id: "gigler", alias: "c_ch_gigler",
+    engine: "ClickHouse", endpoint: "clickhouse-production-bfdb.up.railway.app:443",
+    tables: "--", lastSync: "--", status: "pass",
   },
 ];
 
@@ -87,7 +67,7 @@ export default function SourcesPage() {
       {/* header */}
       <div>
         <p className="t-micro mb-1" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-          Connections · 5 active · 2 with warnings
+          Connections · 1 active
         </p>
         <div className="flex items-end justify-between">
           <div>
@@ -120,36 +100,38 @@ export default function SourcesPage() {
       <div className="border border-line" style={{ background: "var(--bg-1)" }}>
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ background: "var(--bg-2)" }}>
-              <th className="px-4 py-2 text-left t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", width: 32 }} />
-              <th className="px-4 py-2 text-left t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Name</th>
-              <th className="px-4 py-2 text-left t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Engine</th>
-              <th className="px-4 py-2 text-left t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Endpoint</th>
-              <th className="px-4 py-2 text-right t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Tables</th>
-              <th className="px-4 py-2 text-right t-micro" style={{ color: "var(--fg-3)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Last sync</th>
-              <th className="px-4 py-2" style={{ width: 32 }} />
+            <tr className="border-b border-line">
+              {["", "Name", "Engine", "Endpoint", "Tables", "Last sync", ""].map((h, i) => (
+                <th
+                  key={i}
+                  className={`px-3 py-2 t-micro ${i === 4 || i === 5 ? "text-right" : "text-left"}`}
+                  style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {MOCK_SOURCES.map((s) => (
-              <tr key={s.id} className="border-t border-line hover:bg-bg-2 transition-colors cursor-pointer">
-                <td className="px-4 py-3 text-center">
+              <tr key={s.id} className="border-b border-line last:border-0 hover:bg-bg-2 transition-colors cursor-pointer">
+                <td className="px-3 py-2" style={{ width: 32 }}>
                   <StatusDot status={s.status} />
                 </td>
-                <td className="px-4 py-3">
-                  <p className="t-small font-medium" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)", fontWeight: 400 }}>{s.id}</p>
+                <td className="px-3 py-2">
+                  <p className="t-small" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}>{s.id}</p>
                   <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>{s.alias}</p>
                 </td>
-                <td className="px-4 py-3 t-small" style={{ color: "var(--fg-1)" }}>{s.engine}</td>
-                <td className="px-4 py-3 t-small font-mono" style={{ color: "var(--fg-1)" }}>{s.endpoint}</td>
-                <td className="px-4 py-3 t-small text-right font-mono" style={{ color: "var(--fg-1)" }}>{s.tables}</td>
+                <td className="px-3 py-2 t-small" style={{ color: "var(--fg-1)" }}>{s.engine}</td>
+                <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-1)" }}>{s.endpoint}</td>
+                <td className="px-3 py-2 t-small text-right font-mono" style={{ color: "var(--fg-1)" }}>{s.tables}</td>
                 <td
-                  className="px-4 py-3 t-small text-right font-mono"
+                  className="px-3 py-2 t-small text-right font-mono"
                   style={{ color: s.status === "fail" ? "var(--fail)" : s.status === "warn" ? "var(--warn)" : "var(--fg-2)" }}
                 >
                   {s.lastSync}
                 </td>
-                <td className="px-4 py-3 t-small text-right" style={{ color: "var(--fg-3)" }}>›</td>
+                <td className="px-3 py-2 t-small text-right" style={{ color: "var(--fg-3)" }}>›</td>
               </tr>
             ))}
           </tbody>

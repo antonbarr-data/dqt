@@ -24,7 +24,7 @@ import { isSysAdmin } from "@/lib/auth";
 
 const NAV_GROUPS = [
   {
-    label: "Analytics Warehouse",
+    label: null, // no section header for the lone Overview item
     items: [
       { label: "Overview", href: "/overview", icon: LayoutDashboard, count: null },
     ],
@@ -72,6 +72,9 @@ const SYSADMIN_NAV = [
   { label: "Users", href: "/settings/users", icon: Users, count: null },
 ];
 
+const LABEL_H = 24; // explicit px height for every section label — same in open & closed
+const ITEM_H  = 36; // explicit px height for every nav item    — same in open & closed
+
 export function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -106,7 +109,23 @@ export function Sidebar() {
       >
       <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
         {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="mb-1">
+          <div key={group.label ?? "__overview"} className="mb-2">
+            {/* section label — always rendered at fixed height; opacity hides it when closed */}
+            <div
+              className="px-4 t-small whitespace-nowrap overflow-hidden"
+              style={{
+                color: "var(--fg-1)",
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                fontWeight: 500,
+                height: LABEL_H,
+                lineHeight: `${LABEL_H}px`,
+                opacity: group.label && open ? 1 : 0,
+                transition: "opacity 0.1s ease",
+              }}
+            >
+              {group.label ?? ""}
+            </div>
             {group.items.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -116,10 +135,10 @@ export function Sidebar() {
                   href={item.href as never}
                   className={clsx(
                     "flex items-center gap-3 t-body transition-colors",
-                    open ? "px-4 py-2" : "justify-center py-2",
+                    open ? "px-4" : "justify-center",
                     active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
                   )}
-                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined }}
+                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
                   title={!open ? item.label : undefined}
                 >
                   <Icon
@@ -150,7 +169,22 @@ export function Sidebar() {
         ))}
 
         {sysAdmin && (
-          <div className="mb-1">
+          <div className="mb-2">
+            <div
+              className="px-4 t-small whitespace-nowrap overflow-hidden"
+              style={{
+                color: "var(--fg-1)",
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                fontWeight: 500,
+                height: LABEL_H,
+                lineHeight: `${LABEL_H}px`,
+                opacity: open ? 1 : 0,
+                transition: "opacity 0.1s ease",
+              }}
+            >
+              Admin
+            </div>
             {SYSADMIN_NAV.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -160,10 +194,10 @@ export function Sidebar() {
                   href={item.href as never}
                   className={clsx(
                     "flex items-center gap-3 t-body transition-colors",
-                    open ? "px-4 py-2" : "justify-center py-2",
+                    open ? "px-4" : "justify-center",
                     active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
                   )}
-                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined }}
+                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
                   title={!open ? item.label : undefined}
                 >
                   <Icon size={16} strokeWidth={1.6} style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }} />
