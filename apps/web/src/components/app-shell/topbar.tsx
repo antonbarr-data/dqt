@@ -140,11 +140,11 @@ export function Topbar() {
           className="flex items-center gap-2 border border-line px-2.5 py-1 transition-colors hover:border-accent"
           style={{ background: "var(--bg-2)", width: 300 }}
         >
-          <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
-          <span className="flex-1 text-left t-small" style={{ color: "var(--fg-3)" }}>
+          <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-2)", flexShrink: 0 }} />
+          <span className="flex-1 text-left t-small" style={{ color: "var(--fg-2)" }}>
             Search datasets, incidents, tests…
           </span>
-          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}>
+          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-2)", background: "var(--bg-3)", lineHeight: "18px" }}>
             /
           </kbd>
         </button>
@@ -154,9 +154,9 @@ export function Topbar() {
           style={{ background: "var(--bg-2)" }}
           title="Ask a question (Ctrl+K)"
         >
-          <MessageSquare size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
-          <span className="t-small" style={{ color: "var(--fg-3)" }}>Ask...</span>
-          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}>
+          <MessageSquare size={11} strokeWidth={1.6} style={{ color: "var(--fg-2)", flexShrink: 0 }} />
+          <span className="t-small" style={{ color: "var(--fg-2)" }}>Ask...</span>
+          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-2)", background: "var(--bg-3)", lineHeight: "18px" }}>
             ⌘K
           </kbd>
         </button>
@@ -167,7 +167,7 @@ export function Topbar() {
         className="flex items-center gap-3"
         title={testCounts ? `pass ${testCounts.pass} · warn ${testCounts.warn} · fail ${testCounts.fail}` : undefined}
       >
-        <span className="t-micro" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tests</span>
+        <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tests</span>
         {testCounts ? (
           <>
             <span className="flex items-center gap-1">
@@ -182,7 +182,7 @@ export function Topbar() {
             )}
             <span className="flex items-center gap-1">
               <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--fail)", flexShrink: 0 }} />
-              <span className="t-small font-mono" style={{ color: testCounts.fail > 0 ? "var(--fail)" : "var(--fg-3)" }}>{testCounts.fail}</span>
+              <span className="t-small font-mono" style={{ color: testCounts.fail > 0 ? "var(--fail)" : "var(--fg-2)" }}>{testCounts.fail}</span>
             </span>
           </>
         ) : (

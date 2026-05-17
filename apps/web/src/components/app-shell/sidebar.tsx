@@ -131,7 +131,7 @@ export function Sidebar() {
                 </div>
               ) : (
                 <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
-                  <div style={{ height: 1, width: "100%", background: "var(--line)" }} />
+                  <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
                 </div>
               )
             )}
@@ -194,7 +194,7 @@ export function Sidebar() {
               </div>
             ) : (
               <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
-                <div style={{ height: 1, width: "100%", background: "var(--line)" }} />
+                <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
               </div>
             )}
             {SYSADMIN_NAV.map((item) => {
