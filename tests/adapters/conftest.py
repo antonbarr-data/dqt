@@ -9,12 +9,12 @@ def _skip_unless(*env_vars: str, adapter: str):
         pytest.skip(f"{adapter} credentials not set: {missing}")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def skip_no_clickhouse():
     _skip_unless("CLICKHOUSE_HOST", "CLICKHOUSE_USER", "CLICKHOUSE_PASSWORD", adapter="ClickHouse")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def skip_no_snowflake():
     _skip_unless(
         "SNOWFLAKE_ACCOUNT",
@@ -25,12 +25,12 @@ def skip_no_snowflake():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def skip_no_bigquery():
     _skip_unless("GCP_SA_KEY_BIGQUERY", "GCP_PROJECT_ID", adapter="BigQuery")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def skip_no_databricks():
     _skip_unless(
         "DATABRICKS_HOST",

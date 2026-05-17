@@ -133,3 +133,4 @@ data/data_shapes/
 data/orders_dirty.csv
 data/daily_metrics_dirty.csv
 # examples/benchmarks/results_summary.md is generated but committed intentionally
+.playwright-mcp/

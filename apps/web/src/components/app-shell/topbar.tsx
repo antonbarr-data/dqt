@@ -1,16 +1,40 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell } from "lucide-react";
+import { Search, Bell, MessageSquare } from "lucide-react";
 import { getToken, decodeToken, clearToken } from "@/lib/auth";
 import Image from "next/image";
+import { CommandPalette } from "./command-palette";
+import { AskModal } from "@/components/ask-modal/ask-modal";
+
+interface TestCounts { pass: number; warn: number; fail: number }
+
+function useTestCounts(): TestCounts | null {
+  const [counts, setCounts] = useState<TestCounts | null>(null);
+  useEffect(() => {
+    fetch("/api/v1/checks")
+      .then((r) => r.ok ? r.json() : null)
+      .then((checks: Array<{ verdict: string }> | null) => {
+        if (!checks) return;
+        setCounts({
+          pass: checks.filter((c) => c.verdict === "pass").length,
+          warn: checks.filter((c) => c.verdict === "warn").length,
+          fail: checks.filter((c) => c.verdict === "fail").length,
+        });
+      })
+      .catch(() => null);
+  }, []);
+  return counts;
+}
 
 export function Topbar() {
   const router = useRouter();
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [statusText] = useState("9.4k tests/min · all engines healthy");
   const [accountOpen, setAccountOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const testCounts = useTestCounts();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userInitials, setUserInitials] = useState("?");
@@ -45,6 +69,27 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [accountOpen]);
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setAskOpen((v) => !v);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+
+  function handlePictureUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setUserPicture(url);
+    setAccountOpen(false);
+  }
+
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -58,36 +103,83 @@ export function Topbar() {
   }
 
   return (
+    <>
+    <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+    <AskModal open={askOpen} onClose={() => setAskOpen(false)} />
     <header
-      className="relative flex items-center gap-3 px-4 border-b border-line"
-      style={{ height: 44, background: "var(--bg-1)", flexShrink: 0 }}
+      className="flex items-center gap-3 border-b border-line"
+      style={{ height: 44, background: "var(--bg-1)", flexShrink: 0, paddingRight: 16 }}
     >
-      {/* centered search */}
+      {/* logo — left-aligned, same width as sidebar */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 border border-line px-2.5 py-1"
-        style={{ background: "var(--bg-2)", width: 360 }}
+        className="flex items-center gap-2 px-4"
+        style={{ width: 224, flexShrink: 0, height: "100%" }}
       >
-        <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
-        <input
-          type="text"
-          placeholder="Search datasets, incidents, tests…"
-          className="flex-1 bg-transparent t-small outline-none"
-          style={{ color: "var(--fg-1)" }}
-        />
-        <kbd
-          className="t-micro px-1 border border-line"
-          style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}
+        <div
+          className="flex items-center justify-center"
+          style={{ width: 24, height: 24, background: "var(--accent)", flexShrink: 0 }}
         >
-          ⌘K
-        </kbd>
+          <span style={{ fontSize: 14, fontFamily: "'Hiragino Sans','Yu Gothic','Noto Sans JP',system-ui,sans-serif", fontWeight: 600, color: "#0E0F10", lineHeight: 1 }}>
+            質
+          </span>
+        </div>
+        <span style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}>
+          dqt
+        </span>
       </div>
 
-      <div className="flex-1" />
+      {/* centered search — opens command palette */}
+      <div className="flex-1 flex justify-center items-center gap-2">
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="flex items-center gap-2 border border-line px-2.5 py-1 transition-colors hover:border-accent"
+          style={{ background: "var(--bg-2)", width: 300 }}
+        >
+          <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
+          <span className="flex-1 text-left t-small" style={{ color: "var(--fg-3)" }}>
+            Search datasets, incidents, tests…
+          </span>
+        </button>
+        <button
+          onClick={() => setAskOpen(true)}
+          className="flex items-center gap-2 border border-line px-2.5 py-1 transition-colors hover:border-accent"
+          style={{ background: "var(--bg-2)" }}
+          title="Ask a question (Ctrl+K)"
+        >
+          <MessageSquare size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
+          <span className="t-small" style={{ color: "var(--fg-3)" }}>Ask...</span>
+          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}>
+            ⌘K
+          </kbd>
+        </button>
+      </div>
 
-      {/* status pill */}
-      <div className="flex items-center gap-2">
-        <span className="t-micro" style={{ color: "var(--pass)" }}>●</span>
-        <span className="t-small" style={{ color: "var(--fg-1)" }}>{statusText}</span>
+      {/* tests status */}
+      <div
+        className="flex items-center gap-3"
+        title={testCounts ? `pass ${testCounts.pass} · warn ${testCounts.warn} · fail ${testCounts.fail}` : undefined}
+      >
+        <span className="t-micro" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tests</span>
+        {testCounts ? (
+          <>
+            <span className="flex items-center gap-1">
+              <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--pass)", flexShrink: 0 }} />
+              <span className="t-small font-mono" style={{ color: "var(--pass)" }}>{testCounts.pass}</span>
+            </span>
+            {testCounts.warn > 0 && (
+              <span className="flex items-center gap-1">
+                <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--warn)", flexShrink: 0 }} />
+                <span className="t-small font-mono" style={{ color: "var(--warn)" }}>{testCounts.warn}</span>
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <span style={{ display: "inline-block", width: 6, height: 6, background: "var(--fail)", flexShrink: 0 }} />
+              <span className="t-small font-mono" style={{ color: testCounts.fail > 0 ? "var(--fail)" : "var(--fg-3)" }}>{testCounts.fail}</span>
+            </span>
+          </>
+        ) : (
+          <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>--</span>
+        )}
       </div>
 
       <div className="w-px self-stretch" style={{ background: "var(--line)", margin: "10px 0" }} />
@@ -143,33 +235,46 @@ export function Topbar() {
         {accountOpen && (
           <div
             className="absolute right-0 top-full mt-1 border border-line z-50"
-            style={{ background: "var(--bg-1)", width: 200, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }}
+            style={{ background: "var(--bg-1)", width: 220, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}
           >
-            {/* user info header */}
-            <div className="px-3 py-2.5 border-b border-line">
-              {userPicture && (
-                <div className="mb-2">
-                  <Image
-                    src={userPicture}
-                    alt={userName}
-                    width={36}
-                    height={36}
-                    className="object-cover border border-line"
-                    unoptimized
-                  />
-                </div>
-              )}
-              <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>{userName}</p>
-              <p className="t-micro mt-0.5 truncate" style={{ color: "var(--fg-2)" }}>{userEmail}</p>
+            <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-line">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{ width: 28, height: 28, background: "var(--accent-bg)", border: "1px solid var(--line)", overflow: "hidden" }}
+              >
+                {userPicture ? (
+                  <Image src={userPicture} alt={userName} width={28} height={28} className="w-full h-full object-cover" unoptimized />
+                ) : (
+                  <span className="t-small font-medium" style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)" }}>
+                    {userInitials}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="t-small truncate" style={{ color: "var(--fg-0)", fontWeight: 500 }}>{userName}</p>
+                <p className="t-micro truncate" style={{ color: "var(--fg-3)" }}>{userEmail}</p>
+              </div>
             </div>
-
-            {/* menu items */}
+            <input
+              ref={pictureInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePictureUpload}
+            />
+            <button
+              className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
+              style={{ color: "var(--fg-0)" }}
+              onClick={() => pictureInputRef.current?.click()}
+            >
+              Upload picture
+            </button>
             <button
               className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
               style={{ color: "var(--fg-0)" }}
               onClick={() => { setAccountOpen(false); router.push("/settings" as never); }}
             >
-              Account
+              Account settings
             </button>
             <button
               className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2 border-t border-line"
@@ -182,5 +287,6 @@ export function Topbar() {
         )}
       </div>
     </header>
+    </>
   );
 }

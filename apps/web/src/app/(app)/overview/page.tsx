@@ -1,137 +1,119 @@
-import Link from "next/link";
+"use client";
 
-const FLEET_KPIS = [
-  { label: "Open Incidents", value: "3", trend: "fail" },
-  { label: "Datasets Watched", value: "6", trend: null },
-  { label: "Checks Running", value: "46", trend: null },
-  { label: "Auto-explained", value: "2", trend: "pass" },
-] as const;
+import { useEffect, useState, useCallback } from "react";
+import { FeedItemCard } from "@/components/feed/feed-item-card";
 
-const ACTIVITY = [
-  { time: "2 min ago", text: "gigler_transactions.platform_fee_usd failed null_fraction", kind: "fail" },
-  { time: "5 min ago", text: "gig_vendor_stats baseline re-fit completed", kind: "pass" },
-  { time: "12 min ago", text: "fct_orders freshness check passed", kind: "pass" },
-  { time: "1h ago", text: "gig_prices ks2sample warned — distribution shift detected", kind: "warn" },
-  { time: "2h ago", text: "AI agent explained incident #41 — conversion drop traced to fee changes", kind: "info" },
-] as const;
-
-type Trend = "pass" | "warn" | "fail" | null;
-
-function TrendDot({ trend }: { trend: Trend }) {
-  if (!trend) return null;
-  const color = trend === "pass" ? "var(--pass)" : trend === "warn" ? "var(--warn)" : "var(--fail)";
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 7,
-        height: 7,
-        background: color,
-        boxShadow: `0 0 0 2px ${color}28`,
-        marginLeft: 6,
-        verticalAlign: "middle",
-      }}
-    />
-  );
+interface FeedItem {
+  item_id: string;
+  metric_fqn: string;
+  display_name: string;
+  observed_change: number;
+  significance: number;
+  primary_channel: "data" | "business" | "mixed";
+  summary_paragraph: string;
+  estimated_data_contribution: [number, number];
+  estimated_business_contribution: [number, number];
+  evidence_chips: { label: string; display_value: string; direction: "up" | "down" | "flat" }[];
+  reviewed: boolean;
 }
 
-export default function OverviewPage() {
-  return (
-    <div className="p-6 w-full">
-      <h1 className="t-h1 mb-6" style={{ color: "var(--fg-0)" }}>Overview</h1>
+type ChannelFilter = "all" | "data" | "business" | "mixed";
 
-      {/* KPI band */}
-      <div className="grid grid-cols-4 gap-px border border-line mb-8" style={{ background: "var(--line)" }}>
-        {FLEET_KPIS.map((k) => (
-          <div
-            key={k.label}
-            className="px-5 py-4"
-            style={{ background: "var(--bg-1)" }}
+export default function OverviewPage() {
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<ChannelFilter>("all");
+  const [lookback, setLookback] = useState("24h");
+
+  const loadFeed = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await fetch(`/api/v1/feed/today?lookback=${lookback}&limit=20`);
+      if (resp.ok) setItems(await resp.json());
+    } finally {
+      setLoading(false);
+    }
+  }, [lookback]);
+
+  useEffect(() => { loadFeed(); }, [loadFeed]);
+
+  const markReviewed = useCallback(async (itemId: string) => {
+    await fetch(`/api/v1/feed/items/${itemId}/reviewed`, { method: "POST" });
+    setItems(prev => prev.filter(i => i.item_id !== itemId));
+  }, []);
+
+  const visible = filter === "all" ? items : items.filter(i => i.primary_channel === filter);
+
+  return (
+    <div className="p-6">
+      <div className="flex items-baseline justify-between mb-6">
+        <div>
+          <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>Today</h1>
+          <p className="t-small mt-1" style={{ color: "var(--fg-3)" }}>
+            Significant metric movements in the last {lookback}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={lookback}
+            onChange={e => setLookback(e.target.value)}
+            className="t-small border border-line px-2 py-1"
+            style={{ background: "var(--bg-1)", color: "var(--fg-1)" }}
           >
-            <p className="kpi-label mb-2" style={{ color: "var(--fg-2)" }}>{k.label}</p>
-            <p className="kpi-value">
-              {k.value}
-              <TrendDot trend={k.trend as Trend} />
-            </p>
-          </div>
+            <option value="24h">Last 24h</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+          </select>
+          <button
+            onClick={loadFeed}
+            className="t-small px-3 py-1 border border-line hover:border-accent transition-colors"
+            style={{ color: "var(--fg-1)", background: "var(--bg-1)" }}
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+      <div className="flex gap-2 mb-6">
+        {(["all", "data", "business", "mixed"] as ChannelFilter[]).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className="t-micro px-2 py-1 border transition-colors"
+            style={{
+              borderColor: filter === f ? "var(--accent)" : "var(--line)",
+              color: filter === f ? "var(--accent)" : "var(--fg-2)",
+              background: filter === f ? "var(--accent-bg)" : "var(--bg-1)",
+              letterSpacing: "0.06em",
+            }}
+          >
+            {f === "all" ? "All" : f === "data" ? "Data issues" : f === "business" ? "Business shifts" : "Mixed"}
+          </button>
         ))}
       </div>
-
-      {/* datasets + activity */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* datasets shortcut */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="t-h3" style={{ color: "var(--fg-0)" }}>Datasets</h2>
-            <Link href="/datasets" className="t-small" style={{ color: "var(--accent)" }}>
-              View all →
-            </Link>
-          </div>
-          <div className="border border-line" style={{ background: "var(--bg-1)" }}>
-            {[
-              { id: "gigler_transactions", status: "fail" },
-              { id: "gig_prices", status: "warn" },
-              { id: "fct_sessions", status: "warn" },
-              { id: "marketing_campaigns", status: "pass" },
-              { id: "fct_orders", status: "pass" },
-              { id: "gig_vendor_stats", status: "pass" },
-            ].map((ds, i) => {
-              const color = ds.status === "pass" ? "var(--pass)" : ds.status === "warn" ? "var(--warn)" : "var(--fail)";
-              return (
-                <Link
-                  key={ds.id}
-                  href={`/datasets/${ds.id}`}
-                  className="flex items-center justify-between px-3 py-2 border-b border-line last:border-0 transition-colors hover:bg-bg-2"
-                  style={{ color: "var(--fg-0)" }}
-                >
-                  <span className="t-small font-mono">{ds.id}</span>
-                  <span style={{ display: "inline-block", width: 7, height: 7, background: color, boxShadow: `0 0 0 2px ${color}28` }} />
-                </Link>
-              );
-            })}
-          </div>
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="border border-line p-4 h-32 animate-pulse"
+                 style={{ background: "var(--bg-1)" }} />
+          ))}
         </div>
-
-        {/* activity feed */}
-        <div>
-          <h2 className="t-h3 mb-3" style={{ color: "var(--fg-0)" }}>Activity</h2>
-          <div className="space-y-0 border border-line" style={{ background: "var(--bg-1)" }}>
-            {ACTIVITY.map((a, i) => {
-              const color =
-                a.kind === "pass"
-                  ? "var(--pass)"
-                  : a.kind === "warn"
-                  ? "var(--warn)"
-                  : a.kind === "fail"
-                  ? "var(--fail)"
-                  : "var(--fg-2)";
-              return (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 px-3 py-2 border-b border-line last:border-0"
-                >
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 6,
-                      height: 6,
-                      background: color,
-                      marginTop: 4,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="t-small" style={{ color: "var(--fg-1)", lineHeight: 1.5 }}>
-                      {a.text}
-                    </p>
-                    <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)" }}>{a.time}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      ) : visible.length === 0 ? (
+        <div className="border border-line p-12 text-center" style={{ background: "var(--bg-1)" }}>
+          <p className="t-small" style={{ color: "var(--fg-3)" }}>
+            No significant movements in the last {lookback}.
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map(item => (
+            <FeedItemCard
+              key={item.item_id}
+              {...item}
+              onMarkReviewed={markReviewed}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
