@@ -70,10 +70,16 @@ class GiglerService:
             from dqt.adapters.clickhouse.adapter import ClickHouseAdapter
             from dqt.adapters.clickhouse.config import ClickHouseConfig
 
+            # Use Railway private network URL when available (faster, no egress cost)
+            conn_host = (
+                os.environ.get("CLICKHOUSE_INTERNAL_URL")
+                or os.environ.get("CLICKHOUSE_URL", "localhost")
+            )
             secure = os.environ.get("CLICKHOUSE_SECURE", "false").lower() in ("true", "1", "yes")
             cfg = ClickHouseConfig(
-                host=os.environ.get("CLICKHOUSE_URL", "localhost"),
+                host=conn_host,
                 port=int(os.environ.get("CLICKHOUSE_PORT", "8123")),
+                database=os.environ.get("CLICKHOUSE_DB", "default"),
                 username=os.environ.get("CLICKHOUSE_USER", "default"),
                 password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
                 secure=secure,
@@ -225,13 +231,14 @@ class GiglerService:
                 "params": cc.params,
             })
 
-        # Upsert source record
+        # Upsert source record — store the public URL for display even when using internal for connections
+        display_host = os.environ.get("CLICKHOUSE_URL", "unknown")
         async with AsyncSessionLocal() as db:
             stmt = pg_insert(Source).values(
                 id=GIGLER_SOURCE_ID,
                 name="Gigler ClickHouse",
                 engine="ClickHouse",
-                host=os.environ.get("CLICKHOUSE_URL", "unknown"),
+                host=display_host,
                 port=int(os.environ.get("CLICKHOUSE_PORT", "443")),
                 db_name=await loop.run_in_executor(None, self._find_schema),
                 username=os.environ.get("CLICKHOUSE_USER", ""),
@@ -244,7 +251,7 @@ class GiglerService:
                 set_={
                     "last_synced_at": now,
                     "table_count": len(watched),
-                    "host": os.environ.get("CLICKHOUSE_URL", "unknown"),
+                    "host": display_host,
                 },
             )
             await db.execute(stmt)
