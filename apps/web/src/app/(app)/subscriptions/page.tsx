@@ -43,14 +43,14 @@ export default function SubscriptionsPage() {
     fetch("/api/v1/subscriptions?user_id=demo")
       .then((r) => r.json())
       .then((data) => {
-        setSubs(data);
+        setSubs(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
 
     fetch("/api/v1/trigger/history")
       .then((r) => r.json())
-      .then(setHistory)
+      .then((data) => setHistory(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
