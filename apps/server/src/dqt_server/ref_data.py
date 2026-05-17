@@ -152,17 +152,3 @@ ISO_CURRENCIES = [
     ("ZWL", 932, "Zimbabwean Dollar", 2),
 ]
 
-CREATE_REF_TABLES_SQL = """
-CREATE TABLE IF NOT EXISTS ref_countries (
-    alpha2  CHAR(2)      NOT NULL PRIMARY KEY,
-    alpha3  CHAR(3)      NOT NULL,
-    name    VARCHAR(128) NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS ref_currencies (
-    code      CHAR(3)      NOT NULL PRIMARY KEY,
-    numeric   SMALLINT     NOT NULL,
-    name      VARCHAR(128) NOT NULL,
-    decimals  SMALLINT     NOT NULL DEFAULT 2
-);
-"""

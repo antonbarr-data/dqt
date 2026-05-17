@@ -12,7 +12,11 @@ from dqt_server.auth.router import router as auth_router
 from dqt_server.auth.service import SEEDED_SYSADMIN_EMAIL
 from dqt_server.dashboard import router as dashboard_router
 from dqt_server.db.engine import AsyncSessionLocal, Base, engine
-from dqt_server.ref_data import CREATE_REF_TABLES_SQL, ISO_COUNTRIES, ISO_CURRENCIES
+from dqt_server.models import ref_data as _ref_models  # noqa: F401 -- registers ORM models with Base
+from dqt_server.ref_data import ISO_COUNTRIES, ISO_CURRENCIES
+from dqt_server.ref_data_languages import ISO_LANGUAGES
+from dqt_server.ref_data_timezones import ISO_TIMEZONES
+from dqt_server.ref_data_regions import ISO_REGIONS
 
 log = structlog.get_logger(__name__)
 
@@ -22,6 +26,7 @@ async def _setup_db() -> None:
         log.warning("DATABASE_URL not set -- skipping DB setup")
         return
     async with engine.begin() as conn:
+        # Creates all tables defined via SQLAlchemy Base (including ref_* tables)
         await conn.run_sync(Base.metadata.create_all)
         # Add columns to existing tables that predate this column
         for stmt in [
@@ -32,15 +37,7 @@ async def _setup_db() -> None:
                 await conn.execute(text(stmt))
             except Exception:
                 pass
-        # Reference tables (idempotent)
-        for stmt in CREATE_REF_TABLES_SQL.strip().split(";"):
-            stmt = stmt.strip()
-            if stmt:
-                try:
-                    await conn.execute(text(stmt))
-                except Exception:
-                    pass
-    # Seed reference data (upsert, skip if present)
+    # Seed reference data (skip if already present)
     async with AsyncSessionLocal() as db:
         count = await db.scalar(text("SELECT COUNT(*) FROM ref_countries"))
         if not count:
@@ -67,6 +64,45 @@ async def _setup_db() -> None:
                 )
             await db.commit()
             log.info("seeded_ref_currencies", count=len(ISO_CURRENCIES))
+
+        count = await db.scalar(text("SELECT COUNT(*) FROM ref_languages"))
+        if not count:
+            for alpha2, alpha3, name in ISO_LANGUAGES:
+                await db.execute(
+                    text(
+                        "INSERT INTO ref_languages (alpha2, alpha3, name) VALUES (:a2, :a3, :n) "
+                        "ON CONFLICT (alpha2) DO NOTHING"
+                    ),
+                    {"a2": alpha2, "a3": alpha3, "n": name},
+                )
+            await db.commit()
+            log.info("seeded_ref_languages", count=len(ISO_LANGUAGES))
+
+        count = await db.scalar(text("SELECT COUNT(*) FROM ref_timezones"))
+        if not count:
+            for name, utc_region in ISO_TIMEZONES:
+                await db.execute(
+                    text(
+                        "INSERT INTO ref_timezones (name, utc_region) VALUES (:n, :r) "
+                        "ON CONFLICT (name) DO NOTHING"
+                    ),
+                    {"n": name, "r": utc_region},
+                )
+            await db.commit()
+            log.info("seeded_ref_timezones", count=len(ISO_TIMEZONES))
+
+        count = await db.scalar(text("SELECT COUNT(*) FROM ref_regions"))
+        if not count:
+            for code, country, name, category in ISO_REGIONS:
+                await db.execute(
+                    text(
+                        "INSERT INTO ref_regions (code, country, name, category) "
+                        "VALUES (:code, :country, :name, :category) ON CONFLICT (code) DO NOTHING"
+                    ),
+                    {"code": code, "country": country, "name": name, "category": category},
+                )
+            await db.commit()
+            log.info("seeded_ref_regions", count=len(ISO_REGIONS))
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.email == SEEDED_SYSADMIN_EMAIL))
