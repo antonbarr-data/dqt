@@ -53,6 +53,7 @@ from dqt_server.api.v1.feed import router as feed_router
 from dqt_server.api.v1.ask import router as ask_router
 from dqt_server.api.v1.subscriptions import router as subscriptions_router
 from dqt_server.api.v1.trigger import router as trigger_router
+from dqt_server.api.v1.lineage import router as lineage_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -63,6 +64,7 @@ app.include_router(feed_router)
 app.include_router(ask_router)
 app.include_router(subscriptions_router)
 app.include_router(trigger_router)
+app.include_router(lineage_router)
 
 
 @app.get("/health", tags=["ops"])
