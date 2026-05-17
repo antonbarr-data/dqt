@@ -71,9 +71,14 @@ export function Topbar() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      const inInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setAskOpen((v) => !v);
+      } else if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey && !inInput) {
+        e.preventDefault();
+        setPaletteOpen(true);
       }
     }
     document.addEventListener("keydown", onKeyDown);

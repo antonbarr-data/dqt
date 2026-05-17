@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
@@ -81,26 +81,12 @@ const ITEM_H  = 36; // explicit px height for every nav item    — same in open
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [sysAdmin, setSysAdmin] = useState(false);
 
   useEffect(() => {
     setSysAdmin(isSysAdmin());
   }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        router.push("/search");
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [router]);
 
   return (
     <aside
