@@ -1,15 +1,18 @@
-"""Feed API -- Today feed and weekly view."""
+"""Feed API -- Today feed and weekly view built from real check-run history."""
 from __future__ import annotations
 
 import json
 import os
-import random
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt.insights.feed import FeedItem, rank
+from dqt_server.db.engine import get_db
+from dqt_server.models.gigler import CheckRun, MetricDefinition
 
 router = APIRouter(prefix="/api/v1/feed", tags=["feed"])
 
@@ -34,33 +37,68 @@ def _save_reviewed(reviewed: set[str]) -> None:
 _reviewed: set[str] = _load_reviewed()
 
 
-def _synthetic_feed_items(lookback_hours: int = 24) -> list[FeedItem]:
-    from dqt_server.api.v1.insights import _get_registry
+async def _build_feed_items(db: AsyncSession, lookback_hours: int) -> list[FeedItem]:
+    metric_rows = await db.execute(select(MetricDefinition))
+    metrics = metric_rows.scalars().all()
+    if not metrics:
+        return []
 
-    registry = _get_registry()
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     items: list[FeedItem] = []
-    rng = random.Random(42)
 
-    for metric in registry.list():
-        change = rng.uniform(-0.25, 0.25)
-        sig = rng.uniform(0.4, 0.99)
+    for metric in metrics:
+        runs_q = await db.execute(
+            select(CheckRun)
+            .where(CheckRun.dataset_id == metric.dataset, CheckRun.ran_at >= cutoff)
+            .order_by(desc(CheckRun.ran_at))
+            .limit(100)
+        )
+        runs = runs_q.scalars().all()
+
+        if not runs:
+            continue
+
+        fail_count = sum(1 for r in runs if r.verdict == "fail")
+        warn_count = sum(1 for r in runs if r.verdict == "warn")
+        total = len(runs)
+
+        if fail_count > 0:
+            significance = min(0.85 + (fail_count / total) * 0.15, 1.0)
+        elif warn_count > 0:
+            significance = 0.45 + (warn_count / total) * 0.35
+        else:
+            significance = max(0.05, 0.20 - total * 0.001)
+
+        scores = [r.score for r in runs if r.score is not None]
+        if len(scores) >= 2:
+            denom = max(abs(scores[-1]), 0.001)
+            observed_change = max(-1.0, min(1.0, (scores[0] - scores[-1]) / denom))
+        else:
+            observed_change = 0.0
+
+        worst = "fail" if fail_count > 0 else "warn" if warn_count > 0 else "pass"
+        direction = "fell" if observed_change < 0 else "rose"
+        summary = (
+            f"{metric.display_name} score {direction} "
+            f"{abs(observed_change) * 100:.1f}% — "
+            f"{fail_count} failing, {warn_count} warning checks across {total} runs."
+        )
+
         items.append(FeedItem(
             metric_fqn=metric.fqn,
             display_name=metric.display_name,
-            observed_change=change,
-            significance=sig,
+            observed_change=observed_change,
+            significance=significance,
             executive_tier="finance" in (metric.tags or []),
-            novelty=rng.uniform(0.5, 1.0),
-            engagement=rng.uniform(0.0, 2.0),
-            summary_paragraph=(
-                f"{metric.display_name} {'fell' if change < 0 else 'rose'} "
-                f"{abs(change) * 100:.1f}% in the last {lookback_hours}h."
-            ),
-            primary_channel="mixed",
+            novelty=significance,
+            engagement=0.0,
+            summary_paragraph=summary,
+            primary_channel="data",
             estimated_data_contribution=(0.05, 0.20),
             estimated_business_contribution=(0.10, 0.35),
             evidence_chips=[],
         ))
+
     return items
 
 
@@ -84,21 +122,28 @@ def _item_to_dict(item: FeedItem) -> dict:
 
 
 @router.get("/today")
-async def feed_today(lookback: str = "24h", limit: int = 20) -> list[dict]:
+async def feed_today(
+    lookback: str = "24h",
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
     hours = 24
     if lookback.endswith("h"):
         hours = int(lookback[:-1])
     elif lookback.endswith("d"):
         hours = int(lookback[:-1]) * 24
 
-    items = _synthetic_feed_items(lookback_hours=hours)
+    items = await _build_feed_items(db, lookback_hours=hours)
     ranked = rank(items, window=timedelta(hours=hours), limit=limit)
     return [_item_to_dict(i) for i in ranked if i.item_id not in _reviewed]
 
 
 @router.get("/weekly")
-async def feed_weekly(week: str | None = None) -> list[dict]:
-    items = _synthetic_feed_items(lookback_hours=168)
+async def feed_weekly(
+    week: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    items = await _build_feed_items(db, lookback_hours=168)
     ranked = rank(items, window=timedelta(hours=168), limit=50)
     return [_item_to_dict(i) for i in ranked]
 

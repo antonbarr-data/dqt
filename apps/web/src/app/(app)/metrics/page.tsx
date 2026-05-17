@@ -1,5 +1,8 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { serverFetch } from "@/lib/server-api";
+import { Plus } from "lucide-react";
 
 interface MetricSummary {
   fqn: string;
@@ -26,22 +29,188 @@ function VerdictDot({ verdict }: { verdict: string | null }) {
   );
 }
 
-export default async function MetricsPage() {
-  let metrics: MetricSummary[] = [];
-  let fetchError: string | null = null;
+const METRIC_KINDS = ["ratio", "count", "sum", "model"] as const;
 
-  try {
-    metrics = await serverFetch<MetricSummary[]>("/metrics", 30) ?? [];
-  } catch {
-    fetchError = "Failed to load metrics.";
+export default function MetricsPage() {
+  const [metrics, setMetrics] = useState<MetricSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [formName, setFormName] = useState("");
+  const [formKind, setFormKind] = useState<"ratio" | "count" | "sum" | "model">("ratio");
+  const [formDataset, setFormDataset] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/metrics");
+      if (res.ok) {
+        setMetrics(await res.json());
+      } else {
+        setFetchError("Failed to load metrics.");
+      }
+    } catch {
+      setFetchError("Failed to load metrics.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadMetrics(); }, [loadMetrics]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formName.trim() || !formDataset.trim()) {
+      setFormError("Name and dataset are required.");
+      return;
+    }
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const res = await fetch("/api/v1/metrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: formName.trim(),
+          kind: formKind,
+          dataset: formDataset.trim(),
+          description: formDescription.trim(),
+        }),
+      });
+      if (res.status === 201) {
+        setFormName("");
+        setFormKind("ratio");
+        setFormDataset("");
+        setFormDescription("");
+        setFormOpen(false);
+        await loadMetrics();
+      } else if (res.status === 409) {
+        setFormError("A metric with this name already exists for that dataset.");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setFormError(err.detail || "Failed to create metric.");
+      }
+    } catch {
+      setFormError("Network error.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <div className="p-6">
       <div className="flex items-baseline justify-between mb-6">
         <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>Metrics</h1>
-        <span className="t-small" style={{ color: "var(--fg-3)" }}>{metrics.length} tracked</span>
+        <div className="flex items-center gap-3">
+          {!loading && (
+            <span className="t-small" style={{ color: "var(--fg-3)" }}>{metrics.length} tracked</span>
+          )}
+          <button
+            onClick={() => { setFormOpen((v) => !v); setFormError(null); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 t-small border transition-colors hover:opacity-80"
+            style={{
+              background: formOpen ? "var(--accent-bg)" : "var(--bg-2)",
+              color: formOpen ? "var(--accent)" : "var(--fg-0)",
+              borderColor: formOpen ? "var(--accent)" : "var(--line-3)",
+            }}
+          >
+            <Plus size={11} strokeWidth={1.6} />
+            New metric
+          </button>
+        </div>
       </div>
+
+      {/* New metric inline form */}
+      {formOpen && (
+        <form
+          onSubmit={handleSubmit}
+          className="mb-6 border border-line p-4 space-y-3"
+          style={{ background: "var(--bg-1)" }}
+        >
+          <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>New metric</p>
+
+          <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <div>
+              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Name</label>
+              <input
+                type="text"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="e.g. Conversion rate"
+                className="w-full px-3 py-2 border border-line t-small outline-none"
+                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              />
+            </div>
+            <div>
+              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Dataset</label>
+              <input
+                type="text"
+                value={formDataset}
+                onChange={(e) => setFormDataset(e.target.value)}
+                placeholder="e.g. fct_orders"
+                className="w-full px-3 py-2 border border-line t-small outline-none"
+                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              />
+            </div>
+            <div>
+              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Kind</label>
+              <select
+                value={formKind}
+                onChange={(e) => setFormKind(e.target.value as typeof formKind)}
+                className="w-full px-3 py-2 border border-line t-small outline-none"
+                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              >
+                {METRIC_KINDS.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Description</label>
+              <input
+                type="text"
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="Optional"
+                className="w-full px-3 py-2 border border-line t-small outline-none"
+                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+              />
+            </div>
+          </div>
+
+          {formError && (
+            <p className="t-small" style={{ color: "var(--fail)" }}>{formError}</p>
+          )}
+
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-1.5 t-small font-medium border transition-colors hover:opacity-90 disabled:opacity-40"
+              style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+            >
+              {submitting ? "Creating..." : "Create metric"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFormOpen(false); setFormError(null); }}
+              className="px-3 py-1.5 t-small border border-line transition-colors hover:bg-bg-2"
+              style={{ color: "var(--fg-1)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {loading && (
+        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
+          <p className="t-small" style={{ color: "var(--fg-3)" }}>Loading metrics...</p>
+        </div>
+      )}
 
       {fetchError && (
         <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
@@ -49,7 +218,7 @@ export default async function MetricsPage() {
         </div>
       )}
 
-      {!fetchError && (
+      {!loading && !fetchError && (
         <div className="border border-line" style={{ background: "var(--bg-1)" }}>
           {metrics.length === 0 ? (
             <div className="px-4 py-12 text-center t-small" style={{ color: "var(--fg-3)" }}>

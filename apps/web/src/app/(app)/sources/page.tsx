@@ -1,13 +1,19 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { RefreshCw, Plus } from "lucide-react";
 
-const MOCK_SOURCES = [
-  {
-    id: "gigler", alias: "c_ch_gigler",
-    engine: "ClickHouse", endpoint: "clickhouse-production-bfdb.up.railway.app:443",
-    tables: "--", lastSync: "--", status: "pass",
-  },
-];
+interface Source {
+  id: string;
+  name: string;
+  engine: string;
+  endpoint: string;
+  tables: number | string;
+  status: string;
+  last_sync: string;
+}
 
 const ENGINE_CARDS = [
   {
@@ -62,12 +68,42 @@ function StatusDot({ status }: { status: string }) {
 }
 
 export default function SourcesPage() {
+  const router = useRouter();
+  const [sources, setSources] = useState<Source[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const loadSources = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/sources");
+      if (res.ok) {
+        setSources(await res.json());
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSources(); }, [loadSources]);
+
+  async function handleSyncAll() {
+    setSyncing(true);
+    try {
+      await fetch("/api/v1/checks/refresh", { method: "POST" });
+      setTimeout(() => { loadSources(); setSyncing(false); }, 2000);
+    } catch {
+      setSyncing(false);
+    }
+  }
+
+  const activeCount = sources.filter((s) => s.status !== "fail").length;
+
   return (
     <div className="p-6 max-w-5xl space-y-8">
       {/* header */}
       <div>
         <p className="t-micro mb-1" style={{ color: "var(--fg-3)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-          Connections · 1 active
+          Connections · {loading ? "--" : `${activeCount} active`}
         </p>
         <div className="flex items-end justify-between">
           <div>
@@ -78,11 +114,13 @@ export default function SourcesPage() {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
-              className="flex items-center gap-1.5 px-3 py-1.5 t-small border border-line transition-colors hover:bg-bg-2"
+              onClick={handleSyncAll}
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 t-small border border-line transition-colors hover:bg-bg-2 disabled:opacity-50"
               style={{ color: "var(--fg-1)" }}
             >
-              <RefreshCw size={11} strokeWidth={1.6} />
-              Sync all
+              <RefreshCw size={11} strokeWidth={1.6} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Syncing..." : "Sync all"}
             </button>
             <Link
               href="/sources/new/postgres"
@@ -113,23 +151,41 @@ export default function SourcesPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_SOURCES.map((s) => (
-              <tr key={s.id} className="border-b border-line last:border-0 hover:bg-bg-2 transition-colors cursor-pointer">
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-6 text-center t-small" style={{ color: "var(--fg-3)" }}>
+                  Loading sources...
+                </td>
+              </tr>
+            ) : sources.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-6 text-center t-small" style={{ color: "var(--fg-3)" }}>
+                  No sources connected yet. Add a connection below.
+                </td>
+              </tr>
+            ) : sources.map((s) => (
+              <tr
+                key={s.id}
+                className="border-b border-line last:border-0 hover:bg-bg-2 transition-colors cursor-pointer"
+                onClick={() => router.push(`/sources/${s.id}` as never)}
+              >
                 <td className="px-3 py-2" style={{ width: 32 }}>
                   <StatusDot status={s.status} />
                 </td>
                 <td className="px-3 py-2">
-                  <p className="t-small" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}>{s.id}</p>
-                  <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>{s.alias}</p>
+                  <p className="t-small" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}>{s.name}</p>
+                  <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>{s.id}</p>
                 </td>
                 <td className="px-3 py-2 t-small" style={{ color: "var(--fg-1)" }}>{s.engine}</td>
                 <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-1)" }}>{s.endpoint}</td>
-                <td className="px-3 py-2 t-small text-right font-mono" style={{ color: "var(--fg-1)" }}>{s.tables}</td>
+                <td className="px-3 py-2 t-small text-right font-mono" style={{ color: "var(--fg-1)" }}>
+                  {s.tables ?? "--"}
+                </td>
                 <td
                   className="px-3 py-2 t-small text-right font-mono"
                   style={{ color: s.status === "fail" ? "var(--fail)" : s.status === "warn" ? "var(--warn)" : "var(--fg-2)" }}
                 >
-                  {s.lastSync}
+                  {s.last_sync ?? "--"}
                 </td>
                 <td className="px-3 py-2 t-small text-right" style={{ color: "var(--fg-3)" }}>›</td>
               </tr>

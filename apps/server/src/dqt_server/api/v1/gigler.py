@@ -3,16 +3,62 @@ from __future__ import annotations
 
 import asyncio
 import os
+import uuid
 from datetime import datetime, timezone, timedelta
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
 from dqt_server.gigler_service import GIGLER_SOURCE_ID, GIGLER_TABLES, gigler_service
 from dqt_server.models.gigler import CheckRun, Dataset, Incident, Source
+
+_STEP_DISPLAY = {
+    "tcp_reach": "TCP Reach",
+    "auth": "Authentication",
+    "info_schema": "Info Schema Read",
+    "sample_select": "Sample SELECT",
+    "latency_probe": "Latency Probe",
+    "clock_skew": "Clock Skew",
+}
+
+
+def _run_health_check_sync(
+    engine: str, host: str, port: int, username: str, password: str, secure: bool, db_name: str
+) -> dict:
+    engine_lc = engine.lower()
+    if engine_lc == "clickhouse":
+        from dqt.adapters.clickhouse.adapter import ClickHouseAdapter
+        from dqt.adapters.clickhouse.config import ClickHouseConfig
+        cfg = ClickHouseConfig(
+            host=host, port=port, database=db_name,
+            username=username, password=password, secure=secure,
+        )
+        adapter = ClickHouseAdapter(**cfg.to_client_kwargs())
+        hc = adapter.health_check()
+    elif engine_lc == "postgres":
+        from dqt.adapters.postgres.adapter import PostgresAdapter
+        conn_str = f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{db_name}"
+        adapter = PostgresAdapter(conn_str)
+        hc = adapter.health_check()
+    else:
+        raise ValueError(f"Health check for engine '{engine}' is not yet supported")
+    return {
+        "steps": [
+            {
+                "name": s.name,
+                "display": _STEP_DISPLAY.get(s.name, s.name),
+                "status": s.status,
+                "latency_ms": round(s.latency_ms, 1),
+                "detail": s.detail,
+            }
+            for s in hc.steps
+        ],
+        "passed": hc.passed,
+    }
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["gigler"])
@@ -43,6 +89,8 @@ def _source_dict(s: Source) -> dict:
         "endpoint": f"{s.host}:{s.port}/{s.db_name}",
         "host": s.host,
         "port": s.port,
+        "secure": getattr(s, "secure", False),
+        "username": s.username or "",
         "tables": s.table_count,
         "status": s.status,
         "last_sync": _time_ago(s.last_synced_at),
@@ -96,6 +144,64 @@ def _incident_dict(i: Incident) -> dict:
 # Sources
 # ------------------------------------------------------------------
 
+class SourceTestBody(BaseModel):
+    engine: str
+    host: str
+    port: int
+    username: str = ""
+    password: str = ""
+    secure: bool = False
+    db_name: str = "default"
+
+
+class SourceCreateBody(BaseModel):
+    name: str
+    engine: str
+    host: str
+    port: int
+    username: str = ""
+    password: str = ""
+    secure: bool = False
+    db_name: str = "default"
+
+
+@router.post("/sources/test")
+async def test_source_connection(body: SourceTestBody) -> dict:
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(
+            None,
+            _run_health_check_sync,
+            body.engine, body.host, body.port,
+            body.username, body.password, body.secure, body.db_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc))
+
+
+@router.post("/sources", status_code=201)
+async def create_source(body: SourceCreateBody, db: AsyncSession = Depends(get_db)) -> dict:
+    source_id = f"{body.engine.lower()}-{uuid.uuid4().hex[:8]}"
+    now = datetime.now(timezone.utc)
+    source = Source(
+        id=source_id,
+        name=body.name,
+        engine=body.engine,
+        host=body.host,
+        port=body.port,
+        db_name=body.db_name,
+        username=body.username,
+        password=body.password,
+        secure=body.secure,
+        status="unknown",
+        table_count=0,
+        created_at=now,
+    )
+    db.add(source)
+    await db.commit()
+    return _source_dict(source)
+
+
 @router.get("/sources")
 async def list_sources(db: AsyncSession = Depends(get_db)) -> list[dict]:
     result = await db.execute(select(Source).order_by(Source.name))
@@ -108,6 +214,80 @@ async def get_source(source_id: str, db: AsyncSession = Depends(get_db)) -> dict
     if s is None:
         raise HTTPException(404, detail=f"Source '{source_id}' not found")
     return _source_dict(s)
+
+
+class UpdateTablesBody(BaseModel):
+    tables: list[str]
+
+
+@router.get("/sources/{source_id}/tables")
+async def list_source_tables(source_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+    s = await db.get(Source, source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{source_id}' not found")
+
+    # Currently watched tables
+    result = await db.execute(select(Dataset).where(Dataset.source_id == source_id))
+    watched = {d.id for d in result.scalars().all()}
+
+    # All available tables from the warehouse
+    loop = asyncio.get_event_loop()
+    try:
+        all_tables = await loop.run_in_executor(None, gigler_service._list_all_tables_sync)
+    except Exception:
+        all_tables = [{"schema": "default", "name": t} for t in sorted(watched)]
+
+    # If warehouse returned nothing, fall back to watched
+    if not all_tables:
+        all_tables = [{"schema": "default", "name": t} for t in sorted(watched)]
+
+    return [
+        {"name": t["name"], "schema": t["schema"], "watched": t["name"] in watched}
+        for t in all_tables
+    ]
+
+
+@router.put("/sources/{source_id}/tables")
+async def update_source_tables(
+    source_id: str,
+    body: UpdateTablesBody,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    s = await db.get(Source, source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{source_id}' not found")
+
+    new_tables = set(body.tables)
+
+    result = await db.execute(select(Dataset).where(Dataset.source_id == source_id))
+    current_datasets = {d.id: d for d in result.scalars().all()}
+    current_tables = set(current_datasets.keys())
+
+    # Remove deselected (cascade deletes check_runs / incidents)
+    for table_id in (current_tables - new_tables):
+        await db.delete(current_datasets[table_id])
+
+    # Add newly selected
+    now = datetime.now(timezone.utc)
+    schema = gigler_service._schema or "default"
+    for table_name in (new_tables - current_tables):
+        db.add(Dataset(
+            id=table_name,
+            source_id=source_id,
+            schema_name=schema,
+            status="unknown",
+            check_count=0,
+            created_at=now,
+        ))
+
+    s.table_count = len(new_tables)
+    await db.commit()
+
+    # Trigger refresh for any newly added tables
+    if new_tables - current_tables:
+        asyncio.create_task(gigler_service.refresh())
+
+    return {"source_id": source_id, "tables": sorted(new_tables)}
 
 
 # ------------------------------------------------------------------

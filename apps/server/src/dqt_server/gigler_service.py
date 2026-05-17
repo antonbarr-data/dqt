@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from dqt_server.db.engine import AsyncSessionLocal
-from dqt_server.models.gigler import CheckRun, Dataset, Incident, Source
+from dqt_server.models.gigler import CheckRun, ColumnCheck, Dataset, Incident, Source
 
 log = structlog.get_logger(__name__)
 
@@ -81,6 +81,16 @@ class GiglerService:
             self._adapter = ClickHouseAdapter(**cfg.to_client_kwargs())
             log.info("clickhouse_adapter_created", host=cfg.host, port=cfg.port)
         return self._adapter
+
+    def _list_all_tables_sync(self) -> list[dict]:
+        adapter = self._get_adapter()
+        schema = self._find_schema()
+        try:
+            tables = adapter.list_tables(schema)
+            return [{"schema": schema, "name": t} for t in sorted(tables)]
+        except Exception as exc:
+            log.error("list_tables_failed", error=str(exc))
+            return []
 
     def _find_schema(self) -> str:
         """Find the ClickHouse database that contains the gigler tables."""
@@ -193,6 +203,28 @@ class GiglerService:
         loop = asyncio.get_event_loop()
         now = datetime.now(timezone.utc)
 
+        # Determine which tables to watch: prefer DB-persisted selection, fall back to hardcoded list
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(Dataset).where(Dataset.source_id == GIGLER_SOURCE_ID)
+            )
+            db_datasets = result.scalars().all()
+        watched: list[str] = [d.id for d in db_datasets] if db_datasets else list(GIGLER_TABLES)
+
+        # Load user-defined column checks grouped by dataset
+        async with AsyncSessionLocal() as db:
+            cc_result = await db.execute(
+                select(ColumnCheck).where(ColumnCheck.dataset_id.in_(watched))
+            )
+            all_col_checks = cc_result.scalars().all()
+        col_checks_by_dataset: dict[str, list[dict]] = {}
+        for cc in all_col_checks:
+            col_checks_by_dataset.setdefault(cc.dataset_id, []).append({
+                "column_name": cc.column_name,
+                "detector_slug": cc.detector_slug,
+                "params": cc.params,
+            })
+
         # Upsert source record
         async with AsyncSessionLocal() as db:
             stmt = pg_insert(Source).values(
@@ -204,14 +236,14 @@ class GiglerService:
                 db_name=await loop.run_in_executor(None, self._find_schema),
                 username=os.environ.get("CLICKHOUSE_USER", ""),
                 status="unknown",
-                table_count=len(GIGLER_TABLES),
+                table_count=len(watched),
                 last_synced_at=now,
                 created_at=now,
             ).on_conflict_do_update(
                 index_elements=["id"],
                 set_={
                     "last_synced_at": now,
-                    "table_count": len(GIGLER_TABLES),
+                    "table_count": len(watched),
                     "host": os.environ.get("CLICKHOUSE_URL", "unknown"),
                 },
             )
@@ -220,13 +252,20 @@ class GiglerService:
 
         # Check each table
         all_ok = True
-        for table in GIGLER_TABLES:
+        for table in watched:
             result: TableCheckResult = await loop.run_in_executor(
                 None, self._check_table_sync, table
             )
             if result.status == "fail":
                 all_ok = False
             await self._persist_table_result(result, now)
+
+            user_checks = col_checks_by_dataset.get(table, [])
+            if user_checks:
+                user_results = await loop.run_in_executor(
+                    None, self._run_user_checks_sync, table, user_checks
+                )
+                await self._persist_user_check_results(table, user_results, now)
 
         # Update source status
         async with AsyncSessionLocal() as db:
@@ -329,6 +368,85 @@ class GiglerService:
 
             await db.commit()
 
+
+    # ------------------------------------------------------------------
+    # User-defined detector checks
+    # ------------------------------------------------------------------
+
+    def _run_user_checks_sync(self, table: str, col_checks: list[dict]) -> list[dict]:
+        """Run user-defined detectors on sampled column data."""
+        from dqt.algorithms._registry import registry
+
+        adapter = self._get_adapter()
+        schema = self._find_schema()
+        results: list[dict] = []
+
+        try:
+            full_df = adapter.sample(schema, table, n=2000)
+        except Exception as exc:
+            log.error("sample_table_failed", table=table, error=str(exc))
+            return results
+
+        for cc in col_checks:
+            column = cc["column_name"]
+            slug = cc["detector_slug"]
+            params = cc["params"] or {}
+
+            if column not in full_df.columns:
+                log.warning("column_not_found", table=table, column=column)
+                continue
+
+            detector_cls = registry.get(slug)
+            if detector_cls is None:
+                log.warning("unknown_detector", slug=slug)
+                continue
+
+            col_df = full_df[[column]].dropna()
+            if len(col_df) < 20:
+                continue
+
+            mid = len(col_df) // 2
+            ref_df = col_df.iloc[:mid]
+            cur_df = col_df.iloc[mid:]
+
+            try:
+                detector = detector_cls(**params)
+                state = detector.fit(ref_df)
+                det_result = detector.score(cur_df, state)
+                verdict = (
+                    det_result.verdict.value
+                    if hasattr(det_result.verdict, "value")
+                    else str(det_result.verdict)
+                )
+                results.append({
+                    "column": column,
+                    "detector_slug": slug,
+                    "score": float(det_result.score),
+                    "verdict": verdict,
+                    "plain_english": det_result.plain_english,
+                    "details": det_result.details or {},
+                })
+            except Exception as exc:
+                log.error("user_detector_failed", slug=slug, column=column, error=str(exc))
+
+        return results
+
+    async def _persist_user_check_results(self, table: str, results: list[dict], now: datetime) -> None:
+        if not results or AsyncSessionLocal is None:
+            return
+        async with AsyncSessionLocal() as db:
+            for r in results:
+                db.add(CheckRun(
+                    dataset_id=table,
+                    column_name=r["column"],
+                    detector_slug=r["detector_slug"],
+                    score=r["score"],
+                    verdict=r["verdict"],
+                    plain_english=r["plain_english"],
+                    details=r["details"],
+                    ran_at=now,
+                ))
+            await db.commit()
 
     # ------------------------------------------------------------------
     # Column profile (distribution)

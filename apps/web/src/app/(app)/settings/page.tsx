@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getToken, decodeToken, clearToken, isSysAdmin } from "@/lib/auth";
@@ -12,6 +12,13 @@ export default function SettingsPage() {
   const [picture, setPicture] = useState<string | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [sysAdmin, setSysAdmin] = useState(false);
+  const pictureInputRef = useRef<HTMLInputElement>(null);
+
+  function handlePictureUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPicture(URL.createObjectURL(file));
+  }
 
   useEffect(() => {
     const stored = localStorage.getItem("dqt-theme") as "dark" | "light" | null;
@@ -65,6 +72,20 @@ export default function SettingsPage() {
             <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>{name}</p>
             <p className="t-micro mt-0.5" style={{ color: "var(--fg-2)" }}>{email}</p>
           </div>
+          <input
+            ref={pictureInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePictureUpload}
+          />
+          <button
+            onClick={() => pictureInputRef.current?.click()}
+            className="ml-auto px-3 py-1.5 border border-line t-small transition-colors hover:border-accent"
+            style={{ color: "var(--fg-1)" }}
+          >
+            Upload picture
+          </button>
         </div>
       </section>
 

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from dqt_server.auth.models import ROLE_SYSADMIN, User
 from dqt_server.auth.router import router as auth_router
@@ -22,6 +22,15 @@ async def _setup_db() -> None:
         return
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add columns to existing tables that predate this column
+        for stmt in [
+            "ALTER TABLE sources ADD COLUMN IF NOT EXISTS password VARCHAR",
+            "ALTER TABLE sources ADD COLUMN IF NOT EXISTS secure BOOLEAN NOT NULL DEFAULT FALSE",
+        ]:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.email == SEEDED_SYSADMIN_EMAIL))
         if result.scalar_one_or_none() is None:

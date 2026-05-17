@@ -6,8 +6,14 @@ import json as _json
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel as PydanticBaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from dqt_server.db.engine import get_db
+from dqt_server.models.gigler import MetricDefinition
 
 from dqt.metrics import Metric, MetricKind, MetricRegistry
 from dqt_server.gigler_service import GIGLER_SOURCE_ID, GIGLER_TABLES
@@ -55,14 +61,59 @@ def _cache_invalidate(fqn: str) -> None:
         _narrative_cache.pop(k, None)
 
 
+async def _load_registry_from_db(db: AsyncSession) -> MetricRegistry:
+    global _registry
+    result = await db.execute(select(MetricDefinition))
+    rows = list(result.scalars().all())
+    if not rows:
+        from dqt_server.models.gigler import Dataset as DatasetModel
+        ds_result = await db.execute(
+            select(DatasetModel).where(DatasetModel.source_id == GIGLER_SOURCE_ID)
+        )
+        datasets = ds_result.scalars().all()
+        tables = [d.id for d in datasets] or list(GIGLER_TABLES)
+        now = datetime.now(timezone.utc)
+        for table in tables:
+            fqn = f"{GIGLER_SOURCE_ID}.default.{table}.quality"
+            m = MetricDefinition(
+                fqn=fqn,
+                display_name=f"{table} quality",
+                kind="ratio",
+                dataset=table,
+                description=f"Overall data quality score for {table}",
+                owners=["data-team"],
+                tags=["quality"],
+                created_at=now,
+            )
+            db.add(m)
+            rows.append(m)
+        await db.commit()
+
+    metrics = [
+        Metric(
+            fqn=r.fqn,
+            display_name=r.display_name,
+            kind=r.kind,
+            dataset=r.dataset,
+            description=r.description,
+            owners=r.owners or [],
+            tags=r.tags or [],
+        )
+        for r in rows
+    ]
+    reg = MetricRegistry(metrics)
+    _registry = reg
+    return reg
+
+
 def _get_registry() -> MetricRegistry:
     global _registry
     if _registry is None:
-        _registry = _build_registry()
+        _registry = _build_registry_sync()
     return _registry
 
 
-def _build_registry() -> MetricRegistry:
+def _build_registry_sync() -> MetricRegistry:
     metrics = [
         Metric(
             fqn=f"{GIGLER_SOURCE_ID}.default.{table}.quality",
@@ -71,7 +122,7 @@ def _build_registry() -> MetricRegistry:
             dataset=table,
             description=f"Overall data quality score for {table}",
             owners=["data-team"],
-            tags=["gigler", "quality"],
+            tags=["quality"],
         )
         for table in GIGLER_TABLES
     ]
@@ -98,8 +149,55 @@ def _metric_to_dict(m: Metric) -> dict:
 
 
 @router.get("/metrics")
-async def list_metrics() -> list[dict]:
-    return [_metric_to_dict(m) for m in _get_registry().list()]
+async def list_metrics(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    reg = await _load_registry_from_db(db)
+    return [_metric_to_dict(m) for m in reg.list()]
+
+
+class MetricCreate(PydanticBaseModel):
+    display_name: str
+    kind: str = "ratio"
+    dataset: str
+    description: str = ""
+    owners: list[str] = []
+    tags: list[str] = []
+
+
+@router.post("/metrics", status_code=201)
+async def create_metric(body: MetricCreate, db: AsyncSession = Depends(get_db)) -> dict:
+    import re
+    slug = re.sub(r"[^a-z0-9_]", "_", body.display_name.lower())
+    fqn = f"custom.default.{body.dataset}.{slug}"
+    existing = await db.get(MetricDefinition, fqn)
+    if existing:
+        raise HTTPException(409, detail=f"Metric '{fqn}' already exists")
+    m = MetricDefinition(
+        fqn=fqn,
+        display_name=body.display_name,
+        kind=body.kind,
+        dataset=body.dataset,
+        description=body.description,
+        owners=body.owners,
+        tags=body.tags,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(m)
+    await db.commit()
+    global _registry
+    _registry = None
+    return {"fqn": fqn, "display_name": body.display_name}
+
+
+@router.delete("/metrics/{fqn:path}")
+async def delete_metric(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
+    m = await db.get(MetricDefinition, fqn)
+    if m is None:
+        raise HTTPException(404, detail=f"Metric '{fqn}' not found")
+    await db.delete(m)
+    await db.commit()
+    global _registry
+    _registry = None
+    return {"fqn": fqn, "deleted": True}
 
 
 @router.get("/metrics/{fqn:path}/series")

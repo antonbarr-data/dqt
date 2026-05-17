@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, ChangeEvent } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Bell, MessageSquare } from "lucide-react";
 import { getToken, decodeToken, clearToken } from "@/lib/auth";
@@ -89,16 +89,6 @@ export function Topbar() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
-
-  const pictureInputRef = useRef<HTMLInputElement>(null);
-
-  function handlePictureUpload(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setUserPicture(url);
-    setAccountOpen(false);
-  }
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
@@ -269,20 +259,6 @@ export function Topbar() {
                 <p className="t-micro truncate" style={{ color: "var(--fg-3)" }}>{userEmail}</p>
               </div>
             </div>
-            <input
-              ref={pictureInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePictureUpload}
-            />
-            <button
-              className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
-              style={{ color: "var(--fg-0)" }}
-              onClick={() => pictureInputRef.current?.click()}
-            >
-              Upload picture
-            </button>
             <button
               className="w-full text-left px-3 py-2 t-small transition-colors hover:bg-bg-2"
               style={{ color: "var(--fg-0)" }}
