@@ -144,6 +144,9 @@ export function Topbar() {
           <span className="flex-1 text-left t-small" style={{ color: "var(--fg-3)" }}>
             Search datasets, incidents, tests…
           </span>
+          <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}>
+            /
+          </kbd>
         </button>
         <button
           onClick={() => setAskOpen(true)}
