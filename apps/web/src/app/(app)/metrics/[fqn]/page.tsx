@@ -2,6 +2,7 @@ import { serverFetch } from "@/lib/server-api";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { InsightClient } from "./insight-client";
+import { SubscribeButton } from "@/components/subscriptions/subscribe-button";
 
 interface MetricDetail {
   fqn: string;
@@ -70,6 +71,7 @@ export default async function MetricInsightPage({
             <span key={o} className="t-micro px-2 py-0.5 border border-line"
                   style={{ color: "var(--fg-2)" }}>{o}</span>
           ))}
+          <SubscribeButton metricFqn={decodedFqn} />
         </div>
       </div>
 

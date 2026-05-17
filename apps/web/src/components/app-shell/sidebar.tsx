@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
@@ -19,7 +19,7 @@ import {
   Phone,
   ClipboardList,
   MessageSquare,
-  Search,
+  Bell,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { isSysAdmin } from "@/lib/auth";
@@ -30,7 +30,7 @@ const NAV_GROUPS = [
     items: [
       { label: "Overview", href: "/overview", icon: LayoutDashboard, count: null },
       { label: "Ask", href: "/ask", icon: MessageSquare, count: null },
-      { label: "Search", href: "/search", icon: Search, count: null },
+      { label: "Subscriptions", href: "/subscriptions", icon: Bell, count: null },
     ],
   },
   {
@@ -81,12 +81,26 @@ const ITEM_H  = 36; // explicit px height for every nav item    — same in open
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [sysAdmin, setSysAdmin] = useState(false);
 
   useEffect(() => {
     setSysAdmin(isSysAdmin());
   }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        router.push("/search");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
 
   return (
     <aside
@@ -115,21 +129,25 @@ export function Sidebar() {
         {NAV_GROUPS.map((group) => (
           <div key={group.label ?? "__overview"} className="mb-2">
             {group.label !== null && (
-              <div
-                className="px-4 t-small whitespace-nowrap overflow-hidden"
-                style={{
-                  color: "var(--fg-1)",
-                  letterSpacing: "0.10em",
-                  textTransform: "uppercase",
-                  fontWeight: 500,
-                  height: LABEL_H,
-                  lineHeight: `${LABEL_H}px`,
-                  opacity: open ? 1 : 0,
-                  transition: "opacity 0.1s ease",
-                }}
-              >
-                {group.label}
-              </div>
+              open ? (
+                <div
+                  className="px-4 t-small whitespace-nowrap overflow-hidden"
+                  style={{
+                    color: "var(--fg-1)",
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    fontWeight: 500,
+                    height: LABEL_H,
+                    lineHeight: `${LABEL_H}px`,
+                  }}
+                >
+                  {group.label}
+                </div>
+              ) : (
+                <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
+                  <div style={{ height: 1, width: "100%", background: "var(--line)" }} />
+                </div>
+              )
             )}
             {group.items.map((item) => {
               const Icon = item.icon;
@@ -139,11 +157,10 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href as never}
                   className={clsx(
-                    "flex items-center gap-3 t-body transition-colors",
-                    open ? "px-4" : "justify-center",
+                    "flex items-center gap-3 px-4 t-small transition-colors",
                     active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
                   )}
-                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
+                  style={{ color: active ? "var(--fg-0)" : "var(--fg-1)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
                   title={!open ? item.label : undefined}
                 >
                   <Icon
@@ -175,21 +192,25 @@ export function Sidebar() {
 
         {sysAdmin && (
           <div className="mb-2">
-            <div
-              className="px-4 t-small whitespace-nowrap overflow-hidden"
-              style={{
-                color: "var(--fg-1)",
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                fontWeight: 500,
-                height: LABEL_H,
-                lineHeight: `${LABEL_H}px`,
-                opacity: open ? 1 : 0,
-                transition: "opacity 0.1s ease",
-              }}
-            >
-              Admin
-            </div>
+            {open ? (
+              <div
+                className="px-4 t-small whitespace-nowrap overflow-hidden"
+                style={{
+                  color: "var(--fg-1)",
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  fontWeight: 500,
+                  height: LABEL_H,
+                  lineHeight: `${LABEL_H}px`,
+                }}
+              >
+                Admin
+              </div>
+            ) : (
+              <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
+                <div style={{ height: 1, width: "100%", background: "var(--line)" }} />
+              </div>
+            )}
             {SYSADMIN_NAV.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -198,11 +219,10 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href as never}
                   className={clsx(
-                    "flex items-center gap-3 t-body transition-colors",
-                    open ? "px-4" : "justify-center",
+                    "flex items-center gap-3 px-4 t-small transition-colors",
                     active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
                   )}
-                  style={{ color: "var(--fg-0)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
+                  style={{ color: active ? "var(--fg-0)" : "var(--fg-1)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
                   title={!open ? item.label : undefined}
                 >
                   <Icon size={16} strokeWidth={1.6} style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }} />
