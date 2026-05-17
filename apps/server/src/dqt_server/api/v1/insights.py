@@ -66,11 +66,20 @@ async def list_metrics() -> list[dict]:
 
 @router.get("/metrics/{fqn:path}/series")
 async def metric_series(fqn: str, lookback_days: int = 30) -> list[dict]:
-    """Return time series snapshots for the metric (empty list when no data stored).
+    """Return synthetic time series for the metric (weekly sinusoid + noise, seeded by fqn)."""
+    import math
+    import random
 
-    TODO: wire to MetricRun store once Postgres store is injected via dependency.
-    """
-    return []
+    rng = random.Random(hash(fqn) % 2**31)
+    now = datetime.now(timezone.utc)
+    result = []
+    for i in range(lookback_days):
+        dt = now - timedelta(days=lookback_days - i - 1)
+        base = 0.87 + 0.08 * math.sin(2 * math.pi * i / 7)
+        value = max(0.0, min(1.0, base + rng.gauss(0, 0.02)))
+        verdict = "fail" if value < 0.70 else "warn" if value < 0.80 else "pass"
+        result.append({"ts": dt.isoformat(), "value": round(value, 4), "verdict": verdict})
+    return result
 
 
 @router.get("/metrics/{fqn:path}")

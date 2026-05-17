@@ -46,6 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from dqt_server.api.v1.gigler import router as gigler_router
 from dqt_server.api.v1.suggest import router as suggest_router
 from dqt_server.api.v1.search import router as search_router
 from dqt_server.api.v1.insights import router as insights_router
@@ -58,6 +59,7 @@ from dqt_server.api.v1.causal_review import router as causal_review_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
+app.include_router(gigler_router)
 app.include_router(suggest_router)
 app.include_router(search_router)   # BEFORE insights -- /metrics/search before /metrics/{fqn:path}
 app.include_router(insights_router)

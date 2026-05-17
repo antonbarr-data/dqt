@@ -61,21 +61,24 @@ class EdgeOut(BaseModel):
 class GraphOut(BaseModel):
     nodes: list[NodeOut]
     edges: list[EdgeOut]
-    root: str
+    root: str | None
     direction: str
     depth: int
 
 
 @router.get("/graph", response_model=GraphOut)
 def lineage_graph(
-    root: str = Query(..., description="Root node id"),
+    root: str | None = Query(None, description="Root node id; omit to return the full graph"),
     direction: str = Query("both", description="downstream | upstream | both"),
     depth: int = Query(3, ge=1, le=5),
     include_causal: bool = Query(True),
 ):
     if direction not in ("downstream", "upstream", "both"):
         raise HTTPException(status_code=422, detail="direction must be downstream, upstream, or both")
-    sg = _DEMO_GRAPH.subgraph(root, direction=direction, depth=depth)
+    if root is not None:
+        sg = _DEMO_GRAPH.subgraph(root, direction=direction, depth=depth)
+    else:
+        sg = _DEMO_GRAPH
     edges = sg.edges
     if not include_causal:
         edges = [e for e in edges if e.kind != "causality"]
