@@ -21,7 +21,7 @@ const NAV_ITEMS: Item[] = [
   { id: "nav-metrics",    group: "Navigation", label: "Metrics",              href: "/metrics",    icon: <BarChart2 size={13} strokeWidth={1.6} /> },
   { id: "nav-causality",  group: "Navigation", label: "Causality",            href: "/causality",  icon: <Network size={13} strokeWidth={1.6} /> },
   { id: "nav-incidents",  group: "Navigation", label: "Incidents",            href: "/incidents",  icon: <AlertTriangle size={13} strokeWidth={1.6} /> },
-  { id: "nav-tests",      group: "Navigation", label: "Tests",                href: "/tests",      icon: <CheckSquare size={13} strokeWidth={1.6} /> },
+  { id: "nav-checks",     group: "Navigation", label: "Checks",               href: "/checks",     icon: <CheckSquare size={13} strokeWidth={1.6} /> },
   { id: "nav-catalog",    group: "Navigation", label: "Catalog",              href: "/catalog",    icon: <BookOpen size={13} strokeWidth={1.6} /> },
   { id: "nav-policies",   group: "Navigation", label: "Policies",             href: "/policies",   icon: <Shield size={13} strokeWidth={1.6} /> },
   { id: "nav-audit",      group: "Navigation", label: "Audit",                href: "/audit",      icon: <ScrollText size={13} strokeWidth={1.6} /> },

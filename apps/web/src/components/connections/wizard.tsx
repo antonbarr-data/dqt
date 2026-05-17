@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, ChevronLeft, X } from "lucide-react";
+import { Check, Loader2, ChevronLeft, X, Sparkles } from "lucide-react";
 import { clsx } from "clsx";
 
 type FieldDef = {
@@ -48,7 +48,8 @@ const ENGINE_FIELDS: Record<string, FieldDef[]> = {
   ],
 };
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
+type CheckTier = "essential" | "recommended" | "full_coverage";
 
 interface HealthStep {
   name: string;
@@ -60,6 +61,16 @@ interface HealthStep {
 
 interface TableItem { name: string; schema: string; watched: boolean }
 
+interface CheckSuggestion {
+  table: string;
+  column: string;
+  detector_slug: string;
+  params: Record<string, unknown>;
+  rationale: string;
+  confidence: number;
+  tier: CheckTier;
+}
+
 interface WizardProps {
   engine: string;
   sourceId?: string;
@@ -68,6 +79,21 @@ interface WizardProps {
 }
 
 const STEP_LABELS = ["TCP Reach", "Authentication", "Info Schema Read", "Sample SELECT", "Latency Probe", "Clock Skew"];
+const TIER_LABELS: Record<CheckTier, string> = {
+  essential: "Essential",
+  recommended: "Recommended",
+  full_coverage: "Full coverage",
+};
+const TIER_DESC: Record<CheckTier, string> = {
+  essential: "Core data integrity checks (nulls, PK uniqueness, format validation)",
+  recommended: "Adds statistical monitoring and drift detection",
+  full_coverage: "All available checks for maximum observability",
+};
+
+function tierIncludes(activeTier: CheckTier, itemTier: CheckTier): boolean {
+  const order: CheckTier[] = ["essential", "recommended", "full_coverage"];
+  return order.indexOf(itemTier) <= order.indexOf(activeTier);
+}
 
 export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }: WizardProps) {
   const router = useRouter();
@@ -92,8 +118,14 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
   // Step 3 state
   const [tables, setTables] = useState<TableItem[]>([]);
   const [tablesLoading, setTablesLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
+
+  // Step 4 state
+  const [suggestions, setSuggestions] = useState<CheckSuggestion[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [activeTier, setActiveTier] = useState<CheckTier>("essential");
+  const [selectedChecks, setSelectedChecks] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   const runHealthCheck = useCallback(async () => {
     setHealthSteps([]);
@@ -136,7 +168,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       }
       setHealthPassed(data.passed);
     } catch {
-      setHealthError("Network error — could not reach server");
+      setHealthError("Network error -- could not reach server");
     } finally {
       setHealthDone(true);
       setHealthLoading(false);
@@ -174,7 +206,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
           setActiveSourceId(created.id);
         }
       } catch {
-        // proceed to step 3 regardless; tables fetch will fail gracefully
+        // proceed; table fetch will fail gracefully
       }
     }
     setStep(3);
@@ -193,15 +225,88 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       .finally(() => setTablesLoading(false));
   }, [step, activeSourceId]);
 
+  async function handleAdvanceToStep4() {
+    if (!activeSourceId) { setStep(4); return; }
+
+    // Save table selection first
+    await fetch(`/api/v1/sources/${encodeURIComponent(activeSourceId)}/tables`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tables: Array.from(selectedTables) }),
+    }).catch(() => null);
+
+    setSuggestLoading(true);
+    setStep(4);
+    setSuggestions([]);
+
+    try {
+      const res = await fetch(
+        `/api/v1/sources/${encodeURIComponent(activeSourceId)}/suggest-checks`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tables: Array.from(selectedTables) }),
+        }
+      );
+      if (res.ok) {
+        const data: CheckSuggestion[] = await res.json();
+        setSuggestions(data);
+        // Pre-select essential checks
+        const keys = new Set(
+          data
+            .filter((s) => s.tier === "essential")
+            .map((s) => `${s.table}.${s.column}.${s.detector_slug}`)
+        );
+        setSelectedChecks(keys);
+      }
+    } catch {
+      // suggestions optional; user can still finish
+    } finally {
+      setSuggestLoading(false);
+    }
+  }
+
+  function handleTierChange(tier: CheckTier) {
+    setActiveTier(tier);
+    // Auto-select all checks in the new tier scope
+    const keys = new Set(
+      suggestions
+        .filter((s) => tierIncludes(tier, s.tier))
+        .map((s) => `${s.table}.${s.column}.${s.detector_slug}`)
+    );
+    setSelectedChecks(keys);
+  }
+
+  function toggleCheck(key: string) {
+    setSelectedChecks((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   async function handleFinish() {
     if (!activeSourceId) { router.push("/sources"); return; }
     setSaving(true);
     try {
-      await fetch(`/api/v1/sources/${encodeURIComponent(activeSourceId)}/tables`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tables: Array.from(selectedTables) }),
-      });
+      // Save selected checks if any
+      if (selectedChecks.size > 0) {
+        const checksToSave = suggestions
+          .filter((s) => selectedChecks.has(`${s.table}.${s.column}.${s.detector_slug}`))
+          .map((s) => ({
+            dataset_id: s.table,
+            column_name: s.column,
+            detector_slug: s.detector_slug,
+            params: s.params,
+            rationale: s.rationale,
+          }));
+        await fetch("/api/v1/column-checks/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ checks: checksToSave }),
+        }).catch(() => null);
+      }
       router.push(`/sources/${activeSourceId}`);
     } finally {
       setSaving(false);
@@ -221,11 +326,13 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     setFormValues((prev) => ({ ...prev, [key]: value }));
   }
 
+  const stepLabels = ["Configure", "Test & Verify", "Choose Datasets", "Review Checks"] as const;
+
   return (
     <div className="max-w-lg">
       {/* step indicator */}
-      <div className="flex items-center gap-0 mb-6">
-        {(["Configure", "Test & Verify", "Choose Tables"] as const).map((label, idx) => {
+      <div className="flex items-center gap-0 mb-6 flex-wrap gap-y-2">
+        {stepLabels.map((label, idx) => {
           const n = (idx + 1) as Step;
           const active = step === n;
           const done = step > n;
@@ -246,7 +353,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                   {label}
                 </span>
               </div>
-              {idx < 2 && (
+              {idx < stepLabels.length - 1 && (
                 <div className="mx-2" style={{ width: 20, height: 1, background: "var(--line)" }} />
               )}
             </div>
@@ -257,7 +364,6 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       {/* ---- Step 1: Configure ---- */}
       {step === 1 && (
         <div className="space-y-4">
-          {/* Connection name — common field */}
           <div>
             <label className="block t-small mb-1" style={{ color: "var(--fg-1)" }}>Connection name</label>
             <input
@@ -319,7 +425,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
             className="flex items-center gap-2 px-4 py-2 t-small font-medium border transition-colors hover:opacity-90"
             style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
           >
-            Test Connection →
+            Test Connection
           </button>
         </div>
       )}
@@ -390,7 +496,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
               )}
               style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
             >
-              Configure Tables →
+              Choose Datasets
             </button>
             {healthDone && !healthPassed && (
               <button
@@ -405,18 +511,21 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
         </div>
       )}
 
-      {/* ---- Step 3: Choose Tables ---- */}
+      {/* ---- Step 3: Choose Datasets ---- */}
       {step === 3 && (
         <div className="space-y-5">
           <p className="t-small" style={{ color: "var(--fg-1)" }}>
-            Select tables to watch. You can change this later.
+            Select the datasets you want to monitor. You can change this later.
           </p>
 
           <div className="border border-line" style={{ background: "var(--bg-1)" }}>
             {tablesLoading ? (
-              <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>Loading tables...</div>
+              <div className="px-4 py-4 flex items-center gap-2 t-small" style={{ color: "var(--fg-2)" }}>
+                <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
+                Loading datasets...
+              </div>
             ) : tables.length === 0 ? (
-              <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>No tables found.</div>
+              <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>No datasets found.</div>
             ) : (
               tables.map((t, i) => (
                 <label
@@ -433,6 +542,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                     style={{ accentColor: "var(--accent)" }}
                   />
                   <span className="t-body font-mono" style={{ color: "var(--fg-0)" }}>{t.name}</span>
+                  <span className="t-micro ml-auto" style={{ color: "var(--fg-3)" }}>{t.schema}</span>
                 </label>
               ))
             )}
@@ -448,15 +558,134 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
               Back
             </button>
             <button
-              onClick={handleFinish}
-              disabled={saving}
+              onClick={handleAdvanceToStep4}
+              disabled={selectedTables.size === 0 || tablesLoading}
               className={clsx(
                 "flex items-center gap-2 px-4 py-2 t-small font-medium border transition-colors",
-                saving ? "opacity-40 cursor-not-allowed" : "hover:opacity-90"
+                selectedTables.size > 0 && !tablesLoading ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
               )}
               style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
             >
-              {saving ? "Saving..." : "Finish →"}
+              Review Checks
+            </button>
+            {selectedTables.size === 0 && !tablesLoading && (
+              <span className="t-micro" style={{ color: "var(--fg-3)" }}>Select at least one dataset</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Step 4: Review Checks ---- */}
+      {step === 4 && (
+        <div className="space-y-5">
+          <div className="flex items-center gap-2">
+            <Sparkles size={13} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
+            <span className="t-small font-medium" style={{ color: "var(--fg-0)" }}>Suggested checks</span>
+            {suggestLoading && (
+              <Loader2 size={12} strokeWidth={1.6} className="animate-spin" style={{ color: "var(--fg-3)" }} />
+            )}
+          </div>
+
+          {/* Tier filter */}
+          {!suggestLoading && suggestions.length > 0 && (
+            <div className="space-y-1">
+              {(["essential", "recommended", "full_coverage"] as CheckTier[]).map((tier) => {
+                const active = activeTier === tier;
+                const count = suggestions.filter((s) => tierIncludes(tier, s.tier)).length;
+                return (
+                  <button
+                    key={tier}
+                    onClick={() => handleTierChange(tier)}
+                    className="w-full text-left px-3 py-2.5 border transition-colors"
+                    style={{
+                      borderColor: active ? "var(--accent)" : "var(--line)",
+                      background: active ? "var(--accent-bg)" : "var(--bg-1)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="t-small font-medium" style={{ color: active ? "var(--accent)" : "var(--fg-0)" }}>
+                        {TIER_LABELS[tier]}
+                      </span>
+                      <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{count} checks</span>
+                    </div>
+                    <p className="t-micro mt-0.5" style={{ color: "var(--fg-2)", lineHeight: 1.4 }}>
+                      {TIER_DESC[tier]}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Check list */}
+          {!suggestLoading && (
+            <div className="border border-line" style={{ background: "var(--bg-1)", maxHeight: 280, overflowY: "auto" }}>
+              {suggestions.length === 0 ? (
+                <div className="px-4 py-6 t-small text-center" style={{ color: "var(--fg-3)" }}>
+                  {suggestLoading ? "Analyzing columns..." : "No checks suggested. You can add checks manually later."}
+                </div>
+              ) : (
+                suggestions
+                  .filter((s) => tierIncludes(activeTier, s.tier))
+                  .map((s, i) => {
+                    const key = `${s.table}.${s.column}.${s.detector_slug}`;
+                    const checked = selectedChecks.has(key);
+                    return (
+                      <label
+                        key={key}
+                        className={clsx(
+                          "flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-bg-2",
+                          i > 0 && "border-t border-line"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCheck(key)}
+                          className="mt-0.5"
+                          style={{ accentColor: "var(--accent)", flexShrink: 0 }}
+                        />
+                        <div className="min-w-0">
+                          <p className="t-small font-mono" style={{ color: "var(--fg-0)" }}>
+                            {s.table}.{s.column}
+                            <span className="ml-2 t-micro" style={{ color: "var(--accent)" }}>{s.detector_slug}</span>
+                          </p>
+                          <p className="t-micro mt-0.5" style={{ color: "var(--fg-2)", lineHeight: 1.4 }}>
+                            {s.rationale}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })
+              )}
+            </div>
+          )}
+
+          {!suggestLoading && suggestions.length > 0 && (
+            <p className="t-micro" style={{ color: "var(--fg-3)" }}>
+              {selectedChecks.size} of {suggestions.filter((s) => tierIncludes(activeTier, s.tier)).length} checks selected
+            </p>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setStep(3)}
+              className="flex items-center gap-1.5 px-3 py-2 t-small border border-line transition-colors hover:bg-bg-2"
+              style={{ color: "var(--fg-1)" }}
+            >
+              <ChevronLeft size={13} strokeWidth={1.6} />
+              Back
+            </button>
+            <button
+              onClick={handleFinish}
+              disabled={saving || suggestLoading}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 t-small font-medium border transition-colors",
+                !saving && !suggestLoading ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
+              )}
+              style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+            >
+              {saving ? "Saving..." : "Finish"}
             </button>
           </div>
         </div>

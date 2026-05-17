@@ -1,6 +1,6 @@
-"""GiglerService — connects to the Gigler ClickHouse warehouse, runs dqt checks,
+"""GiglerService -- connects to warehouse sources, runs dqt checks,
 and persists results to Postgres so the API can serve them without hitting
-ClickHouse on every request.
+the warehouse on every request.
 """
 from __future__ import annotations
 
@@ -18,14 +18,6 @@ from dqt_server.db.engine import AsyncSessionLocal
 from dqt_server.models.gigler import CheckRun, ColumnCheck, Dataset, Incident, Source
 
 log = structlog.get_logger(__name__)
-
-GIGLER_SOURCE_ID = "gigler"
-GIGLER_TABLES = [
-    "marketing_campaigns",
-    "gigler_transactions",
-    "gig_vendor_stats",
-    "gig_prices",
-]
 
 # null_fraction thresholds
 _FAIL_THRESHOLD = 0.10
@@ -46,6 +38,7 @@ class ColumnCheckResult:
 class TableCheckResult:
     table: str
     schema_name: str
+    source_id: str
     row_count: int
     column_count: int
     col_names: list[str]
@@ -55,151 +48,200 @@ class TableCheckResult:
     error: str | None = None
 
 
-class GiglerService:
-    def __init__(self) -> None:
-        self._adapter: Any = None
-        self._schema: str | None = None
-        self._refreshing = False
+def _make_adapter(source: Source) -> Any:
+    """Create warehouse adapter from Source credentials."""
+    engine_lc = source.engine.lower()
+    if engine_lc == "clickhouse":
+        from dqt.adapters.clickhouse.adapter import ClickHouseAdapter
+        from dqt.adapters.clickhouse.config import ClickHouseConfig
+        # Prefer Railway internal URL for ClickHouse if host matches public URL
+        host = source.host
+        internal = os.environ.get("CLICKHOUSE_INTERNAL_URL")
+        if internal and os.environ.get("CLICKHOUSE_URL", "") == host:
+            host = internal
+        cfg = ClickHouseConfig(
+            host=host, port=source.port, database=source.db_name,
+            username=source.username or "default",
+            password=source.password or "",
+            secure=source.secure,
+        )
+        return ClickHouseAdapter(**cfg.to_client_kwargs())
+    elif engine_lc == "postgres":
+        from dqt.adapters.postgres.adapter import PostgresAdapter
+        pw = source.password or ""
+        user = source.username or "postgres"
+        conn_str = f"postgresql+psycopg2://{user}:{pw}@{source.host}:{source.port}/{source.db_name}"
+        return PostgresAdapter(conn_str)
+    else:
+        raise ValueError(f"Unsupported engine for refresh: {source.engine}")
 
-    # ------------------------------------------------------------------
-    # ClickHouse helpers (sync — run in thread executor)
-    # ------------------------------------------------------------------
 
-    def _get_adapter(self) -> Any:
-        if self._adapter is None:
-            from dqt.adapters.clickhouse.adapter import ClickHouseAdapter
-            from dqt.adapters.clickhouse.config import ClickHouseConfig
+def _default_schema_for_source(source: Source) -> str:
+    """Return the primary schema name to use when listing tables for a source."""
+    engine_lc = source.engine.lower()
+    if engine_lc == "clickhouse":
+        return source.db_name or "default"
+    return "public"
 
-            # Use Railway private network URL when available (faster, no egress cost)
-            conn_host = (
-                os.environ.get("CLICKHOUSE_INTERNAL_URL")
-                or os.environ.get("CLICKHOUSE_URL", "localhost")
-            )
-            secure = os.environ.get("CLICKHOUSE_SECURE", "false").lower() in ("true", "1", "yes")
-            cfg = ClickHouseConfig(
-                host=conn_host,
-                port=int(os.environ.get("CLICKHOUSE_PORT", "8123")),
-                database=os.environ.get("CLICKHOUSE_DB", "default"),
-                username=os.environ.get("CLICKHOUSE_USER", "default"),
-                password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
-                secure=secure,
-            )
-            self._adapter = ClickHouseAdapter(**cfg.to_client_kwargs())
-            log.info("clickhouse_adapter_created", host=cfg.host, port=cfg.port)
-        return self._adapter
 
-    def _list_all_tables_sync(self) -> list[dict]:
-        adapter = self._get_adapter()
-        schema = self._find_schema()
-        try:
-            tables = adapter.list_tables(schema)
-            return [{"schema": schema, "name": t} for t in sorted(tables)]
-        except Exception as exc:
-            log.error("list_tables_failed", error=str(exc))
-            return []
-
-    def _find_schema(self) -> str:
-        """Find the ClickHouse database that contains the gigler tables."""
-        if self._schema:
-            return self._schema
-        adapter = self._get_adapter()
+def _list_tables_for_source_sync(source: Source) -> list[dict]:
+    """List all tables available in a source warehouse."""
+    try:
+        adapter = _make_adapter(source)
+        schema = _default_schema_for_source(source)
         try:
             schemas = adapter.list_schemas()
-            for schema in schemas:
-                tables = adapter.list_tables(schema)
-                if any(t in tables for t in GIGLER_TABLES):
-                    self._schema = schema
-                    log.info("gigler_schema_found", schema=schema)
-                    return schema
+            if schemas and schema not in schemas:
+                schema = schemas[0]
         except Exception:
             pass
-        # Fall back to default
-        self._schema = "default"
-        return self._schema
+        tables = adapter.list_tables(schema)
+        return [{"schema": schema, "name": t} for t in sorted(tables)]
+    except Exception as exc:
+        log.error("list_tables_failed", source_id=source.id, error=str(exc))
+        return []
 
-    def _check_table_sync(self, table: str) -> TableCheckResult:
-        """Run null fraction checks for all columns in one ClickHouse query."""
-        adapter = self._get_adapter()
-        schema = self._find_schema()
 
-        try:
-            # Get column metadata
-            cols = adapter.describe_columns(schema, table)
-            col_names = [c.name for c in cols]
-            col_types = [c.data_type for c in cols]
+def _check_table_sync(adapter: Any, schema: str, table: str, source_id: str) -> TableCheckResult:
+    """Run null fraction checks for all columns in one warehouse query."""
+    try:
+        cols = adapter.describe_columns(schema, table)
+        col_names = [c.name for c in cols]
+        col_types = [c.data_type for c in cols]
 
-            if not col_names:
-                return TableCheckResult(
-                    table=table, schema_name=schema, row_count=0,
-                    column_count=0, col_names=[], col_types=[], checks=[],
-                    status="unknown",
-                )
+        if not col_names:
+            return TableCheckResult(
+                table=table, schema_name=schema, source_id=source_id,
+                row_count=0, column_count=0, col_names=[], col_types=[], checks=[],
+                status="unknown",
+            )
 
-            # Build one-pass aggregate query: total count + null count per column
-            exprs = ["COUNT(*) AS __total"]
-            for i, col in enumerate(col_names):
-                exprs.append(f"countIf(isNull(`{col}`)) AS _n{i}")
-            sql = f"SELECT {', '.join(exprs)} FROM `{schema}`.`{table}`"
+        exprs = ["COUNT(*) AS __total"]
+        for i, col in enumerate(col_names):
+            exprs.append(f"countIf(isNull(`{col}`)) AS _n{i}")
+        sql = f"SELECT {', '.join(exprs)} FROM `{schema}`.`{table}`"
 
-            result = adapter._client.query(sql)
-            row = result.result_rows[0]
-            total = int(row[0] or 0)
+        result = adapter._client.query(sql)
+        row = result.result_rows[0]
+        total = int(row[0] or 0)
 
-            checks: list[ColumnCheckResult] = []
-            for i, col in enumerate(col_names):
-                null_count = int(row[i + 1] or 0)
-                frac = null_count / total if total > 0 else 0.0
-                verdict = (
-                    "fail" if frac > _FAIL_THRESHOLD else
-                    "warn" if frac > _WARN_THRESHOLD else
-                    "pass"
-                )
-                checks.append(ColumnCheckResult(
-                    column=col,
-                    null_fraction=frac,
-                    null_count=null_count,
-                    total=total,
-                    verdict=verdict,
-                    message=f"{null_count:,}/{total:,} rows NULL ({frac:.1%})",
-                ))
-
-            table_status = (
-                "fail" if any(c.verdict == "fail" for c in checks) else
-                "warn" if any(c.verdict == "warn" for c in checks) else
+        checks: list[ColumnCheckResult] = []
+        for i, col in enumerate(col_names):
+            null_count = int(row[i + 1] or 0)
+            frac = null_count / total if total > 0 else 0.0
+            verdict = (
+                "fail" if frac > _FAIL_THRESHOLD else
+                "warn" if frac > _WARN_THRESHOLD else
                 "pass"
             )
+            checks.append(ColumnCheckResult(
+                column=col,
+                null_fraction=frac,
+                null_count=null_count,
+                total=total,
+                verdict=verdict,
+                message=f"{null_count:,}/{total:,} rows NULL ({frac:.1%})",
+            ))
 
-            log.info("table_checked", table=table, rows=total, status=table_status)
-            return TableCheckResult(
-                table=table, schema_name=schema, row_count=total,
-                column_count=len(col_names), col_names=col_names, col_types=col_types,
-                checks=checks, status=table_status,
+        table_status = (
+            "fail" if any(c.verdict == "fail" for c in checks) else
+            "warn" if any(c.verdict == "warn" for c in checks) else
+            "pass"
+        )
+        log.info("table_checked", table=table, rows=total, status=table_status)
+        return TableCheckResult(
+            table=table, schema_name=schema, source_id=source_id,
+            row_count=total, column_count=len(col_names), col_names=col_names,
+            col_types=col_types, checks=checks, status=table_status,
+        )
+
+    except Exception as exc:
+        log.error("table_check_failed", table=table, error=str(exc))
+        return TableCheckResult(
+            table=table, schema_name=schema, source_id=source_id,
+            row_count=0, column_count=0, col_names=[], col_types=[], checks=[],
+            status="fail", error=str(exc),
+        )
+
+
+def _run_user_checks_sync(
+    adapter: Any, schema: str, table: str, col_checks: list[dict]
+) -> list[dict]:
+    """Run user-defined detectors on sampled column data."""
+    from dqt.algorithms._registry import registry
+
+    results: list[dict] = []
+    try:
+        full_df = adapter.sample(schema, table, n=2000)
+    except Exception as exc:
+        log.error("sample_table_failed", table=table, error=str(exc))
+        return results
+
+    for cc in col_checks:
+        column = cc["column_name"]
+        slug = cc["detector_slug"]
+        params = cc["params"] or {}
+
+        if column not in full_df.columns:
+            log.warning("column_not_found", table=table, column=column)
+            continue
+
+        detector_cls = registry.get(slug)
+        if detector_cls is None:
+            log.warning("unknown_detector", slug=slug)
+            continue
+
+        col_df = full_df[[column]].dropna()
+        if len(col_df) < 20:
+            continue
+
+        mid = len(col_df) // 2
+        ref_df = col_df.iloc[:mid]
+        cur_df = col_df.iloc[mid:]
+
+        try:
+            detector = detector_cls(**params)
+            state = detector.fit(ref_df)
+            det_result = detector.score(cur_df, state)
+            verdict = (
+                det_result.verdict.value
+                if hasattr(det_result.verdict, "value")
+                else str(det_result.verdict)
             )
-
+            results.append({
+                "column": column,
+                "detector_slug": slug,
+                "score": float(det_result.score),
+                "verdict": verdict,
+                "plain_english": det_result.plain_english,
+                "details": det_result.details or {},
+            })
         except Exception as exc:
-            log.error("table_check_failed", table=table, error=str(exc))
-            return TableCheckResult(
-                table=table, schema_name=schema, row_count=0,
-                column_count=0, col_names=[], col_types=[], checks=[],
-                status="fail", error=str(exc),
-            )
+            log.error("user_detector_failed", slug=slug, column=column, error=str(exc))
+
+    return results
+
+
+class GiglerService:
+    def __init__(self) -> None:
+        self._refreshing = False
 
     # ------------------------------------------------------------------
     # Async public interface
     # ------------------------------------------------------------------
 
     async def refresh(self) -> None:
-        """Run all ClickHouse checks and persist results to Postgres."""
+        """Run all warehouse checks across all sources and persist results to Postgres."""
         if self._refreshing:
             log.warning("refresh_already_running")
             return
         self._refreshing = True
-        log.info("gigler_refresh_started")
+        log.info("refresh_started")
         try:
             await self._do_refresh()
         finally:
             self._refreshing = False
-        log.info("gigler_refresh_done")
+        log.info("refresh_done")
 
     async def _do_refresh(self) -> None:
         if AsyncSessionLocal is None:
@@ -209,88 +251,78 @@ class GiglerService:
         loop = asyncio.get_event_loop()
         now = datetime.now(timezone.utc)
 
-        # Determine which tables to watch: prefer DB-persisted selection, fall back to hardcoded list
         async with AsyncSessionLocal() as db:
-            result = await db.execute(
-                select(Dataset).where(Dataset.source_id == GIGLER_SOURCE_ID)
-            )
-            db_datasets = result.scalars().all()
-        watched: list[str] = [d.id for d in db_datasets] if db_datasets else list(GIGLER_TABLES)
+            src_result = await db.execute(select(Source))
+            all_sources = src_result.scalars().all()
 
-        # Load user-defined column checks grouped by dataset
-        async with AsyncSessionLocal() as db:
-            cc_result = await db.execute(
-                select(ColumnCheck).where(ColumnCheck.dataset_id.in_(watched))
-            )
-            all_col_checks = cc_result.scalars().all()
-        col_checks_by_dataset: dict[str, list[dict]] = {}
-        for cc in all_col_checks:
-            col_checks_by_dataset.setdefault(cc.dataset_id, []).append({
-                "column_name": cc.column_name,
-                "detector_slug": cc.detector_slug,
-                "params": cc.params,
-            })
+        if not all_sources:
+            log.info("no_sources_to_refresh")
+            return
 
-        # Upsert source record — store the public URL for display even when using internal for connections
-        display_host = os.environ.get("CLICKHOUSE_URL", "unknown")
-        async with AsyncSessionLocal() as db:
-            stmt = pg_insert(Source).values(
-                id=GIGLER_SOURCE_ID,
-                name="Gigler ClickHouse",
-                engine="ClickHouse",
-                host=display_host,
-                port=int(os.environ.get("CLICKHOUSE_PORT", "443")),
-                db_name=await loop.run_in_executor(None, self._find_schema),
-                username=os.environ.get("CLICKHOUSE_USER", ""),
-                status="unknown",
-                table_count=len(watched),
-                last_synced_at=now,
-                created_at=now,
-            ).on_conflict_do_update(
-                index_elements=["id"],
-                set_={
-                    "last_synced_at": now,
-                    "table_count": len(watched),
-                    "host": display_host,
-                },
-            )
-            await db.execute(stmt)
-            await db.commit()
-
-        # Check each table
-        all_ok = True
-        for table in watched:
-            result: TableCheckResult = await loop.run_in_executor(
-                None, self._check_table_sync, table
-            )
-            if result.status == "fail":
-                all_ok = False
-            await self._persist_table_result(result, now)
-
-            user_checks = col_checks_by_dataset.get(table, [])
-            if user_checks:
-                user_results = await loop.run_in_executor(
-                    None, self._run_user_checks_sync, table, user_checks
+        for source in all_sources:
+            async with AsyncSessionLocal() as db:
+                ds_result = await db.execute(
+                    select(Dataset).where(Dataset.source_id == source.id)
                 )
-                await self._persist_user_check_results(table, user_results, now)
+                db_datasets = ds_result.scalars().all()
 
-        # Update source status
-        async with AsyncSessionLocal() as db:
-            src = await db.get(Source, GIGLER_SOURCE_ID)
-            if src:
-                src.status = "pass" if all_ok else "warn"
-                src.last_synced_at = now
-                await db.commit()
+            if not db_datasets:
+                continue
+
+            watched = [d.id for d in db_datasets]
+
+            async with AsyncSessionLocal() as db:
+                cc_result = await db.execute(
+                    select(ColumnCheck).where(ColumnCheck.dataset_id.in_(watched))
+                )
+                all_col_checks = cc_result.scalars().all()
+
+            col_checks_by_dataset: dict[str, list[dict]] = {}
+            for cc in all_col_checks:
+                col_checks_by_dataset.setdefault(cc.dataset_id, []).append({
+                    "column_name": cc.column_name,
+                    "detector_slug": cc.detector_slug,
+                    "params": cc.params,
+                })
+
+            try:
+                adapter = await loop.run_in_executor(None, _make_adapter, source)
+                schema = _default_schema_for_source(source)
+            except Exception as exc:
+                log.error("adapter_creation_failed", source_id=source.id, error=str(exc))
+                continue
+
+            all_ok = True
+            for table in watched:
+                result = await loop.run_in_executor(
+                    None, _check_table_sync, adapter, schema, table, source.id
+                )
+                if result.status == "fail":
+                    all_ok = False
+                await self._persist_table_result(result, now)
+
+                user_checks = col_checks_by_dataset.get(table, [])
+                if user_checks:
+                    user_results = await loop.run_in_executor(
+                        None, _run_user_checks_sync, adapter, schema, table, user_checks
+                    )
+                    await self._persist_user_check_results(table, user_results, now)
+
+            async with AsyncSessionLocal() as db:
+                src = await db.get(Source, source.id)
+                if src:
+                    src.status = "pass" if all_ok else "warn"
+                    src.last_synced_at = now
+                    await db.commit()
 
     async def _persist_table_result(self, result: TableCheckResult, now: datetime) -> None:
         if AsyncSessionLocal is None:
             return
 
         async with AsyncSessionLocal() as db:
-            # Upsert Dataset
             stmt = pg_insert(Dataset).values(
                 id=result.table,
-                source_id=GIGLER_SOURCE_ID,
+                source_id=result.source_id,
                 schema_name=result.schema_name,
                 row_count=result.row_count,
                 column_count=result.column_count,
@@ -310,7 +342,6 @@ class GiglerService:
             )
             await db.execute(stmt)
 
-            # Insert CheckRun records for each column
             for chk in result.checks:
                 db.add(CheckRun(
                     dataset_id=result.table,
@@ -326,10 +357,8 @@ class GiglerService:
                     },
                     ran_at=now,
                 ))
-
             await db.commit()
 
-        # Update incidents: open new ones, resolve cleared ones
         await self._sync_incidents(result, now)
 
     async def _sync_incidents(self, result: TableCheckResult, now: datetime) -> None:
@@ -337,7 +366,6 @@ class GiglerService:
             return
 
         async with AsyncSessionLocal() as db:
-            # Load existing open incidents for this table
             existing_q = await db.execute(
                 select(Incident).where(
                     Incident.dataset_id == result.table,
@@ -354,7 +382,6 @@ class GiglerService:
                 if chk.verdict in ("fail", "warn")
             }
 
-            # Open new incidents
             for chk in result.checks:
                 if chk.verdict in ("fail", "warn") and chk.column not in existing_cols:
                     db.add(Incident(
@@ -367,7 +394,6 @@ class GiglerService:
                         opened_at=now,
                     ))
 
-            # Resolve cleared incidents
             for inc in existing:
                 if inc.column_name not in failing_cols:
                     inc.status = "resolved"
@@ -375,70 +401,9 @@ class GiglerService:
 
             await db.commit()
 
-
-    # ------------------------------------------------------------------
-    # User-defined detector checks
-    # ------------------------------------------------------------------
-
-    def _run_user_checks_sync(self, table: str, col_checks: list[dict]) -> list[dict]:
-        """Run user-defined detectors on sampled column data."""
-        from dqt.algorithms._registry import registry
-
-        adapter = self._get_adapter()
-        schema = self._find_schema()
-        results: list[dict] = []
-
-        try:
-            full_df = adapter.sample(schema, table, n=2000)
-        except Exception as exc:
-            log.error("sample_table_failed", table=table, error=str(exc))
-            return results
-
-        for cc in col_checks:
-            column = cc["column_name"]
-            slug = cc["detector_slug"]
-            params = cc["params"] or {}
-
-            if column not in full_df.columns:
-                log.warning("column_not_found", table=table, column=column)
-                continue
-
-            detector_cls = registry.get(slug)
-            if detector_cls is None:
-                log.warning("unknown_detector", slug=slug)
-                continue
-
-            col_df = full_df[[column]].dropna()
-            if len(col_df) < 20:
-                continue
-
-            mid = len(col_df) // 2
-            ref_df = col_df.iloc[:mid]
-            cur_df = col_df.iloc[mid:]
-
-            try:
-                detector = detector_cls(**params)
-                state = detector.fit(ref_df)
-                det_result = detector.score(cur_df, state)
-                verdict = (
-                    det_result.verdict.value
-                    if hasattr(det_result.verdict, "value")
-                    else str(det_result.verdict)
-                )
-                results.append({
-                    "column": column,
-                    "detector_slug": slug,
-                    "score": float(det_result.score),
-                    "verdict": verdict,
-                    "plain_english": det_result.plain_english,
-                    "details": det_result.details or {},
-                })
-            except Exception as exc:
-                log.error("user_detector_failed", slug=slug, column=column, error=str(exc))
-
-        return results
-
-    async def _persist_user_check_results(self, table: str, results: list[dict], now: datetime) -> None:
+    async def _persist_user_check_results(
+        self, table: str, results: list[dict], now: datetime
+    ) -> None:
         if not results or AsyncSessionLocal is None:
             return
         async with AsyncSessionLocal() as db:
@@ -456,13 +421,13 @@ class GiglerService:
             await db.commit()
 
     # ------------------------------------------------------------------
-    # Column profile (distribution)
+    # Column profile (distribution) -- for per-column detail page
     # ------------------------------------------------------------------
 
-    def _profile_column_sync(self, table: str, column: str) -> dict:
+    def _profile_column_sync(
+        self, adapter: Any, schema: str, table: str, column: str
+    ) -> dict:
         """Return value-distribution profile for a single column."""
-        adapter = self._get_adapter()
-        schema = self._find_schema()
         try:
             type_result = adapter._client.query(
                 f"SELECT type FROM system.columns "
@@ -480,7 +445,9 @@ class GiglerService:
             log.error("column_profile_failed", table=table, column=column, error=str(exc))
             return {"kind": "error", "column": column, "error": str(exc)}
 
-    def _numeric_profile(self, adapter: Any, schema: str, table: str, column: str, col_type: str) -> dict:
+    def _numeric_profile(
+        self, adapter: Any, schema: str, table: str, column: str, col_type: str
+    ) -> dict:
         stats_sql = (
             f"SELECT count(*) AS n,"
             f" toFloat64(min(`{column}`)) AS mn,"
@@ -496,7 +463,10 @@ class GiglerService:
         )
         result = adapter._client.query(stats_sql)
         if not result.result_rows or not result.result_rows[0][0]:
-            return {"kind": "numeric", "column": column, "data_type": col_type, "buckets": [], "stats": {}, "total_count": 0}
+            return {
+                "kind": "numeric", "column": column, "data_type": col_type,
+                "buckets": [], "stats": {}, "total_count": 0,
+            }
 
         row = result.result_rows[0]
         total = int(row[0])
@@ -512,10 +482,12 @@ class GiglerService:
         if hi <= lo:
             return {
                 "kind": "numeric", "column": column, "data_type": col_type,
-                "stats": {"min": mn, "max": mx, "mean": mean, "stddev": std,
-                          "p25": p25, "p50": p50, "p75": p75,
-                          "outlier_lower": fence_lo, "outlier_upper": fence_hi,
-                          "total_count": total, "outlier_low_count": 0, "outlier_high_count": 0},
+                "stats": {
+                    "min": mn, "max": mx, "mean": mean, "stddev": std,
+                    "p25": p25, "p50": p50, "p75": p75,
+                    "outlier_lower": fence_lo, "outlier_upper": fence_hi,
+                    "total_count": total, "outlier_low_count": 0, "outlier_high_count": 0,
+                },
                 "buckets": [{"lower": lo, "upper": lo, "count": total, "is_outlier": False}],
             }
 
@@ -536,8 +508,10 @@ class GiglerService:
             lower = lo + i * bucket_width
             upper = lo + (i + 1) * bucket_width
             is_outlier = upper <= fence_lo or lower >= fence_hi
-            buckets.append({"lower": round(lower, 6), "upper": round(upper, 6),
-                            "count": counts.get(i, 0), "is_outlier": is_outlier})
+            buckets.append({
+                "lower": round(lower, 6), "upper": round(upper, 6),
+                "count": counts.get(i, 0), "is_outlier": is_outlier,
+            })
 
         return {
             "kind": "numeric", "column": column, "data_type": col_type,
@@ -553,7 +527,9 @@ class GiglerService:
             "buckets": buckets,
         }
 
-    def _categorical_profile(self, adapter: Any, schema: str, table: str, column: str, col_type: str) -> dict:
+    def _categorical_profile(
+        self, adapter: Any, schema: str, table: str, column: str, col_type: str
+    ) -> dict:
         total_result = adapter._client.query(
             f"SELECT count(*) FROM `{schema}`.`{table}` WHERE isNotNull(`{column}`)"
         )

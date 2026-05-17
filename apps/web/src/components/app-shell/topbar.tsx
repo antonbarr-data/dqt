@@ -9,10 +9,10 @@ import { CommandPalette } from "./command-palette";
 import { AskModal } from "@/components/ask-modal/ask-modal";
 import { HelpModal } from "./help-modal";
 
-interface TestCounts { pass: number; warn: number; fail: number }
+interface CheckCounts { pass: number; warn: number; fail: number }
 
-function useTestCounts(): TestCounts | null {
-  const [counts, setCounts] = useState<TestCounts | null>(null);
+function useCheckCounts(): CheckCounts | null {
+  const [counts, setCounts] = useState<CheckCounts | null>(null);
   useEffect(() => {
     fetch("/api/v1/checks")
       .then((r) => r.ok ? r.json() : null)
@@ -36,7 +36,7 @@ export function Topbar() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const testCounts = useTestCounts();
+  const testCounts = useCheckCounts();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userInitials, setUserInitials] = useState("?");
@@ -138,7 +138,7 @@ export function Topbar() {
         >
           <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-2)", flexShrink: 0 }} />
           <span className="flex-1 text-left t-small" style={{ color: "var(--fg-2)" }}>
-            Search datasets, incidents, tests…
+            Search datasets, incidents, checks…
           </span>
           <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-2)", background: "var(--bg-3)", lineHeight: "18px" }}>
             /
@@ -158,12 +158,12 @@ export function Topbar() {
         </button>
       </div>
 
-      {/* tests status */}
+      {/* checks status */}
       <div
         className="flex items-center gap-3"
         title={testCounts ? `pass ${testCounts.pass} · warn ${testCounts.warn} · fail ${testCounts.fail}` : undefined}
       >
-        <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tests</span>
+        <span className="t-micro" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Checks</span>
         {testCounts ? (
           <>
             <span className="flex items-center gap-1">

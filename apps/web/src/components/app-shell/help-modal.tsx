@@ -21,7 +21,7 @@ const NAV = [
   { key: "Metrics", href: "/metrics" },
   { key: "Causality", href: "/causality" },
   { key: "Incidents", href: "/incidents" },
-  { key: "Tests", href: "/tests" },
+  { key: "Checks", href: "/checks" },
 ];
 
 export function HelpModal({ open, onClose }: HelpModalProps) {

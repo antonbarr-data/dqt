@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.gigler import Dataset
-from dqt_server.gigler_service import gigler_service
+from dqt_server.models.gigler import Dataset, Source
+from dqt_server.gigler_service import _make_adapter, _default_schema_for_source
 from dqt.checks.suggest import ColumnProfile, suggest_checks_for_column
 
 router = APIRouter(prefix="/api/v1", tags=["suggest"])
@@ -73,14 +73,20 @@ async def suggest_checks(
     d = await db.get(Dataset, dataset_id)
     if d is None:
         raise HTTPException(404, detail=f"Dataset '{dataset_id}' not found")
+    s = await db.get(Source, d.source_id)
 
     loop = asyncio.get_event_loop()
-    try:
-        profile_data = await loop.run_in_executor(
-            None, gigler_service._profile_column_sync, dataset_id, column
-        )
-    except Exception:
-        profile_data = {}
+    profile_data: dict = {}
+    if s is not None:
+        try:
+            from dqt_server.gigler_service import gigler_service as _gs
+            adapter = await loop.run_in_executor(None, _make_adapter, s)
+            schema = _default_schema_for_source(s)
+            profile_data = await loop.run_in_executor(
+                None, _gs._profile_column_sync, adapter, schema, dataset_id, column
+            )
+        except Exception:
+            pass
 
     profile = _build_profile(dataset_id, column, profile_data)
     suggestions = suggest_checks_for_column(profile, use_llm=use_llm)

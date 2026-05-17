@@ -12,13 +12,14 @@ from dqt_server.auth.router import router as auth_router
 from dqt_server.auth.service import SEEDED_SYSADMIN_EMAIL
 from dqt_server.dashboard import router as dashboard_router
 from dqt_server.db.engine import AsyncSessionLocal, Base, engine
+from dqt_server.ref_data import CREATE_REF_TABLES_SQL, ISO_COUNTRIES, ISO_CURRENCIES
 
 log = structlog.get_logger(__name__)
 
 
 async def _setup_db() -> None:
     if engine is None:
-        log.warning("DATABASE_URL not set — skipping DB setup")
+        log.warning("DATABASE_URL not set -- skipping DB setup")
         return
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -31,6 +32,42 @@ async def _setup_db() -> None:
                 await conn.execute(text(stmt))
             except Exception:
                 pass
+        # Reference tables (idempotent)
+        for stmt in CREATE_REF_TABLES_SQL.strip().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                try:
+                    await conn.execute(text(stmt))
+                except Exception:
+                    pass
+    # Seed reference data (upsert, skip if present)
+    async with AsyncSessionLocal() as db:
+        count = await db.scalar(text("SELECT COUNT(*) FROM ref_countries"))
+        if not count:
+            for alpha2, alpha3, name in ISO_COUNTRIES:
+                await db.execute(
+                    text(
+                        "INSERT INTO ref_countries (alpha2, alpha3, name) VALUES (:a2, :a3, :n) "
+                        "ON CONFLICT (alpha2) DO NOTHING"
+                    ),
+                    {"a2": alpha2, "a3": alpha3, "n": name},
+                )
+            await db.commit()
+            log.info("seeded_ref_countries", count=len(ISO_COUNTRIES))
+
+        count = await db.scalar(text("SELECT COUNT(*) FROM ref_currencies"))
+        if not count:
+            for code, numeric, name, decimals in ISO_CURRENCIES:
+                await db.execute(
+                    text(
+                        "INSERT INTO ref_currencies (code, numeric, name, decimals) "
+                        "VALUES (:c, :n, :nm, :d) ON CONFLICT (code) DO NOTHING"
+                    ),
+                    {"c": code, "n": numeric, "nm": name, "d": decimals},
+                )
+            await db.commit()
+            log.info("seeded_ref_currencies", count=len(ISO_CURRENCIES))
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.email == SEEDED_SYSADMIN_EMAIL))
         if result.scalar_one_or_none() is None:

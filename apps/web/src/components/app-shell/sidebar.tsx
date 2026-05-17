@@ -52,7 +52,7 @@ const NAV_GROUPS = [
     label: "Watch",
     items: [
       { label: "Incidents", href: "/incidents", icon: AlertTriangle, count: null, countFail: true },
-      { label: "Tests", href: "/tests", icon: CheckSquare, count: null },
+      { label: "Checks", href: "/checks", icon: CheckSquare, count: null },
     ],
   },
   {

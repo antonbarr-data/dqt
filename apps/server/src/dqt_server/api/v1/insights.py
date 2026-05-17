@@ -16,7 +16,6 @@ from dqt_server.db.engine import get_db
 from dqt_server.models.gigler import MetricDefinition
 
 from dqt.metrics import Metric, MetricKind, MetricRegistry
-from dqt_server.gigler_service import GIGLER_SOURCE_ID, GIGLER_TABLES
 
 router = APIRouter(prefix="/api/v1", tags=["insights"])
 
@@ -65,29 +64,6 @@ async def _load_registry_from_db(db: AsyncSession) -> MetricRegistry:
     global _registry
     result = await db.execute(select(MetricDefinition))
     rows = list(result.scalars().all())
-    if not rows:
-        from dqt_server.models.gigler import Dataset as DatasetModel
-        ds_result = await db.execute(
-            select(DatasetModel).where(DatasetModel.source_id == GIGLER_SOURCE_ID)
-        )
-        datasets = ds_result.scalars().all()
-        tables = [d.id for d in datasets] or list(GIGLER_TABLES)
-        now = datetime.now(timezone.utc)
-        for table in tables:
-            fqn = f"{GIGLER_SOURCE_ID}.default.{table}.quality"
-            m = MetricDefinition(
-                fqn=fqn,
-                display_name=f"{table} quality",
-                kind="ratio",
-                dataset=table,
-                description=f"Overall data quality score for {table}",
-                owners=["data-team"],
-                tags=["quality"],
-                created_at=now,
-            )
-            db.add(m)
-            rows.append(m)
-        await db.commit()
 
     metrics = [
         Metric(
@@ -109,24 +85,8 @@ async def _load_registry_from_db(db: AsyncSession) -> MetricRegistry:
 def _get_registry() -> MetricRegistry:
     global _registry
     if _registry is None:
-        _registry = _build_registry_sync()
+        _registry = MetricRegistry([])
     return _registry
-
-
-def _build_registry_sync() -> MetricRegistry:
-    metrics = [
-        Metric(
-            fqn=f"{GIGLER_SOURCE_ID}.default.{table}.quality",
-            display_name=f"{table} quality",
-            kind="ratio",
-            dataset=table,
-            description=f"Overall data quality score for {table}",
-            owners=["data-team"],
-            tags=["quality"],
-        )
-        for table in GIGLER_TABLES
-    ]
-    return MetricRegistry(metrics)
 
 
 def _metric_to_dict(m: Metric) -> dict:

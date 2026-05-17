@@ -1,8 +1,7 @@
-"""REST API routes for Gigler ClickHouse data — sources, datasets, checks, incidents."""
+"""REST API routes for sources, datasets, checks, incidents."""
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -13,8 +12,11 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.gigler_service import GIGLER_SOURCE_ID, GIGLER_TABLES, gigler_service
-from dqt_server.models.gigler import CheckRun, Dataset, Incident, Source
+from dqt_server.gigler_service import (
+    _make_adapter, _default_schema_for_source, _list_tables_for_source_sync,
+    gigler_service,
+)
+from dqt_server.models.gigler import CheckRun, ColumnCheck, Dataset, Incident, Source
 
 _STEP_DISPLAY = {
     "tcp_reach": "TCP Reach",
@@ -59,6 +61,7 @@ def _run_health_check_sync(
         ],
         "passed": hc.passed,
     }
+
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["gigler"])
@@ -226,20 +229,17 @@ async def list_source_tables(source_id: str, db: AsyncSession = Depends(get_db))
     if s is None:
         raise HTTPException(404, detail=f"Source '{source_id}' not found")
 
-    # Currently watched tables
     result = await db.execute(select(Dataset).where(Dataset.source_id == source_id))
     watched = {d.id for d in result.scalars().all()}
 
-    # All available tables from the warehouse
     loop = asyncio.get_event_loop()
     try:
-        all_tables = await loop.run_in_executor(None, gigler_service._list_all_tables_sync)
+        all_tables = await loop.run_in_executor(None, _list_tables_for_source_sync, s)
     except Exception:
-        all_tables = [{"schema": "default", "name": t} for t in sorted(watched)]
+        all_tables = [{"schema": _default_schema_for_source(s), "name": t} for t in sorted(watched)]
 
-    # If warehouse returned nothing, fall back to watched
     if not all_tables:
-        all_tables = [{"schema": "default", "name": t} for t in sorted(watched)]
+        all_tables = [{"schema": _default_schema_for_source(s), "name": t} for t in sorted(watched)]
 
     return [
         {"name": t["name"], "schema": t["schema"], "watched": t["name"] in watched}
@@ -258,18 +258,15 @@ async def update_source_tables(
         raise HTTPException(404, detail=f"Source '{source_id}' not found")
 
     new_tables = set(body.tables)
-
     result = await db.execute(select(Dataset).where(Dataset.source_id == source_id))
     current_datasets = {d.id: d for d in result.scalars().all()}
     current_tables = set(current_datasets.keys())
 
-    # Remove deselected (cascade deletes check_runs / incidents)
     for table_id in (current_tables - new_tables):
         await db.delete(current_datasets[table_id])
 
-    # Add newly selected
     now = datetime.now(timezone.utc)
-    schema = gigler_service._schema or "default"
+    schema = _default_schema_for_source(s)
     for table_name in (new_tables - current_tables):
         db.add(Dataset(
             id=table_name,
@@ -283,11 +280,141 @@ async def update_source_tables(
     s.table_count = len(new_tables)
     await db.commit()
 
-    # Trigger refresh for any newly added tables
     if new_tables - current_tables:
         asyncio.create_task(gigler_service.refresh())
 
     return {"source_id": source_id, "tables": sorted(new_tables)}
+
+
+# ------------------------------------------------------------------
+# Suggest checks for a source (used by wizard step 4)
+# ------------------------------------------------------------------
+
+class SuggestChecksBody(BaseModel):
+    tables: list[str]
+
+
+def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
+    """Get AI-powered check suggestions for selected tables in a source."""
+    from dqt.checks.suggest import ColumnProfile, suggest_checks_for_column
+
+    results: list[dict] = []
+    try:
+        adapter = _make_adapter(source)
+        schema = _default_schema_for_source(source)
+    except Exception as exc:
+        log.warning("suggest_adapter_failed", source_id=source.id, error=str(exc))
+        return results
+
+    for table in tables:
+        try:
+            cols = adapter.describe_columns(schema, table)
+        except Exception as exc:
+            log.warning("suggest_describe_failed", table=table, error=str(exc))
+            continue
+
+        for col in cols:
+            name_lower = col.name.lower()
+            profile = ColumnProfile(
+                name=col.name,
+                data_type=col.data_type,
+                null_fraction=0.0,
+                distinct_count=0,
+                sample_values=[],
+                min_value=None,
+                max_value=None,
+                is_likely_pk=name_lower in ("id", f"{table}_id", "pk"),
+                is_likely_fk=(
+                    name_lower.endswith("_id")
+                    and name_lower not in ("id",)
+                    and name_lower != f"{table}_id"
+                ),
+                is_likely_enum=False,
+                is_likely_email="email" in name_lower,
+                is_likely_timestamp=any(
+                    t in col.data_type.lower()
+                    for t in ("timestamp", "datetime", "date")
+                ) or any(k in name_lower for k in ("_at", "_date", "timestamp", "created", "updated")),
+                is_likely_currency=any(
+                    k in name_lower
+                    for k in ("amount", "price", "revenue", "cost", "fee", "total", "usd", "eur")
+                ),
+                is_likely_country=name_lower in ("country", "country_code", "country_iso"),
+                sample_size_used=0,
+            )
+            suggestions = suggest_checks_for_column(profile, use_llm=True)
+            for sugg in suggestions:
+                tier = (
+                    "essential" if sugg.confidence >= 0.80
+                    else "recommended" if sugg.confidence >= 0.60
+                    else "full_coverage"
+                )
+                results.append({
+                    "table": table,
+                    "column": col.name,
+                    "detector_slug": sugg.detector_slug,
+                    "params": sugg.params,
+                    "rationale": sugg.rationale,
+                    "confidence": round(sugg.confidence, 3),
+                    "tier": tier,
+                })
+
+    return results
+
+
+@router.post("/sources/{source_id}/suggest-checks")
+async def suggest_checks_for_source(
+    source_id: str,
+    body: SuggestChecksBody,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    s = await db.get(Source, source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{source_id}' not found")
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _suggest_checks_sync, s, body.tables)
+
+
+# ------------------------------------------------------------------
+# Column checks (user-defined)
+# ------------------------------------------------------------------
+
+class ColumnCheckBatchItem(BaseModel):
+    dataset_id: str
+    column_name: str
+    detector_slug: str
+    params: dict = {}
+    rationale: str = ""
+
+
+class ColumnCheckBatchBody(BaseModel):
+    checks: list[ColumnCheckBatchItem]
+
+
+@router.post("/column-checks/batch", status_code=201)
+async def create_column_checks_batch(
+    body: ColumnCheckBatchBody,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    now = datetime.now(timezone.utc)
+    created = 0
+    for item in body.checks:
+        check_id = f"{item.dataset_id}.{item.column_name}.{item.detector_slug}"
+        existing = await db.get(ColumnCheck, check_id)
+        if existing is None:
+            db.add(ColumnCheck(
+                id=check_id,
+                dataset_id=item.dataset_id,
+                column_name=item.column_name,
+                detector_slug=item.detector_slug,
+                params=item.params,
+                rationale=item.rationale,
+                created_at=now,
+                updated_at=now,
+            ))
+            created += 1
+    await db.commit()
+    return {"created": created}
 
 
 # ------------------------------------------------------------------
@@ -306,7 +433,6 @@ async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) -> di
     if d is None:
         raise HTTPException(404, detail=f"Dataset '{dataset_id}' not found")
 
-    # Latest check run per column
     runs_q = await db.execute(
         select(CheckRun)
         .where(CheckRun.dataset_id == dataset_id)
@@ -315,7 +441,6 @@ async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) -> di
     )
     runs = runs_q.scalars().all()
 
-    # Deduplicate to latest run per column
     seen: set[str | None] = set()
     latest_runs: list[CheckRun] = []
     for r in runs:
@@ -346,7 +471,6 @@ async def list_checks(
     if verdict:
         q = q.where(CheckRun.verdict == verdict)
 
-    # Return latest per (dataset, column) pair
     result = await db.execute(q.limit(1000))
     runs = result.scalars().all()
 
@@ -363,7 +487,7 @@ async def list_checks(
 
 @router.post("/checks/refresh")
 async def refresh_checks() -> dict:
-    """Trigger a non-blocking refresh of all ClickHouse checks."""
+    """Trigger a non-blocking refresh of all warehouse checks."""
     asyncio.create_task(gigler_service.refresh())
     return {"status": "refresh_started"}
 
@@ -396,9 +520,14 @@ async def get_column_profile(
     d = await db.get(Dataset, dataset_id)
     if d is None:
         raise HTTPException(404, detail=f"Dataset '{dataset_id}' not found")
+    s = await db.get(Source, d.source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{d.source_id}' not found")
+    schema = _default_schema_for_source(s)
     loop = asyncio.get_event_loop()
+    adapter = await loop.run_in_executor(None, _make_adapter, s)
     return await loop.run_in_executor(
-        None, gigler_service._profile_column_sync, dataset_id, column
+        None, gigler_service._profile_column_sync, adapter, schema, dataset_id, column
     )
 
 
@@ -425,7 +554,6 @@ async def overview(db: AsyncSession = Depends(get_db)) -> dict:
     datasets_q = await db.execute(select(Dataset).order_by(Dataset.id))
     datasets = datasets_q.scalars().all()
 
-    # Activity: latest 8 incidents
     activity_q = await db.execute(
         select(Incident).order_by(desc(Incident.opened_at)).limit(8)
     )
@@ -440,7 +568,6 @@ async def overview(db: AsyncSession = Depends(get_db)) -> dict:
             "kind": kind,
         })
 
-    # If no real activity yet, add a placeholder
     if not activity_items:
         activity_items = [
             {"time": "just now", "text": "No incidents recorded yet", "kind": "info"}
@@ -449,7 +576,7 @@ async def overview(db: AsyncSession = Depends(get_db)) -> dict:
     return {
         "kpis": {
             "open_incidents": open_count,
-            "datasets_watched": dataset_count or len(GIGLER_TABLES),
+            "datasets_watched": dataset_count,
             "checks_running": check_count,
             "auto_explained": 0,
         },

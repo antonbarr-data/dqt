@@ -102,7 +102,7 @@ export default async function DatasetDetailPage({
         {[
           { label: "Rows", value: fmtRows(dataset.row_count) },
           { label: "Columns", value: String(dataset.column_count ?? "--") },
-          { label: "Tests", value: String(dataset.check_count) },
+          { label: "Checks", value: String(dataset.check_count) },
           { label: "Last run", value: dataset.last_run },
         ].map((k) => (
           <div key={k.label} className="px-5 py-4" style={{ background: "var(--bg-1)" }}>
@@ -200,7 +200,7 @@ export default async function DatasetDetailPage({
                   className="px-3 py-4 t-small text-center"
                   style={{ color: "var(--fg-3)" }}
                 >
-                  {filter ? `No ${filter} tests.` : "No tests yet."}
+                  {filter ? `No ${filter} checks.` : "No checks yet."}
                 </td>
               </tr>
             ) : (

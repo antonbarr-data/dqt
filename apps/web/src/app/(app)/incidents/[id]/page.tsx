@@ -283,11 +283,11 @@ baseline: 14d`;
                 </Link>
               )}
               <Link
-                href="/tests"
+                href="/checks"
                 className="flex items-center justify-between px-4 py-2.5 hover:bg-bg-2 transition-colors"
                 style={{ color: "var(--fg-0)" }}
               >
-                <span className="t-small">View all tests</span>
+                <span className="t-small">View all checks</span>
                 <span style={{ color: "var(--accent)", fontSize: 12 }}>→</span>
               </Link>
             </div>
