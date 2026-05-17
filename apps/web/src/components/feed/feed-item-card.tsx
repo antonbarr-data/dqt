@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SubscribeButton } from "@/components/subscriptions/subscribe-button";
 
 interface EvidenceChip {
   label: string;
@@ -69,6 +70,7 @@ export function FeedItemCard({
               style={{ color: "var(--accent)" }}>
           Dig deeper
         </Link>
+        <SubscribeButton metricFqn={metric_fqn} />
         <button
           className="t-small hover:opacity-70"
           style={{ color: "var(--fg-3)" }}
