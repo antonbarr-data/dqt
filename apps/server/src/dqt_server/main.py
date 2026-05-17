@@ -51,6 +51,8 @@ from dqt_server.api.v1.search import router as search_router
 from dqt_server.api.v1.insights import router as insights_router
 from dqt_server.api.v1.feed import router as feed_router
 from dqt_server.api.v1.ask import router as ask_router
+from dqt_server.api.v1.subscriptions import router as subscriptions_router
+from dqt_server.api.v1.trigger import router as trigger_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -59,6 +61,8 @@ app.include_router(search_router)   # BEFORE insights -- /metrics/search before 
 app.include_router(insights_router)
 app.include_router(feed_router)
 app.include_router(ask_router)
+app.include_router(subscriptions_router)
+app.include_router(trigger_router)
 
 
 @app.get("/health", tags=["ops"])
