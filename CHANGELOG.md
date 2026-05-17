@@ -8,6 +8,28 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-05-17 (Phase 2, Milestone 5)
+
+### Added (dqt library)
+- `LineageGraph.subgraph(root, direction, depth)` -- extract a depth-bounded subgraph around any node; direction is "upstream", "downstream", or "both".
+- `LineageGraph.shortest_path(source, target)` -- BFS shortest directed path between two nodes; returns node-id list or None.
+- `CausalReviewEdge` -- dataclass representing a proposed causal edge pending HITL review (cause, effect, p_value, evidence_strength, status, reviewer, notes, weight_delta).
+- `ReviewStore` -- in-memory store for causal edge review decisions with accept/reject, list_pending, list_by_status, and stats methods.
+
+### Added (server)
+- `GET /api/v1/lineage/graph` -- subgraph API (root, direction, depth, include_causal query params).
+- `GET /api/v1/lineage/path` -- BFS shortest-path API between two metric nodes.
+- `GET /api/v1/causal/review/queue` -- paginated pending causal edge review queue.
+- `POST /api/v1/causal/review/{edge_id}` -- accept or reject a proposed causal edge.
+- `GET /api/v1/causal/review/stats` -- accept rate and review velocity stats.
+
+### Added (web)
+- Metric lineage explorer (`/metrics/[fqn]/lineage`) -- pure-SVG DAG with depth slider (1-5), direction-aware BFS layout, edge detail side panel, causal vs lineage edge styling.
+- Causal reviewer queue (`/causal/review`) -- two-column layout with edge list + quick accept/reject icons on the left and a detail panel with notes textarea on the right.
+- Causality page (`/causality`) updated from "Coming soon." to entry point with link to reviewer queue.
+- Help modal (Ctrl+/) -- keyboard shortcut cheat-sheet and navigation links.
+- Empty, error, and loading skeleton states added to overview, datasets, incidents, and metrics list pages.
+
 ## [1.1.0-RC] - 2026-05-16 (Phase 2, Milestone 1)
 
 ### Added (dqt library)
