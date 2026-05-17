@@ -22,14 +22,19 @@ type ChannelFilter = "all" | "data" | "business" | "mixed";
 export default function OverviewPage() {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ChannelFilter>("all");
   const [lookback, setLookback] = useState("24h");
 
   const loadFeed = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const resp = await fetch(`/api/v1/feed/today?lookback=${lookback}&limit=20`);
       if (resp.ok) setItems(await resp.json());
+      else setError("Failed to load feed.");
+    } catch {
+      setError("Failed to load feed.");
     } finally {
       setLoading(false);
     }
@@ -90,14 +95,19 @@ export default function OverviewPage() {
           </button>
         ))}
       </div>
-      {loading ? (
+      {error && (
+        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
+          <p className="t-small" style={{ color: "var(--fail)" }}>{error}</p>
+        </div>
+      )}
+      {!error && loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="border border-line p-4 h-32 animate-pulse"
                  style={{ background: "var(--bg-1)" }} />
           ))}
         </div>
-      ) : visible.length === 0 ? (
+      ) : !error && visible.length === 0 ? (
         <div className="border border-line p-12 text-center" style={{ background: "var(--bg-1)" }}>
           <p className="t-small" style={{ color: "var(--fg-3)" }}>
             No significant movements in the last {lookback}.

@@ -7,6 +7,7 @@ import { getToken, decodeToken, clearToken } from "@/lib/auth";
 import Image from "next/image";
 import { CommandPalette } from "./command-palette";
 import { AskModal } from "@/components/ask-modal/ask-modal";
+import { HelpModal } from "./help-modal";
 
 interface TestCounts { pass: number; warn: number; fail: number }
 
@@ -34,6 +35,7 @@ export function Topbar() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const testCounts = useTestCounts();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -76,6 +78,9 @@ export function Topbar() {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setAskOpen((v) => !v);
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
       } else if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey && !inInput) {
         e.preventDefault();
         setPaletteOpen(true);
@@ -111,6 +116,7 @@ export function Topbar() {
     <>
     <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     <AskModal open={askOpen} onClose={() => setAskOpen(false)} />
+    <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     <header
       className="flex items-center gap-3 border-b border-line"
       style={{ height: 44, background: "var(--bg-1)", flexShrink: 0, paddingRight: 16 }}

@@ -20,10 +20,18 @@ export default async function IncidentsPage({
 }) {
   const { status = "open" } = await searchParams;
 
-  const [open, all] = await Promise.all([
-    serverFetch<IncidentRow[]>(`/incidents?status=open`, 15),
-    serverFetch<IncidentRow[]>(`/incidents?status=${status}`, 15),
-  ]);
+  let open: IncidentRow[] | null = null;
+  let all: IncidentRow[] | null = null;
+  let fetchError: string | null = null;
+
+  try {
+    [open, all] = await Promise.all([
+      serverFetch<IncidentRow[]>(`/incidents?status=open`, 15),
+      serverFetch<IncidentRow[]>(`/incidents?status=${status}`, 15),
+    ]);
+  } catch {
+    fetchError = "Failed to load incidents.";
+  }
 
   const incidents = all ?? [];
   const openCount = open?.length ?? 0;
@@ -77,35 +85,44 @@ export default async function IncidentsPage({
         ))}
       </div>
 
+      {/* error state */}
+      {fetchError && (
+        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
+          <p className="t-small" style={{ color: "var(--fail)" }}>{fetchError}</p>
+        </div>
+      )}
+
       {/* table */}
-      <div className="border border-line" style={{ background: "var(--bg-1)" }}>
-        {incidents.length === 0 ? (
-          <div className="px-4 py-12 text-center t-small" style={{ color: "var(--fg-3)" }}>
-            No {status} incidents
-          </div>
-        ) : (
-          <table className="w-full" style={{ borderCollapse: "collapse" }}>
-            <thead>
-              <tr className="border-b border-line">
-                {["", "Severity", "Dataset", "Column", "Detector", "Message", "Opened"].map((h) => (
-                  <th
-                    key={h}
-                    className="px-3 py-2 text-left t-micro"
-                    style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}
-                  >
-                    {h}
-                  </th>
+      {!fetchError && (
+        <div className="border border-line" style={{ background: "var(--bg-1)" }}>
+          {incidents.length === 0 ? (
+            <div className="px-4 py-12 text-center t-small" style={{ color: "var(--fg-3)" }}>
+              No {status} incidents
+            </div>
+          ) : (
+            <table className="w-full" style={{ borderCollapse: "collapse" }}>
+              <thead>
+                <tr className="border-b border-line">
+                  {["", "Severity", "Dataset", "Column", "Detector", "Message", "Opened"].map((h) => (
+                    <th
+                      key={h}
+                      className="px-3 py-2 text-left t-micro"
+                      style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {incidents.map((inc) => (
+                  <IncidentTableRow key={inc.id} inc={inc} />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {incidents.map((inc) => (
-                <IncidentTableRow key={inc.id} inc={inc} />
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
 }
