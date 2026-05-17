@@ -48,11 +48,13 @@ app.add_middleware(
 
 from dqt_server.api.v1.suggest import router as suggest_router
 from dqt_server.api.v1.insights import router as insights_router
+from dqt_server.api.v1.feed import router as feed_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
 app.include_router(suggest_router)
 app.include_router(insights_router)
+app.include_router(feed_router)
 
 
 @app.get("/health", tags=["ops"])
