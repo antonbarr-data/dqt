@@ -8,6 +8,11 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-05-17
+
+### Added (dqt library)
+- `ReviewStore.get(edge_id)` -- look up a single proposed causal edge by id; returns `None` if not found.
+
 ## [1.3.0] - 2026-05-17 (Phase 2, Milestone 5)
 
 ### Added (dqt library)
