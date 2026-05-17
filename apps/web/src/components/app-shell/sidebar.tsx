@@ -18,15 +18,19 @@ import {
   ScrollText,
   Phone,
   ClipboardList,
+  MessageSquare,
+  Search,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { isSysAdmin } from "@/lib/auth";
 
 const NAV_GROUPS = [
   {
-    label: null, // no section header for the lone Overview item
+    label: null, // no section header for the top items
     items: [
       { label: "Overview", href: "/overview", icon: LayoutDashboard, count: null },
+      { label: "Ask", href: "/ask", icon: MessageSquare, count: null },
+      { label: "Search", href: "/search", icon: Search, count: null },
     ],
   },
   {
