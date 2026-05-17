@@ -9,6 +9,7 @@ Ranking formula: score = magnitude * significance * executive_boost * novelty * 
 """
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, Literal
@@ -36,11 +37,13 @@ class FeedItem:
     estimated_business_contribution: tuple[float, float]
     evidence_chips: list[EvidenceChip] = field(default_factory=list)
     reviewed: bool = False
-    item_id: str = field(default_factory=lambda: __import__("uuid").uuid4().hex[:12])
+    item_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
 
 
 def rank(items: list[FeedItem], *, window: timedelta, limit: int = 20) -> list[FeedItem]:
     """Return items sorted by importance score, truncated to limit."""
+    # window reserved for M4 time-based novelty decay
+    _ = window
     def score(item: FeedItem) -> float:
         magnitude = min(1.0, abs(item.observed_change))
         executive_boost = 1.5 if item.executive_tier else 1.0
