@@ -13,6 +13,8 @@ The following are contractually stable through all v1.x releases:
 - `dqt.Check`, `dqt.Runner`, `dqt.MemoryStore`, `dqt.PostgresStore`, `dqt.Verdict`
 - Every `dqt.algorithms.<group>` module's exported detector classes (all 64 slugs registered in `_registry`)
 - `dqt.causality.pcmci_pairwise`, `dqt.causality.granger_pairwise`
+- `dqt.causality.CausalReviewEdge`, `dqt.causality.ReviewStore` (stable from v1.3.0)
+- `dqt.lineage.LineageGraph`, `dqt.lineage.LineageNode`, `dqt.lineage.LineageEdge` (stable from v1.3.0)
 - `dqt.lineage.from_dbt_manifest`
 - `dqt.store.proof.compute_proof`, `dqt.store.proof.verify_proof`
 - `dqt.lineage.dedup.deduplicate_alerts`, `dqt.lineage.explain.explain_incident`
@@ -90,4 +92,4 @@ The labeled-fixture CI eval suite established in v0.4.3 runs on every commit. v1
 
 ---
 
-*Last updated: 2026-05-14. See [CHANGELOG.md](CHANGELOG.md) for full release history.*
+*Last updated: 2026-05-17. See [CHANGELOG.md](CHANGELOG.md) for full release history.*

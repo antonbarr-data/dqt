@@ -6,6 +6,8 @@ from dqt_cli.commands.dashboard import dashboard_command
 from dqt_cli.commands.demo import reset_command, seed_command
 from dqt_cli.commands.healthcheck import healthcheck_command
 from dqt_cli.commands.list_detectors import list_detectors_command
+from dqt_cli.commands.metrics_serve import metrics_serve_command
+from dqt_cli.commands.migrate import migrate_command
 from dqt_cli.commands.prometheus import prometheus_command
 from dqt_cli.commands.report import report_command
 from dqt_cli.commands.run import run_command
@@ -16,6 +18,8 @@ app.command("run")(run_command)
 app.command("dashboard")(dashboard_command)
 app.command("healthcheck")(healthcheck_command)
 app.command("list-detectors")(list_detectors_command)
+app.command("metrics")(metrics_serve_command)
+app.command("migrate")(migrate_command)
 app.command("prometheus-exporter")(prometheus_command)
 app.command("report")(report_command)
 app.add_typer(wiki_app, name="wiki")

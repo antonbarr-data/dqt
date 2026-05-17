@@ -56,6 +56,9 @@ from dqt_server.api.v1.subscriptions import router as subscriptions_router
 from dqt_server.api.v1.trigger import router as trigger_router
 from dqt_server.api.v1.lineage import router as lineage_router
 from dqt_server.api.v1.causal_review import router as causal_review_router
+from dqt_server.api.v1.checks import router as checks_router
+from dqt_server.api.v1.detectors import router as detectors_router
+from dqt_server.api.v1.causal_compute import router as causal_compute_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -69,6 +72,9 @@ app.include_router(subscriptions_router)
 app.include_router(trigger_router)
 app.include_router(lineage_router)
 app.include_router(causal_review_router)
+app.include_router(checks_router)
+app.include_router(detectors_router)
+app.include_router(causal_compute_router)
 
 
 @app.get("/health", tags=["ops"])

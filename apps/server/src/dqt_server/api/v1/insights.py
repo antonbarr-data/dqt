@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Request
@@ -15,6 +16,43 @@ router = APIRouter(prefix="/api/v1", tags=["insights"])
 
 _pinned: set[str] = set()
 _registry: MetricRegistry | None = None
+
+# Narrative cache keyed by (fqn, lookback_days); TTL 6h
+_CACHE_TTL_SECS = 6 * 3600
+
+
+@dataclass
+class _CacheEntry:
+    payload: dict
+    expires_at: datetime
+
+
+_narrative_cache: dict[str, _CacheEntry] = {}
+
+
+def _cache_key(fqn: str, lookback_days: int) -> str:
+    return f"{fqn}:{lookback_days}"
+
+
+def _cache_get(fqn: str, lookback_days: int) -> dict | None:
+    key = _cache_key(fqn, lookback_days)
+    entry = _narrative_cache.get(key)
+    if entry and datetime.now(timezone.utc) < entry.expires_at:
+        return entry.payload
+    return None
+
+
+def _cache_set(fqn: str, lookback_days: int, payload: dict) -> None:
+    key = _cache_key(fqn, lookback_days)
+    _narrative_cache[key] = _CacheEntry(
+        payload=payload,
+        expires_at=datetime.now(timezone.utc) + timedelta(seconds=_CACHE_TTL_SECS),
+    )
+
+
+def _cache_invalidate(fqn: str) -> None:
+    for k in [k for k in _narrative_cache if k.startswith(f"{fqn}:")]:
+        _narrative_cache.pop(k, None)
 
 
 def _get_registry() -> MetricRegistry:
@@ -98,7 +136,7 @@ async def pin_metric(fqn: str) -> dict:
 
 @router.post("/metrics/{fqn:path}/explain")
 async def explain_metric_sse(fqn: str, request: Request) -> StreamingResponse:
-    """Stream a MovementExplanation in 5 SSE chunks."""
+    """Stream a MovementExplanation in 5 SSE chunks. Results cached 6h."""
     registry = _get_registry()
     metric = registry.get(fqn)
     if metric is None:
@@ -106,6 +144,7 @@ async def explain_metric_sse(fqn: str, request: Request) -> StreamingResponse:
 
     body = await request.json() if await request.body() else {}
     lookback_days = int(body.get("lookback_days", 7))
+    force_refresh = bool(body.get("force_refresh", False))
 
     async def event_stream():
         from dqt.insights.explain import explain_movement
@@ -114,7 +153,6 @@ async def explain_metric_sse(fqn: str, request: Request) -> StreamingResponse:
         now = datetime.now(timezone.utc)
         window_start = now - timedelta(days=lookback_days)
 
-        # Use an in-memory store for now (no Postgres wired in this endpoint yet)
         store = MemoryStore()
 
         def _emit(event_type: str, data: dict) -> str:
@@ -124,17 +162,28 @@ async def explain_metric_sse(fqn: str, request: Request) -> StreamingResponse:
                                "window_end": now.isoformat()})
         await asyncio.sleep(0)
 
+        # Return cached result if available and not forcing refresh
+        cached = None if force_refresh else _cache_get(fqn, lookback_days)
+        if cached:
+            yield _emit("summary", cached["summary"])
+            await asyncio.sleep(0)
+            yield _emit("channel_a", cached["channel_a"])
+            await asyncio.sleep(0)
+            yield _emit("channel_b", cached["channel_b"])
+            await asyncio.sleep(0)
+            yield _emit("ruled_out", cached["ruled_out"])
+            await asyncio.sleep(0)
+            yield _emit("done", cached["done"])
+            return
+
         try:
             expl = explain_movement(
                 fqn, (window_start, now),
                 store=store,
                 use_llm=True,
             )
-            yield _emit("summary", {"text": expl.summary_paragraph,
-                                     "primary_channel": expl.primary_channel})
-            await asyncio.sleep(0)
-
-            yield _emit("channel_a", {
+            summary_chunk = {"text": expl.summary_paragraph, "primary_channel": expl.primary_channel}
+            channel_a_chunk = {
                 "issues": [
                     {"detector_slug": i.detector_slug, "verdict": i.verdict,
                      "contribution_low": i.contribution_low, "contribution_high": i.contribution_high,
@@ -142,10 +191,8 @@ async def explain_metric_sse(fqn: str, request: Request) -> StreamingResponse:
                     for i in expl.data_issues
                 ],
                 "estimated_contribution": list(expl.estimated_data_contribution),
-            })
-            await asyncio.sleep(0)
-
-            yield _emit("channel_b", {
+            }
+            channel_b_chunk = {
                 "drivers": [
                     {"cause": d.cause_metric_fqn, "lag": d.lag_periods,
                      "p_value": d.p_value, "evidence_strength": d.evidence_strength,
@@ -153,18 +200,32 @@ async def explain_metric_sse(fqn: str, request: Request) -> StreamingResponse:
                     for d in expl.business_drivers
                 ],
                 "estimated_contribution": list(expl.estimated_business_contribution),
-            })
-            await asyncio.sleep(0)
-
-            yield _emit("ruled_out", {
+            }
+            ruled_out_chunk = {
                 "items": [{"fqn": r.candidate_fqn, "reason": r.reason} for r in expl.ruled_out]
-            })
-            await asyncio.sleep(0)
-
-            yield _emit("done", {
+            }
+            done_chunk = {
                 "explanation_id": str(expl.explanation_id),
                 "citations": {k: [e.row_id for e in rows] for k, rows in expl.citations.items()},
+            }
+
+            _cache_set(fqn, lookback_days, {
+                "summary": summary_chunk,
+                "channel_a": channel_a_chunk,
+                "channel_b": channel_b_chunk,
+                "ruled_out": ruled_out_chunk,
+                "done": done_chunk,
             })
+
+            yield _emit("summary", summary_chunk)
+            await asyncio.sleep(0)
+            yield _emit("channel_a", channel_a_chunk)
+            await asyncio.sleep(0)
+            yield _emit("channel_b", channel_b_chunk)
+            await asyncio.sleep(0)
+            yield _emit("ruled_out", ruled_out_chunk)
+            await asyncio.sleep(0)
+            yield _emit("done", done_chunk)
 
         except Exception as exc:
             yield _emit("error", {"message": str(exc)})

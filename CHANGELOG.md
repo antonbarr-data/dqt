@@ -16,12 +16,24 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 - `CausalReviewEdge` -- dataclass representing a proposed causal edge pending HITL review (cause, effect, p_value, evidence_strength, status, reviewer, notes, weight_delta).
 - `ReviewStore` -- in-memory store for causal edge review decisions with accept/reject, list_pending, list_by_status, and stats methods.
 
+### Added (dqt library, continued)
+- `ReviewStore.get(edge_id)` -- look up a single edge by id.
+- `dqt.causality.granger_pairwise` now returns `GrangerReport.significant_edges` property for direct iteration over edges with `evidence_strength` in `{"moderate", "strong"}`.
+
 ### Added (server)
 - `GET /api/v1/lineage/graph` -- subgraph API (root, direction, depth, include_causal query params).
 - `GET /api/v1/lineage/path` -- BFS shortest-path API between two metric nodes.
 - `GET /api/v1/causal/review/queue` -- paginated pending causal edge review queue.
 - `POST /api/v1/causal/review/{edge_id}` -- accept or reject a proposed causal edge.
 - `GET /api/v1/causal/review/stats` -- accept rate and review velocity stats.
+- `POST /api/v1/causal/recompute` -- on-demand causality discovery; runs Granger pairwise on all registered metrics and queues significant edges for HITL review.
+- `GET /api/v1/causal/recompute/status` -- last run timestamp and current pending queue size.
+- `GET /api/v1/checks/{dataset_id}/columns/{column}/checks` -- list column-level checks.
+- `POST /api/v1/checks/{dataset_id}/columns/{column}/checks` -- create a column-level check.
+- `DELETE /api/v1/checks/{check_id}` -- remove a check.
+- `GET /api/v1/detectors` -- list all registered detector slugs with group, label, and default params.
+- Narrative cache on `POST /api/v1/metrics/{fqn}/explain` -- 6h TTL, bypassed by `force_refresh: true` in request body.
+- `mark_reviewed` in feed API now persists to `~/.dqt/feed_reviewed.json` (configurable via `DQT_DATA_DIR`) so reviewed state survives server restarts.
 
 ### Added (web)
 - Metric lineage explorer (`/metrics/[fqn]/lineage`) -- pure-SVG DAG with depth slider (1-5), direction-aware BFS layout, edge detail side panel, causal vs lineage edge styling.
@@ -29,6 +41,14 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 - Causality page (`/causality`) updated from "Coming soon." to entry point with link to reviewer queue.
 - Help modal (Ctrl+/) -- keyboard shortcut cheat-sheet and navigation links.
 - Empty, error, and loading skeleton states added to overview, datasets, incidents, and metrics list pages.
+- Metric insight page enhancements: lineage strip (3 upstream + current + 3 downstream nodes), active checks card with mini-sparklines, recent incidents list with severity dots.
+- Column check picker upgraded with "All Detectors" tab (grouped, searchable), param editor, and custom slug entry.
+- Datasets page rebuilt as 3-level browser: source rail, schema/table tree, and column panel with expandable check management.
+- URL-stable state on stateful pages: `?depth=N` on lineage explorer, `?lookback=N` on metric insight window picker.
+
+### CLI
+- `dqt migrate` -- idempotent schema migration command. Creates `dqt_metric_pins`, `dqt_check_suggestions`, `dqt_causal_reviews_v2`, `dqt_ui_feedback` tables. Supports `--dry-run` and `--database-url`.
+- `dqt metrics` -- starts a read-only Prometheus/OpenMetrics HTTP server (default port 8090). Bearer token auth via `DQT_METRICS_TOKEN`; `--generate-token` flag for initial setup.
 
 ## [1.1.0-RC] - 2026-05-16 (Phase 2, Milestone 1)
 

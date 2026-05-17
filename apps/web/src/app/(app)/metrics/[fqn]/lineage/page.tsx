@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GitBranch } from "lucide-react";
 
 interface LNode { id: string; kind: string; label: string }
@@ -60,7 +61,20 @@ export default function MetricLineagePage({ params }: { params: Promise<{ fqn: s
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<LEdge | null>(null);
-  const [depth, setDepth] = useState(3);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [depth, setDepth] = useState(() => {
+    const d = searchParams.get("depth");
+    const n = d ? parseInt(d, 10) : 3;
+    return n >= 1 && n <= 5 ? n : 3;
+  });
+
+  const setDepthAndUrl = useCallback((d: number) => {
+    setDepth(d);
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("depth", String(d));
+    router.replace(`?${sp.toString()}`, { scroll: false });
+  }, [router, searchParams]);
 
   useEffect(() => {
     params.then(p => setFqn(decodeURIComponent(p.fqn)));
@@ -105,7 +119,7 @@ export default function MetricLineagePage({ params }: { params: Promise<{ fqn: s
             {[1, 2, 3, 4, 5].map(d => (
               <button
                 key={d}
-                onClick={() => setDepth(d)}
+                onClick={() => setDepthAndUrl(d)}
                 className="w-6 h-6 t-micro flex items-center justify-center border transition-colors"
                 style={{
                   background: depth === d ? "var(--accent-bg)" : "var(--bg-2)",

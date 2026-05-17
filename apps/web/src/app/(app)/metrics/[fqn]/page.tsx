@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { serverFetch } from "@/lib/server-api";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -87,7 +88,9 @@ export default async function MetricInsightPage({
       </div>
 
       {/* Client component handles streaming narrative, reconciliation, evidence, chart */}
-      <InsightClient fqn={decodedFqn} metric={metric} />
+      <Suspense>
+        <InsightClient fqn={decodedFqn} metric={metric} />
+      </Suspense>
     </div>
   );
 }

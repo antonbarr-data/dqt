@@ -1,8 +1,11 @@
 """Feed API -- Today feed and weekly view."""
 from __future__ import annotations
 
+import json
+import os
 import random
 from datetime import timedelta
+from pathlib import Path
 
 from fastapi import APIRouter
 
@@ -10,7 +13,25 @@ from dqt.insights.feed import FeedItem, rank
 
 router = APIRouter(prefix="/api/v1/feed", tags=["feed"])
 
-_reviewed: set[str] = set()
+_REVIEWED_PATH = Path(os.environ.get("DQT_DATA_DIR", Path.home() / ".dqt")) / "feed_reviewed.json"
+
+
+def _load_reviewed() -> set[str]:
+    try:
+        _REVIEWED_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if _REVIEWED_PATH.exists():
+            return set(json.loads(_REVIEWED_PATH.read_text()))
+    except Exception:
+        pass
+    return set()
+
+
+def _save_reviewed(reviewed: set[str]) -> None:
+    _REVIEWED_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _REVIEWED_PATH.write_text(json.dumps(sorted(reviewed)))
+
+
+_reviewed: set[str] = _load_reviewed()
 
 
 def _synthetic_feed_items(lookback_hours: int = 24) -> list[FeedItem]:
@@ -85,4 +106,5 @@ async def feed_weekly(week: str | None = None) -> list[dict]:
 @router.post("/items/{item_id}/reviewed")
 async def mark_reviewed(item_id: str) -> dict:
     _reviewed.add(item_id)
+    _save_reviewed(_reviewed)
     return {"item_id": item_id, "reviewed": True}

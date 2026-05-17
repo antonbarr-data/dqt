@@ -26,6 +26,9 @@ class ReviewStore:
     def add(self, edge: CausalReviewEdge) -> None:
         self._edges[edge.id] = edge
 
+    def get(self, edge_id: str) -> CausalReviewEdge | None:
+        return self._edges.get(edge_id)
+
     def review(
         self,
         edge_id: str,

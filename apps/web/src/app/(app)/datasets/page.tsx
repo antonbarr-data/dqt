@@ -1,169 +1,737 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
+import { ChevronRight, ChevronDown, Database, Table2, Plus, Columns } from "lucide-react";
+import { SuggestPanel } from "@/components/checks/suggest-panel";
 
-interface DatasetRow {
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Source {
   id: string;
-  source: string;
-  rows: string;
-  columns: number;
-  checks: number;
+  name: string;
+  engine: string;
+  tables: number;
   status: string;
-  lastRun: string;
 }
 
-type Status = "pass" | "warn" | "fail";
+interface Dataset {
+  id: string;
+  source: string;
+  schema: string;
+  row_count: number | null;
+  column_count: number | null;
+  check_count: number;
+  status: string;
+  last_run: string;
+}
 
-function StatusDot({ status }: { status: Status }) {
-  const color = status === "pass" ? "var(--pass)" : status === "warn" ? "var(--warn)" : "var(--fail)";
+interface CheckResult {
+  id: number;
+  dataset_id: string;
+  column: string | null;
+  detector: string;
+  score: number | null;
+  verdict: string | null;
+  message: string | null;
+}
+
+interface DatasetDetail extends Dataset {
+  checks: CheckResult[];
+}
+
+interface ColumnCheck {
+  id: string;
+  dataset_id: string;
+  column: string;
+  detector_slug: string;
+  params: Record<string, unknown>;
+  rationale: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function statusColor(status: string | null | undefined): string {
+  if (status === "pass") return "var(--pass)";
+  if (status === "warn") return "var(--warn)";
+  if (status === "fail") return "var(--fail)";
+  return "var(--fg-3)";
+}
+
+function StatusDot({ status }: { status: string | null | undefined }) {
+  const color = statusColor(status);
   return (
     <span
       style={{
         display: "inline-block",
         width: 8,
         height: 8,
+        flexShrink: 0,
         background: color,
         boxShadow: `0 0 0 2px ${color}30`,
-        flexShrink: 0,
       }}
     />
   );
 }
 
-const MOCK_DATASETS: DatasetRow[] = [
-  { id: "marketing_campaigns", source: "gigler_warehouse", rows: "2.4M", columns: 16, checks: 8, status: "pass", lastRun: "2 min ago" },
-  { id: "gigler_transactions", source: "gigler_warehouse", rows: "8.1M", columns: 16, checks: 12, status: "fail", lastRun: "2 min ago" },
-  { id: "gig_prices", source: "gigler_warehouse", rows: "1.2M", columns: 9, checks: 5, status: "warn", lastRun: "2 min ago" },
-  { id: "gig_vendor_stats", source: "gigler_warehouse", rows: "980K", columns: 11, checks: 5, status: "pass", lastRun: "5 min ago" },
-  { id: "fct_orders", source: "demo_warehouse", rows: "5.3M", columns: 14, checks: 10, status: "pass", lastRun: "10 min ago" },
-  { id: "fct_sessions", source: "demo_warehouse", rows: "12.1M", columns: 8, checks: 6, status: "warn", lastRun: "10 min ago" },
-];
+function SkeletonBar({ width = "100%", height = 14 }: { width?: string; height?: number }) {
+  return (
+    <div
+      style={{
+        width,
+        height,
+        background: "var(--bg-3)",
+        opacity: 0.6,
+        borderRadius: 0,
+      }}
+    />
+  );
+}
 
-export default function DatasetsPage() {
-  const [datasets, setDatasets] = useState<DatasetRow[]>([]);
+// Group datasets by schema within a source
+function groupBySchema(datasets: Dataset[]): Record<string, Dataset[]> {
+  const groups: Record<string, Dataset[]> = {};
+  for (const ds of datasets) {
+    const key = ds.schema || "(default)";
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(ds);
+  }
+  return groups;
+}
+
+// Aggregate columns from detail checks (deduplicate by column name)
+function extractColumns(checks: CheckResult[]): Array<{ name: string; verdict: string | null; checkCount: number }> {
+  const map = new Map<string, { verdict: string | null; checkCount: number }>();
+  for (const c of checks) {
+    const col = c.column ?? "(table)";
+    const existing = map.get(col);
+    if (!existing) {
+      map.set(col, { verdict: c.verdict, checkCount: 1 });
+    } else {
+      existing.checkCount += 1;
+      // Escalate verdict
+      if (c.verdict === "fail" || existing.verdict !== "fail") {
+        if (c.verdict === "fail") existing.verdict = "fail";
+        else if (c.verdict === "warn" && existing.verdict !== "fail") existing.verdict = "warn";
+      }
+    }
+  }
+  return Array.from(map.entries()).map(([name, meta]) => ({ name, ...meta }));
+}
+
+// ---------------------------------------------------------------------------
+// Column expanded row
+// ---------------------------------------------------------------------------
+
+function ColumnExpanded({
+  datasetId,
+  column,
+}: {
+  datasetId: string;
+  column: string;
+}) {
+  const [checks, setChecks] = useState<ColumnCheck[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [slug, setSlug] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  const loadChecks = useCallback(() => {
+    setLoading(true);
+    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}/checks`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: ColumnCheck[]) => setChecks(data))
+      .catch(() => setChecks([]))
+      .finally(() => setLoading(false));
+  }, [datasetId, column]);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetch("/api/v1/datasets")
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then((data: DatasetRow[]) => setDatasets(data))
-      .catch(() => {
-        // Fall back to mock data for demo
-        setDatasets(MOCK_DATASETS);
+    loadChecks();
+  }, [loadChecks]);
+
+  function handleAdd() {
+    if (!slug.trim()) return;
+    setAdding(true);
+    setAddError(null);
+    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}/checks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ detector_slug: slug.trim(), params: {}, rationale: "" }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .then(() => {
+        setSlug("");
+        loadChecks();
+      })
+      .catch((e: Error) => setAddError(e.message))
+      .finally(() => setAdding(false));
+  }
 
   return (
-    <div className="p-6">
-      {/* page header */}
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>Datasets</h1>
-        <div className="t-small" style={{ color: "var(--fg-2)" }}>
-          {!loading && !error ? `${datasets.length} datasets` : ""}
+    <div
+      style={{
+        background: "var(--bg-2)",
+        borderTop: "1px solid var(--line)",
+        padding: "12px 16px 0",
+      }}
+    >
+      {/* Existing checks */}
+      <div className="mb-3">
+        <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Checks
+        </p>
+        {loading ? (
+          <SkeletonBar width="60%" height={12} />
+        ) : checks.length === 0 ? (
+          <p className="t-micro" style={{ color: "var(--fg-3)" }}>No checks yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {checks.map((c) => (
+              <span
+                key={c.id}
+                className="t-micro px-2 py-0.5 border"
+                style={{
+                  borderColor: "var(--line-3)",
+                  color: "var(--fg-1)",
+                  fontFamily: "var(--font-jetbrains-mono)",
+                  background: "var(--bg-3)",
+                }}
+              >
+                {c.detector_slug}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add check form */}
+      <div className="flex items-center gap-2 mb-3">
+        <input
+          type="text"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          placeholder="detector_slug"
+          className="t-small flex-1 px-2 py-1 border"
+          style={{
+            background: "var(--bg-1)",
+            borderColor: "var(--line)",
+            color: "var(--fg-0)",
+            fontFamily: "var(--font-jetbrains-mono)",
+            outline: "none",
+            minWidth: 0,
+          }}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={adding || !slug.trim()}
+          className="t-micro px-3 py-1 border flex items-center gap-1"
+          style={{
+            borderColor: slug.trim() ? "var(--accent)" : "var(--line)",
+            color: slug.trim() ? "var(--accent)" : "var(--fg-3)",
+            background: "transparent",
+            cursor: adding || !slug.trim() ? "default" : "pointer",
+            flexShrink: 0,
+          }}
+        >
+          <Plus size={11} strokeWidth={1.6} />
+          {adding ? "Adding..." : "Add"}
+        </button>
+      </div>
+      {addError && (
+        <p className="t-micro mb-2" style={{ color: "var(--fail)" }}>
+          {addError}
+        </p>
+      )}
+
+      {/* AI suggestions */}
+      <div>
+        <p className="t-micro mb-1" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          AI Suggestions
+        </p>
+        <SuggestPanel datasetId={datasetId} column={column} />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
+export default function DatasetsPage() {
+  const [sources, setSources] = useState<Source[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
+
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [datasetsLoading, setDatasetsLoading] = useState(true);
+  const [datasetsError, setDatasetsError] = useState<string | null>(null);
+
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set());
+
+  const [datasetDetail, setDatasetDetail] = useState<DatasetDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  // Load sources
+  useEffect(() => {
+    setSourcesLoading(true);
+    setSourcesError(null);
+    fetch("/api/v1/sources")
+      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
+      .then((data: Source[]) => {
+        setSources(data);
+        if (data.length > 0) setSelectedSourceId(data[0].id);
+      })
+      .catch((e: unknown) => setSourcesError(String(e)))
+      .finally(() => setSourcesLoading(false));
+  }, []);
+
+  // Load datasets
+  useEffect(() => {
+    setDatasetsLoading(true);
+    setDatasetsError(null);
+    fetch("/api/v1/datasets")
+      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
+      .then((data: Dataset[]) => setDatasets(data))
+      .catch((e: unknown) => setDatasetsError(String(e)))
+      .finally(() => setDatasetsLoading(false));
+  }, []);
+
+  // Load dataset detail when selected
+  useEffect(() => {
+    if (!selectedDatasetId) {
+      setDatasetDetail(null);
+      return;
+    }
+    setDetailLoading(true);
+    setDetailError(null);
+    fetch(`/api/v1/datasets/${encodeURIComponent(selectedDatasetId)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
+      .then((data: DatasetDetail) => setDatasetDetail(data))
+      .catch((e: unknown) => setDetailError(String(e)))
+      .finally(() => setDetailLoading(false));
+  }, [selectedDatasetId]);
+
+  // When source selection changes, clear dataset selection
+  function handleSelectSource(id: string) {
+    setSelectedSourceId(id);
+    setSelectedDatasetId(null);
+    setDatasetDetail(null);
+  }
+
+  // Toggle schema group expand
+  function toggleSchema(key: string) {
+    setExpandedSchemas((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  // Datasets filtered to selected source
+  const filteredDatasets = selectedSourceId
+    ? datasets.filter((d) => d.source === selectedSourceId)
+    : datasets;
+
+  const schemaGroups = groupBySchema(filteredDatasets);
+
+  // Auto-expand all schemas when source changes
+  useEffect(() => {
+    setExpandedSchemas(new Set(Object.keys(groupBySchema(filteredDatasets))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSourceId, datasetsLoading]);
+
+  return (
+    <div
+      className="flex h-full overflow-hidden fade-in"
+      style={{ background: "var(--bg-0)" }}
+    >
+      {/* ----------------------------------------------------------------- */}
+      {/* Left rail — sources (220px)                                        */}
+      {/* ----------------------------------------------------------------- */}
+      <div
+        style={{
+          width: 220,
+          flexShrink: 0,
+          borderRight: "1px solid var(--line)",
+          background: "var(--bg-1)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          className="px-3 py-3 border-b"
+          style={{ borderColor: "var(--line)", flexShrink: 0 }}
+        >
+          <p
+            className="t-micro"
+            style={{
+              color: "var(--fg-3)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Sources
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {sourcesLoading && (
+            <div className="flex flex-col gap-2 p-3">
+              {[1, 2, 3].map((i) => (
+                <SkeletonBar key={i} width="80%" height={13} />
+              ))}
+            </div>
+          )}
+          {sourcesError && (
+            <p className="t-micro px-3 py-3" style={{ color: "var(--fail)" }}>
+              {sourcesError}
+            </p>
+          )}
+          {!sourcesLoading && !sourcesError && sources.length === 0 && (
+            <p className="t-small px-3 py-4 text-center" style={{ color: "var(--fg-3)" }}>
+              No sources.
+            </p>
+          )}
+          {!sourcesLoading &&
+            !sourcesError &&
+            sources.map((src) => {
+              const isSelected = selectedSourceId === src.id;
+              return (
+                <button
+                  key={src.id}
+                  onClick={() => handleSelectSource(src.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors"
+                  style={{
+                    background: isSelected ? "var(--accent-bg)" : "transparent",
+                    borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Database
+                    size={13}
+                    strokeWidth={1.6}
+                    style={{ color: isSelected ? "var(--accent)" : "var(--fg-3)", flexShrink: 0 }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="t-small truncate"
+                      style={{
+                        color: isSelected ? "var(--fg-0)" : "var(--fg-1)",
+                        fontFamily: "var(--font-jetbrains-mono)",
+                      }}
+                    >
+                      {src.name}
+                    </p>
+                    <p className="t-micro" style={{ color: "var(--fg-3)" }}>
+                      {src.engine} · {src.tables ?? 0} tables
+                    </p>
+                  </div>
+                  <StatusDot status={src.status} />
+                </button>
+              );
+            })}
         </div>
       </div>
 
-      {error && (
-        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
-          <p className="t-small" style={{ color: "var(--fail)" }}>{error}</p>
+      {/* ----------------------------------------------------------------- */}
+      {/* Middle rail — schema/table tree (280px)                            */}
+      {/* ----------------------------------------------------------------- */}
+      <div
+        style={{
+          width: 280,
+          flexShrink: 0,
+          borderRight: "1px solid var(--line)",
+          background: "var(--bg-1)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          className="px-3 py-3 border-b flex items-center justify-between"
+          style={{ borderColor: "var(--line)", flexShrink: 0 }}
+        >
+          <p
+            className="t-micro"
+            style={{
+              color: "var(--fg-3)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Tables
+          </p>
+          {!datasetsLoading && (
+            <span className="t-micro" style={{ color: "var(--fg-3)" }}>
+              {filteredDatasets.length}
+            </span>
+          )}
         </div>
-      )}
-
-      {loading && (
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-12 border border-line" style={{ background: "var(--bg-2)", opacity: 0.5 }} />
-          ))}
-        </div>
-      )}
-
-      {!loading && !error && datasets.length === 0 && (
-        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
-          <p className="t-small" style={{ color: "var(--fg-3)" }}>No datasets yet.</p>
-        </div>
-      )}
-
-      {!loading && !error && datasets.length > 0 && (
-        /* table */
-        <div className="border border-line" style={{ background: "var(--bg-1)" }}>
-          <table className="w-full" style={{ borderCollapse: "collapse" }}>
-            <thead>
-              <tr className="border-b border-line">
-                {["Dataset", "Source", "Rows", "Columns", "Tests", "Status", "Last Run"].map((h) => (
-                  <th
-                    key={h}
-                    className="px-3 py-2 text-left t-micro"
+        <div className="flex-1 overflow-y-auto">
+          {datasetsLoading && (
+            <div className="flex flex-col gap-2 p-3">
+              {[1, 2, 3, 4].map((i) => (
+                <SkeletonBar key={i} width={`${60 + i * 8}%`} height={12} />
+              ))}
+            </div>
+          )}
+          {datasetsError && (
+            <p className="t-micro px-3 py-3" style={{ color: "var(--fail)" }}>
+              {datasetsError}
+            </p>
+          )}
+          {!datasetsLoading && !datasetsError && filteredDatasets.length === 0 && (
+            <p className="t-small px-3 py-4 text-center" style={{ color: "var(--fg-3)" }}>
+              {selectedSourceId ? "No datasets for this source." : "Select a source."}
+            </p>
+          )}
+          {!datasetsLoading &&
+            !datasetsError &&
+            Object.entries(schemaGroups).map(([schema, schemaDatassets]) => {
+              const isOpen = expandedSchemas.has(schema);
+              return (
+                <div key={schema}>
+                  {/* Schema header */}
+                  <button
+                    onClick={() => toggleSchema(schema)}
+                    className="w-full flex items-center gap-1.5 px-3 py-2 text-left border-b transition-colors"
                     style={{
-                      color: "var(--fg-2)",
-                      fontWeight: 400,
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
+                      borderColor: "var(--line)",
+                      background: "var(--bg-2)",
+                      cursor: "pointer",
                     }}
                   >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {datasets.map((ds) => (
-                <tr
-                  key={ds.id}
-                  className="border-b border-line last:border-0 hover:bg-bg-2 transition-colors"
-                >
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/datasets/${ds.id}`}
-                      className="t-body font-mono hover:underline"
-                      style={{ color: "var(--fg-0)" }}
+                    {isOpen ? (
+                      <ChevronDown size={12} strokeWidth={1.6} style={{ color: "var(--fg-3)" }} />
+                    ) : (
+                      <ChevronRight size={12} strokeWidth={1.6} style={{ color: "var(--fg-3)" }} />
+                    )}
+                    <span
+                      className="t-micro flex-1 truncate"
+                      style={{
+                        color: "var(--fg-2)",
+                        fontFamily: "var(--font-jetbrains-mono)",
+                        letterSpacing: "0.04em",
+                      }}
                     >
-                      {ds.id}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 t-small" style={{ color: "var(--fg-1)" }}>
-                    {ds.source}
-                  </td>
-                  <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-1)" }}>
-                    {ds.rows}
-                  </td>
-                  <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-1)" }}>
-                    {ds.columns}
-                  </td>
-                  <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-1)" }}>
-                    {ds.checks}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <StatusDot status={ds.status as Status} />
-                      <span
-                        className="t-small"
-                        style={{
-                          color:
-                            ds.status === "pass"
-                              ? "var(--pass)"
-                              : ds.status === "warn"
-                              ? "var(--warn)"
-                              : "var(--fail)",
-                        }}
-                      >
-                        {ds.status}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 t-small" style={{ color: "var(--fg-2)" }}>
-                    {ds.lastRun}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      {schema}
+                    </span>
+                    <span className="t-micro" style={{ color: "var(--fg-3)" }}>
+                      {schemaDatassets.length}
+                    </span>
+                  </button>
+
+                  {/* Dataset rows */}
+                  {isOpen &&
+                    schemaDatassets.map((ds) => {
+                      const isSelected = selectedDatasetId === ds.id;
+                      return (
+                        <button
+                          key={ds.id}
+                          onClick={() => setSelectedDatasetId(ds.id)}
+                          className="w-full flex items-center gap-2 pl-6 pr-3 py-2 text-left border-b transition-colors"
+                          style={{
+                            borderColor: "var(--line)",
+                            background: isSelected ? "var(--accent-bg)" : "transparent",
+                            borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Table2
+                            size={12}
+                            strokeWidth={1.6}
+                            style={{
+                              color: isSelected ? "var(--accent)" : "var(--fg-3)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span
+                            className="t-small flex-1 truncate"
+                            style={{
+                              color: isSelected ? "var(--fg-0)" : "var(--fg-1)",
+                              fontFamily: "var(--font-jetbrains-mono)",
+                            }}
+                          >
+                            {ds.id}
+                          </span>
+                          <StatusDot status={ds.status} />
+                          <span className="t-micro" style={{ color: "var(--fg-3)" }}>
+                            {ds.column_count ?? "--"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                </div>
+              );
+            })}
         </div>
-      )}
+      </div>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Main panel — column list                                           */}
+      {/* ----------------------------------------------------------------- */}
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        {/* Header */}
+        <div
+          className="flex items-center gap-2 px-4 py-3 border-b"
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--bg-1)",
+            flexShrink: 0,
+          }}
+        >
+          {datasetDetail ? (
+            <>
+              <Columns
+                size={14}
+                strokeWidth={1.6}
+                style={{ color: "var(--fg-3)" }}
+              />
+              <span
+                className="t-small"
+                style={{
+                  color: "var(--fg-0)",
+                  fontFamily: "var(--font-jetbrains-mono)",
+                }}
+              >
+                {datasetDetail.id}
+              </span>
+              <span className="t-micro" style={{ color: "var(--fg-3)" }}>
+                {extractColumns(datasetDetail.checks).length} columns
+              </span>
+            </>
+          ) : (
+            <span className="t-small" style={{ color: "var(--fg-3)" }}>
+              Select a dataset
+            </span>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto" style={{ background: "var(--bg-0)" }}>
+          {detailLoading && (
+            <div className="flex flex-col gap-2 p-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <SkeletonBar key={i} width={`${50 + i * 7}%`} height={14} />
+              ))}
+            </div>
+          )}
+          {detailError && (
+            <div className="flex items-center justify-center h-32">
+              <p className="t-small" style={{ color: "var(--fail)" }}>
+                {detailError}
+              </p>
+            </div>
+          )}
+          {!selectedDatasetId && !detailLoading && (
+            <div className="flex items-center justify-center h-32">
+              <p className="t-small" style={{ color: "var(--fg-3)" }}>
+                Select a dataset to browse columns
+              </p>
+            </div>
+          )}
+          {!detailLoading && !detailError && datasetDetail && (
+            <ColumnList dataset={datasetDetail} />
+          )}
+        </div>
+      </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Column list component (separated to isolate expanded state)
+// ---------------------------------------------------------------------------
+
+function ColumnList({ dataset }: { dataset: DatasetDetail }) {
+  const [expandedCol, setExpandedCol] = useState<string | null>(null);
+  const columns = extractColumns(dataset.checks);
+
+  return (
+    <>
+      {columns.length === 0 ? (
+        <div className="flex items-center justify-center h-32">
+          <p className="t-small" style={{ color: "var(--fg-3)" }}>
+            No columns found.
+          </p>
+        </div>
+      ) : (
+        columns.map((col) => {
+          const isExpanded = expandedCol === col.name;
+          return (
+            <div key={col.name} style={{ borderBottom: "1px solid var(--line)" }}>
+              <button
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left"
+                style={{
+                  background: isExpanded ? "var(--bg-2)" : "transparent",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isExpanded)
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-1)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!isExpanded)
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                }}
+                onClick={() => setExpandedCol(isExpanded ? null : col.name)}
+              >
+                {isExpanded ? (
+                  <ChevronDown
+                    size={13}
+                    strokeWidth={1.6}
+                    style={{ color: "var(--fg-3)", flexShrink: 0 }}
+                  />
+                ) : (
+                  <ChevronRight
+                    size={13}
+                    strokeWidth={1.6}
+                    style={{ color: "var(--fg-3)", flexShrink: 0 }}
+                  />
+                )}
+                <StatusDot status={col.verdict ?? undefined} />
+                <span
+                  className="t-small flex-1 min-w-0 truncate"
+                  style={{
+                    color: "var(--fg-0)",
+                    fontFamily: "var(--font-jetbrains-mono)",
+                  }}
+                >
+                  {col.name}
+                </span>
+                {col.checkCount > 0 && (
+                  <span
+                    className="t-micro px-1.5"
+                    style={{
+                      background: "var(--bg-3)",
+                      color: "var(--fg-3)",
+                      fontFamily: "var(--font-jetbrains-mono)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {col.checkCount}
+                  </span>
+                )}
+              </button>
+              {isExpanded && (
+                <ColumnExpanded datasetId={dataset.id} column={col.name} />
+              )}
+            </div>
+          );
+        })
+      )}
+    </>
   );
 }
