@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SubscribeButton } from "@/components/subscriptions/subscribe-button";
 
 interface ClarifyOption {
   metric_fqn: string;
@@ -100,10 +101,13 @@ export default function AskPage() {
                   Showing insight for <span className="font-mono" style={{ color: "var(--accent)" }}>{entry.display_name}</span>
                   {" "}over the last {entry.window_days} days.
                 </p>
-                <Link href={`/metrics/${encodeURIComponent(entry.metric_fqn!)}`}
-                      className="t-small hover:underline" style={{ color: "var(--accent)" }}>
-                  Open metric insight page
-                </Link>
+                <div className="flex items-center gap-4 mt-2">
+                  <Link href={`/metrics/${encodeURIComponent(entry.metric_fqn!)}`}
+                        className="t-small hover:underline" style={{ color: "var(--accent)" }}>
+                    Open metric insight page
+                  </Link>
+                  <SubscribeButton metricFqn={entry.metric_fqn!} />
+                </div>
               </div>
             )}
             {entry.type === "answer" && entry.intent === "list" && (

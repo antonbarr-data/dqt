@@ -1,0 +1,25 @@
+# Node
+apps/web/node_modules
+apps/web/.next
+
+# Python caches
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+
+# Virtual environments
+**/.venv
+
+# Git
+.git
+
+# Test / dev artifacts
+.playwright-mcp
+tmp
+reference_data
+docs/superpowers
+*.egg-info
+dist
+build

@@ -6,6 +6,7 @@ from dqt.causality.events import (
 )
 from dqt.causality.granger import GrangerEdge, GrangerReport, granger_pairwise
 from dqt.causality.pcmci import PCMCIEdge, PCMCIReport, pcmci_pairwise
+from dqt.causality.review import CausalReviewEdge, ReviewStore
 
 __all__ = [
     "EventSource",
@@ -14,4 +15,5 @@ __all__ = [
     "InMemoryEventSource",
     "GrangerEdge", "GrangerReport", "granger_pairwise",
     "PCMCIEdge", "PCMCIReport", "pcmci_pairwise",
+    "CausalReviewEdge", "ReviewStore",
 ]
