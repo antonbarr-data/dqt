@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Bell } from "lucide-react";
+import { Search, Bell, MessageSquare } from "lucide-react";
 import { getToken, decodeToken, clearToken } from "@/lib/auth";
 import Image from "next/image";
 import { CommandPalette } from "./command-palette";
+import { AskModal } from "@/components/ask-modal/ask-modal";
 
 interface TestCounts { pass: number; warn: number; fail: number }
 
@@ -32,6 +33,7 @@ export function Topbar() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [accountOpen, setAccountOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const testCounts = useTestCounts();
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
@@ -71,7 +73,7 @@ export function Topbar() {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setPaletteOpen((v) => !v);
+        setAskOpen((v) => !v);
       }
     }
     document.addEventListener("keydown", onKeyDown);
@@ -103,6 +105,7 @@ export function Topbar() {
   return (
     <>
     <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+    <AskModal open={askOpen} onClose={() => setAskOpen(false)} />
     <header
       className="flex items-center gap-3 border-b border-line"
       style={{ height: 44, background: "var(--bg-1)", flexShrink: 0, paddingRight: 16 }}
@@ -126,16 +129,25 @@ export function Topbar() {
       </div>
 
       {/* centered search — opens command palette */}
-      <div className="flex-1 flex justify-center">
+      <div className="flex-1 flex justify-center items-center gap-2">
         <button
           onClick={() => setPaletteOpen(true)}
           className="flex items-center gap-2 border border-line px-2.5 py-1 transition-colors hover:border-accent"
-          style={{ background: "var(--bg-2)", width: 360 }}
+          style={{ background: "var(--bg-2)", width: 300 }}
         >
           <Search size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
           <span className="flex-1 text-left t-small" style={{ color: "var(--fg-3)" }}>
             Search datasets, incidents, tests…
           </span>
+        </button>
+        <button
+          onClick={() => setAskOpen(true)}
+          className="flex items-center gap-2 border border-line px-2.5 py-1 transition-colors hover:border-accent"
+          style={{ background: "var(--bg-2)" }}
+          title="Ask a question (Ctrl+K)"
+        >
+          <MessageSquare size={11} strokeWidth={1.6} style={{ color: "var(--fg-3)", flexShrink: 0 }} />
+          <span className="t-small" style={{ color: "var(--fg-3)" }}>Ask...</span>
           <kbd className="t-micro px-1 border border-line" style={{ color: "var(--fg-3)", background: "var(--bg-3)", lineHeight: "18px" }}>
             ⌘K
           </kbd>
