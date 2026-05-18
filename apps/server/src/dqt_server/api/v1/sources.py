@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,11 +15,11 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.gigler_service import (
+from dqt_server.check_runner import (
     _make_adapter, _default_schema_for_source, _list_tables_for_source_sync,
-    gigler_service,
+    check_runner,
 )
-from dqt_server.models.gigler import CheckRun, ColumnCheck, Dataset, Incident, Source
+from dqt_server.models.core import CheckRun, ColumnCheck, Dataset, Incident, Source
 
 _STEP_DISPLAY = {
     "tcp_reach": "TCP Reach",
@@ -64,7 +67,7 @@ def _run_health_check_sync(
 
 
 log = structlog.get_logger(__name__)
-router = APIRouter(prefix="/api/v1", tags=["gigler"])
+router = APIRouter(prefix="/api/v1", tags=["sources"])
 
 
 def _time_ago(dt: datetime | None) -> str:
@@ -281,7 +284,7 @@ async def update_source_tables(
     await db.commit()
 
     if new_tables - current_tables:
-        asyncio.create_task(gigler_service.refresh())
+        asyncio.create_task(check_runner.refresh())
 
     return {"source_id": source_id, "tables": sorted(new_tables)}
 
@@ -294,9 +297,108 @@ class SuggestChecksBody(BaseModel):
     tables: list[str]
 
 
+_COLUMN_CONCEPTS_PATH = Path(__file__).parent.parent.parent / "data" / "column_concepts.md"
+
+
+def _load_column_concepts() -> str:
+    try:
+        return _COLUMN_CONCEPTS_PATH.read_text(encoding="utf-8")
+    except OSError:
+        log.warning("column_concepts_missing", path=str(_COLUMN_CONCEPTS_PATH))
+        return ""
+
+
+def _llm_suggest_batch(
+    table: str,
+    col_names: list[str],
+    col_types: list[str],
+    rules_content: str,
+    api_key: str,
+) -> dict[str, list[dict]]:
+    """One Claude call for all columns in a table. Returns {col_name: [check_dict]}."""
+    import anthropic
+
+    col_lines = "\n".join(
+        f"- {name} (SQL type: {dtype})"
+        for name, dtype in zip(col_names, col_types)
+    )
+
+    prompt = (
+        f"You are a data quality expert. Using the reference guide below, "
+        f"suggest data quality checks for each column in the table `{table}`.\n\n"
+        f"## Reference: dqt Column Concepts and Recommended Checks\n\n"
+        f"{rules_content}\n\n"
+        f"## Columns to analyse\n\n"
+        f"{col_lines}\n\n"
+        f"For each column, identify its closest concept from the reference guide "
+        f"and return the most appropriate checks.\n"
+        f"Rules:\n"
+        f"- Use detector_slug values exactly as listed in the reference guide\n"
+        f"- Only include checks with confidence > 0.6\n"
+        f"- Do not repeat checks already obvious from the type alone\n"
+        f"- Reply ONLY with valid JSON, no markdown fences:\n"
+        f'{{"column_name": [{{"detector_slug": "...", "params": {{}}, "rationale": "...", "confidence": 0.85}}]}}'
+    )
+
+    client = anthropic.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=2048,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = msg.content[0].text.strip()
+    # Strip markdown code fences if model adds them
+    if raw.startswith("```"):
+        raw = "\n".join(
+            line for line in raw.splitlines()
+            if not line.startswith("```")
+        ).strip()
+
+    parsed = json.loads(raw)
+    result: dict[str, list[dict]] = {}
+    for col_name, checks in parsed.items():
+        if isinstance(checks, list):
+            result[col_name] = [
+                c for c in checks
+                if isinstance(c, dict) and "detector_slug" in c
+            ]
+    return result
+
+
+def _build_profile(col_name: str, col_type: str, table: str):
+    from dqt.checks.suggest import ColumnProfile
+    name_lower = col_name.lower()
+    return ColumnProfile(
+        name=col_name,
+        data_type=col_type,
+        null_fraction=0.0,
+        distinct_count=0,
+        sample_values=[],
+        min_value=None,
+        max_value=None,
+        is_likely_pk=name_lower in ("id", f"{table}_id", "pk"),
+        is_likely_fk=(
+            name_lower.endswith("_id")
+            and name_lower not in ("id",)
+            and name_lower != f"{table}_id"
+        ),
+        is_likely_enum=False,
+        is_likely_email="email" in name_lower,
+        is_likely_timestamp=(
+            any(t in col_type.lower() for t in ("timestamp", "datetime", "date"))
+            or any(k in name_lower for k in ("_at", "_date", "timestamp", "created", "updated"))
+        ),
+        is_likely_currency=any(
+            k in name_lower for k in ("amount", "price", "revenue", "cost", "fee", "total", "usd", "eur")
+        ),
+        is_likely_country=name_lower in ("country", "country_code", "country_iso"),
+        sample_size_used=0,
+    )
+
+
 def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
-    """Get AI-powered check suggestions for selected tables in a source."""
-    from dqt.checks.suggest import ColumnProfile, suggest_checks_for_column
+    """Suggest data quality checks for selected tables using heuristics + Claude AI."""
+    from dqt.checks.suggest import SuggestedCheck, suggest_checks_for_column
 
     results: list[dict] = []
     try:
@@ -306,6 +408,11 @@ def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
         log.warning("suggest_adapter_failed", source_id=source.id, error=str(exc))
         return results
 
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        log.warning("suggest_no_anthropic_key", note="falling back to heuristics only")
+    rules_content = _load_column_concepts() if api_key else ""
+
     for table in tables:
         try:
             cols = adapter.describe_columns(schema, table)
@@ -313,37 +420,41 @@ def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
             log.warning("suggest_describe_failed", table=table, error=str(exc))
             continue
 
+        col_names = [c.name for c in cols]
+        col_types = [c.data_type for c in cols]
+
+        # Heuristic suggestions (always run, no API needed)
+        heuristic: dict[str, list[SuggestedCheck]] = {
+            c.name: suggest_checks_for_column(_build_profile(c.name, c.data_type, table), use_llm=False)
+            for c in cols
+        }
+
+        # LLM suggestions: one call for the whole table
+        llm: dict[str, list[dict]] = {}
+        if api_key and rules_content:
+            try:
+                llm = _llm_suggest_batch(table, col_names, col_types, rules_content, api_key)
+                log.info("suggest_llm_ok", table=table, columns=len(col_names))
+            except Exception as exc:
+                log.warning("suggest_llm_failed", table=table, error=str(exc))
+
+        # Merge: heuristic baseline + LLM additions, dedup by slug (highest confidence wins)
         for col in cols:
-            name_lower = col.name.lower()
-            profile = ColumnProfile(
-                name=col.name,
-                data_type=col.data_type,
-                null_fraction=0.0,
-                distinct_count=0,
-                sample_values=[],
-                min_value=None,
-                max_value=None,
-                is_likely_pk=name_lower in ("id", f"{table}_id", "pk"),
-                is_likely_fk=(
-                    name_lower.endswith("_id")
-                    and name_lower not in ("id",)
-                    and name_lower != f"{table}_id"
-                ),
-                is_likely_enum=False,
-                is_likely_email="email" in name_lower,
-                is_likely_timestamp=any(
-                    t in col.data_type.lower()
-                    for t in ("timestamp", "datetime", "date")
-                ) or any(k in name_lower for k in ("_at", "_date", "timestamp", "created", "updated")),
-                is_likely_currency=any(
-                    k in name_lower
-                    for k in ("amount", "price", "revenue", "cost", "fee", "total", "usd", "eur")
-                ),
-                is_likely_country=name_lower in ("country", "country_code", "country_iso"),
-                sample_size_used=0,
-            )
-            suggestions = suggest_checks_for_column(profile, use_llm=True)
-            for sugg in suggestions:
+            all_suggestions: list[SuggestedCheck] = list(heuristic[col.name])
+            for llm_check in llm.get(col.name, []):
+                all_suggestions.append(SuggestedCheck(
+                    detector_slug=llm_check["detector_slug"],
+                    params=llm_check.get("params", {}),
+                    rationale=llm_check.get("rationale", ""),
+                    confidence=float(llm_check.get("confidence", 0.65)),
+                ))
+
+            seen: dict[str, SuggestedCheck] = {}
+            for s in sorted(all_suggestions, key=lambda x: x.confidence, reverse=True):
+                if s.detector_slug not in seen:
+                    seen[s.detector_slug] = s
+
+            for sugg in seen.values():
                 tier = (
                     "essential" if sugg.confidence >= 0.80
                     else "recommended" if sugg.confidence >= 0.60
@@ -488,7 +599,7 @@ async def list_checks(
 @router.post("/checks/refresh")
 async def refresh_checks() -> dict:
     """Trigger a non-blocking refresh of all warehouse checks."""
-    asyncio.create_task(gigler_service.refresh())
+    asyncio.create_task(check_runner.refresh())
     return {"status": "refresh_started"}
 
 
@@ -527,7 +638,7 @@ async def get_column_profile(
     loop = asyncio.get_event_loop()
     adapter = await loop.run_in_executor(None, _make_adapter, s)
     return await loop.run_in_executor(
-        None, gigler_service._profile_column_sync, adapter, schema, dataset_id, column
+        None, check_runner._profile_column_sync, adapter, schema, dataset_id, column
     )
 
 

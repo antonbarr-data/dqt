@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, ChevronLeft, X, Sparkles } from "lucide-react";
+import { Check, Loader2, ChevronLeft, X, Sparkles, TrendingUp } from "lucide-react";
 import { clsx } from "clsx";
 
 type FieldDef = {
@@ -48,7 +48,7 @@ const ENGINE_FIELDS: Record<string, FieldDef[]> = {
   ],
 };
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 type CheckTier = "essential" | "recommended" | "full_coverage";
 
 interface HealthStep {
@@ -125,7 +125,11 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [activeTier, setActiveTier] = useState<CheckTier>("essential");
   const [selectedChecks, setSelectedChecks] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
+  const [savingChecks, setSavingChecks] = useState(false);
+
+  // Step 5 state
+  const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set());
+  const [savingMetrics, setSavingMetrics] = useState(false);
 
   const runHealthCheck = useCallback(async () => {
     setHealthSteps([]);
@@ -228,7 +232,6 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
   async function handleAdvanceToStep4() {
     if (!activeSourceId) { setStep(4); return; }
 
-    // Save table selection first
     await fetch(`/api/v1/sources/${encodeURIComponent(activeSourceId)}/tables`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -251,7 +254,6 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       if (res.ok) {
         const data: CheckSuggestion[] = await res.json();
         setSuggestions(data);
-        // Pre-select essential checks
         const keys = new Set(
           data
             .filter((s) => s.tier === "essential")
@@ -260,7 +262,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
         setSelectedChecks(keys);
       }
     } catch {
-      // suggestions optional; user can still finish
+      // suggestions optional
     } finally {
       setSuggestLoading(false);
     }
@@ -268,7 +270,6 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
 
   function handleTierChange(tier: CheckTier) {
     setActiveTier(tier);
-    // Auto-select all checks in the new tier scope
     const keys = new Set(
       suggestions
         .filter((s) => tierIncludes(tier, s.tier))
@@ -286,11 +287,26 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     });
   }
 
-  async function handleFinish() {
+  // Columns that have at least one selected check -- candidates for metrics
+  function checkedColumns(): Array<{ table: string; column: string; checkCount: number }> {
+    const map = new Map<string, number>();
+    selectedChecks.forEach((key) => {
+      const parts = key.split(".");
+      // key format: table.column.detector_slug -- column may contain dots
+      if (parts.length < 3) return;
+      const colKey = `${parts[0]}.${parts[1]}`;
+      map.set(colKey, (map.get(colKey) ?? 0) + 1);
+    });
+    return Array.from(map.entries()).map(([k, count]) => {
+      const dot = k.indexOf(".");
+      return { table: k.slice(0, dot), column: k.slice(dot + 1), checkCount: count };
+    });
+  }
+
+  async function handleAdvanceToStep5() {
     if (!activeSourceId) { router.push("/sources"); return; }
-    setSaving(true);
+    setSavingChecks(true);
     try {
-      // Save selected checks if any
       if (selectedChecks.size > 0) {
         const checksToSave = suggestions
           .filter((s) => selectedChecks.has(`${s.table}.${s.column}.${s.detector_slug}`))
@@ -307,9 +323,42 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
           body: JSON.stringify({ checks: checksToSave }),
         }).catch(() => null);
       }
+
+      const cols = checkedColumns();
+      if (cols.length === 0) {
+        router.push(`/sources/${activeSourceId}`);
+        return;
+      }
+      // Pre-select all checked columns as metrics
+      setSelectedMetrics(new Set(cols.map((c) => `${c.table}.${c.column}`)));
+      setStep(5);
+    } finally {
+      setSavingChecks(false);
+    }
+  }
+
+  async function handleFinish() {
+    if (!activeSourceId) { router.push("/sources"); return; }
+    setSavingMetrics(true);
+    try {
+      if (selectedMetrics.size > 0) {
+        const metricsToSave = checkedColumns()
+          .filter((c) => selectedMetrics.has(`${c.table}.${c.column}`))
+          .map((c) => ({
+            display_name: `${c.table}.${c.column}`,
+            kind: "count",
+            dataset: c.table,
+            description: `Auto-created from data quality checks on ${c.table}.${c.column}`,
+          }));
+        await fetch("/api/v1/metrics/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metrics: metricsToSave }),
+        }).catch(() => null);
+      }
       router.push(`/sources/${activeSourceId}`);
     } finally {
-      setSaving(false);
+      setSavingMetrics(false);
     }
   }
 
@@ -322,11 +371,20 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     });
   }
 
+  function toggleMetric(key: string) {
+    setSelectedMetrics((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   function setField(key: string, value: string) {
     setFormValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  const stepLabels = ["Configure", "Test & Verify", "Choose Datasets", "Review Checks"] as const;
+  const stepLabels = ["Configure", "Test & Verify", "Choose Datasets", "Review Checks", "Add Metrics"] as const;
 
   return (
     <div className="max-w-lg">
@@ -622,7 +680,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
             <div className="border border-line" style={{ background: "var(--bg-1)", maxHeight: 280, overflowY: "auto" }}>
               {suggestions.length === 0 ? (
                 <div className="px-4 py-6 t-small text-center" style={{ color: "var(--fg-3)" }}>
-                  {suggestLoading ? "Analyzing columns..." : "No checks suggested. You can add checks manually later."}
+                  No checks suggested. You can add checks manually later.
                 </div>
               ) : (
                 suggestions
@@ -677,15 +735,101 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
               Back
             </button>
             <button
-              onClick={handleFinish}
-              disabled={saving || suggestLoading}
+              onClick={handleAdvanceToStep5}
+              disabled={savingChecks || suggestLoading}
               className={clsx(
                 "flex items-center gap-2 px-4 py-2 t-small font-medium border transition-colors",
-                !saving && !suggestLoading ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
+                !savingChecks && !suggestLoading ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
               )}
               style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
             >
-              {saving ? "Saving..." : "Finish"}
+              {savingChecks ? "Saving..." : "Add Metrics"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Step 5: Add Metrics ---- */}
+      {step === 5 && (
+        <div className="space-y-5">
+          <div className="flex items-center gap-2">
+            <TrendingUp size={13} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
+            <span className="t-small font-medium" style={{ color: "var(--fg-0)" }}>Add columns as metrics</span>
+          </div>
+
+          <p className="t-small" style={{ color: "var(--fg-1)", lineHeight: 1.5 }}>
+            These columns have data quality checks. Add them to the semantic layer to track values over time and run causal analysis.
+          </p>
+
+          <div className="border border-line" style={{ background: "var(--bg-1)" }}>
+            {checkedColumns().length === 0 ? (
+              <div className="px-4 py-6 t-small text-center" style={{ color: "var(--fg-3)" }}>
+                No columns with checks to add as metrics.
+              </div>
+            ) : (
+              checkedColumns().map((c, i) => {
+                const key = `${c.table}.${c.column}`;
+                const checked = selectedMetrics.has(key);
+                return (
+                  <label
+                    key={key}
+                    className={clsx(
+                      "flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-bg-2",
+                      i > 0 && "border-t border-line"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleMetric(key)}
+                      style={{ accentColor: "var(--accent)", flexShrink: 0 }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="t-small font-mono" style={{ color: "var(--fg-0)" }}>
+                        {c.table}.{c.column}
+                      </p>
+                    </div>
+                    <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>
+                      {c.checkCount} {c.checkCount === 1 ? "check" : "checks"}
+                    </span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+
+          {checkedColumns().length > 0 && (
+            <p className="t-micro" style={{ color: "var(--fg-3)" }}>
+              {selectedMetrics.size} of {checkedColumns().length} columns selected
+            </p>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setStep(4)}
+              className="flex items-center gap-1.5 px-3 py-2 t-small border border-line transition-colors hover:bg-bg-2"
+              style={{ color: "var(--fg-1)" }}
+            >
+              <ChevronLeft size={13} strokeWidth={1.6} />
+              Back
+            </button>
+            <button
+              onClick={handleFinish}
+              disabled={savingMetrics}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 t-small font-medium border transition-colors",
+                !savingMetrics ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
+              )}
+              style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+            >
+              {savingMetrics ? "Saving..." : "Finish"}
+            </button>
+            <button
+              onClick={() => router.push(`/sources/${activeSourceId}`)}
+              className="px-3 py-2 t-small border border-line transition-colors hover:bg-bg-2"
+              style={{ color: "var(--fg-1)" }}
+            >
+              Skip
             </button>
           </div>
         </div>

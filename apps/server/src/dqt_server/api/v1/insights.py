@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.gigler import MetricDefinition
+from dqt_server.models.core import MetricDefinition
 
 from dqt.metrics import Metric, MetricKind, MetricRegistry
 
@@ -146,6 +146,45 @@ async def create_metric(body: MetricCreate, db: AsyncSession = Depends(get_db)) 
     global _registry
     _registry = None
     return {"fqn": fqn, "display_name": body.display_name}
+
+
+class MetricBatchItem(PydanticBaseModel):
+    display_name: str
+    kind: str = "ratio"
+    dataset: str
+    description: str = ""
+    owners: list[str] = []
+    tags: list[str] = []
+
+
+class MetricBatchBody(PydanticBaseModel):
+    metrics: list[MetricBatchItem]
+
+
+@router.post("/metrics/batch", status_code=201)
+async def create_metrics_batch(body: MetricBatchBody, db: AsyncSession = Depends(get_db)) -> dict:
+    import re
+    created = 0
+    for item in body.metrics:
+        slug = re.sub(r"[^a-z0-9_]", "_", item.display_name.lower())
+        fqn = f"custom.default.{item.dataset}.{slug}"
+        existing = await db.get(MetricDefinition, fqn)
+        if existing is None:
+            db.add(MetricDefinition(
+                fqn=fqn,
+                display_name=item.display_name,
+                kind=item.kind,
+                dataset=item.dataset,
+                description=item.description,
+                owners=item.owners,
+                tags=item.tags,
+                created_at=datetime.now(timezone.utc),
+            ))
+            created += 1
+    await db.commit()
+    global _registry
+    _registry = None
+    return {"created": created}
 
 
 @router.delete("/metrics/{fqn:path}")

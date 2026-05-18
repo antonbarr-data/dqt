@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt.insights.feed import FeedItem, rank
 from dqt_server.db.engine import get_db
-from dqt_server.models.gigler import CheckRun, MetricDefinition
+from dqt_server.models.core import CheckRun, MetricDefinition
 
 router = APIRouter(prefix="/api/v1/feed", tags=["feed"])
 

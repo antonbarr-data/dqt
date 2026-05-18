@@ -1,4 +1,4 @@
-"""GiglerService -- connects to warehouse sources, runs dqt checks,
+"""CheckRunner -- connects to warehouse sources, runs dqt checks,
 and persists results to Postgres so the API can serve them without hitting
 the warehouse on every request.
 """
@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from dqt_server.db.engine import AsyncSessionLocal
-from dqt_server.models.gigler import CheckRun, ColumnCheck, Dataset, Incident, Source
+from dqt_server.models.core import CheckRun, ColumnCheck, Dataset, Incident, Source
 
 log = structlog.get_logger(__name__)
 
@@ -222,7 +222,7 @@ def _run_user_checks_sync(
     return results
 
 
-class GiglerService:
+class CheckRunner:
     def __init__(self) -> None:
         self._refreshing = False
 
@@ -548,4 +548,4 @@ class GiglerService:
 
 
 # Module-level singleton
-gigler_service = GiglerService()
+check_runner = CheckRunner()

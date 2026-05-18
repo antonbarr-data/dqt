@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.gigler import ColumnCheck
+from dqt_server.models.core import ColumnCheck
 
 router = APIRouter(prefix="/api/v1", tags=["checks"])
 

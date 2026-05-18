@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.gigler import Dataset, Source
-from dqt_server.gigler_service import _make_adapter, _default_schema_for_source
+from dqt_server.models.core import Dataset, Source
+from dqt_server.check_runner import _make_adapter, _default_schema_for_source
 from dqt.checks.suggest import ColumnProfile, suggest_checks_for_column
 
 router = APIRouter(prefix="/api/v1", tags=["suggest"])
@@ -79,7 +79,7 @@ async def suggest_checks(
     profile_data: dict = {}
     if s is not None:
         try:
-            from dqt_server.gigler_service import gigler_service as _gs
+            from dqt_server.check_runner import check_runner as _gs
             adapter = await loop.run_in_executor(None, _make_adapter, s)
             schema = _default_schema_for_source(s)
             profile_data = await loop.run_in_executor(
