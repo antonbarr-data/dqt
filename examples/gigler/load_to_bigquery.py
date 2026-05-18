@@ -36,6 +36,12 @@ def is_combined(path: Path) -> bool:
     return not _SHARD_RE.search(path.stem)
 
 
+def read_project_from_credentials(credentials_path: str) -> str | None:
+    import json
+    with open(credentials_path) as f:
+        return json.load(f).get("quota_project_id")
+
+
 def load(credentials_path: str, project: str, dataset_name: str) -> None:
     try:
         import google.auth
@@ -94,7 +100,7 @@ def main() -> None:
         "--credentials", required=True,
         help="Path to application_default_credentials.json or service account JSON",
     )
-    parser.add_argument("--project", required=True, help="GCP project ID")
+    parser.add_argument("--project", default=None, help="GCP project ID (default: quota_project_id from credentials)")
     parser.add_argument("--dataset", default="gigler", help="BigQuery dataset name (default: gigler)")
     args = parser.parse_args()
 
@@ -102,7 +108,11 @@ def main() -> None:
     if not creds.exists():
         sys.exit(f"Credentials file not found: {creds}")
 
-    load(str(creds), args.project, args.dataset)
+    project = args.project or read_project_from_credentials(str(creds))
+    if not project:
+        sys.exit("Could not determine project ID -- pass --project or add quota_project_id to credentials")
+
+    load(str(creds), project, args.dataset)
 
 
 if __name__ == "__main__":
