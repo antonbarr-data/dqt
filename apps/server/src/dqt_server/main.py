@@ -1,6 +1,28 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+
+def _load_dotenv() -> None:
+    """Load .env from repo root if present (dev convenience -- no-op in prod)."""
+    candidate = Path(__file__).parents[4] / ".env"
+    if not candidate.exists():
+        return
+    with open(candidate) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key not in os.environ:
+                os.environ[key] = val
+
+
+_load_dotenv()
 
 import structlog
 from fastapi import FastAPI
