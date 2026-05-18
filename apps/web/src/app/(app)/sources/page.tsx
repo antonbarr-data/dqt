@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Plus } from "lucide-react";
+import { RefreshCw, Plus, Download } from "lucide-react";
 
 interface Source {
   id: string;
@@ -139,7 +139,7 @@ export default function SourcesPage() {
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line">
-              {["", "Name", "Engine", "Endpoint", "Tables", "Last sync", ""].map((h, i) => (
+              {["", "Name", "Engine", "Endpoint", "Tables", "Last sync", "", ""].map((h, i) => (
                 <th
                   key={i}
                   className={`px-3 py-2 t-micro ${i === 4 || i === 5 ? "text-right" : "text-left"}`}
@@ -186,6 +186,18 @@ export default function SourcesPage() {
                   style={{ color: s.status === "fail" ? "var(--fail)" : s.status === "warn" ? "var(--warn)" : "var(--fg-2)" }}
                 >
                   {s.last_sync ?? "--"}
+                </td>
+                <td className="px-3 py-2 t-small text-right" style={{ color: "var(--fg-3)" }}>
+                  <a
+                    href={`/api/v1/sources/${s.id}/export`}
+                    download
+                    onClick={e => e.stopPropagation()}
+                    className="inline-flex items-center justify-center w-6 h-6 border border-transparent hover:border-line transition-colors"
+                    style={{ color: "var(--fg-3)" }}
+                    title="Download YAML bundle"
+                  >
+                    <Download size={11} strokeWidth={1.6} />
+                  </a>
                 </td>
                 <td className="px-3 py-2 t-small text-right" style={{ color: "var(--fg-3)" }}>›</td>
               </tr>

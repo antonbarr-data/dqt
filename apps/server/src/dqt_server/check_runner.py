@@ -72,6 +72,19 @@ def _make_adapter(source: Source) -> Any:
         user = source.username or "postgres"
         conn_str = f"postgresql+psycopg2://{user}:{pw}@{source.host}:{source.port}/{source.db_name}"
         return PostgresAdapter(conn_str)
+    elif engine_lc == "bigquery":
+        from dqt.adapters.bigquery.adapter import BigQueryAdapter
+        import json as _json
+        project = source.host  # host field stores GCP project ID
+        client_kwargs: dict = {}
+        if source.password:
+            from google.oauth2 import service_account
+            sa_info = _json.loads(source.password)
+            client_kwargs["credentials"] = service_account.Credentials.from_service_account_info(
+                sa_info,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+        return BigQueryAdapter(project=project, **client_kwargs)
     else:
         raise ValueError(f"Unsupported engine for refresh: {source.engine}")
 
@@ -81,6 +94,8 @@ def _default_schema_for_source(source: Source) -> str:
     engine_lc = source.engine.lower()
     if engine_lc == "clickhouse":
         return source.db_name or "default"
+    if engine_lc == "bigquery":
+        return source.db_name or ""  # dataset name; empty = scan all
     return "public"
 
 

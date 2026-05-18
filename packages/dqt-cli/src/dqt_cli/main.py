@@ -2,6 +2,7 @@
 
 import typer
 
+from dqt_cli.commands.apply import apply_command
 from dqt_cli.commands.dashboard import dashboard_command
 from dqt_cli.commands.demo import reset_command, seed_command
 from dqt_cli.commands.healthcheck import healthcheck_command
@@ -15,6 +16,7 @@ from dqt_cli.commands.wiki import wiki_app
 
 app = typer.Typer(name="dqt", help="dqt data quality CLI", no_args_is_help=True)
 app.command("run")(run_command)
+app.command("apply")(apply_command)
 app.command("dashboard")(dashboard_command)
 app.command("healthcheck")(healthcheck_command)
 app.command("list-detectors")(list_detectors_command)

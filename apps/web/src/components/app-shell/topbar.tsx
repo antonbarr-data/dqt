@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Search, Bell, MessageSquare } from "lucide-react";
 import { getToken, decodeToken, clearToken } from "@/lib/auth";
 import Image from "next/image";
@@ -112,9 +113,10 @@ export function Topbar() {
       style={{ height: 44, background: "var(--bg-1)", flexShrink: 0, paddingRight: 16 }}
     >
       {/* logo — left-aligned, same width as sidebar */}
-      <div
+      <Link
+        href="/overview"
         className="flex items-center gap-2 px-4"
-        style={{ width: 224, flexShrink: 0, height: "100%" }}
+        style={{ width: 224, flexShrink: 0, height: "100%", textDecoration: "none" }}
       >
         <div
           className="flex items-center justify-center"
@@ -127,7 +129,7 @@ export function Topbar() {
         <span style={{ color: "var(--accent)", fontSize: 17, fontFamily: "var(--font-jetbrains-mono)", fontWeight: 300, letterSpacing: "-0.05em" }}>
           dqt
         </span>
-      </div>
+      </Link>
 
       {/* centered search — opens command palette */}
       <div className="flex-1 flex justify-center items-center gap-2">

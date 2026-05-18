@@ -6,7 +6,7 @@ import json as _json
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel
 from sqlalchemy import select
@@ -21,6 +21,16 @@ router = APIRouter(prefix="/api/v1", tags=["insights"])
 
 _pinned: set[str] = set()
 _registry: MetricRegistry | None = None
+
+
+def _run_causality_in_background() -> None:
+    """Lazy-import causal modules and trigger discovery. Safe to call after all modules load."""
+    try:
+        from dqt_server.api.v1.causal_compute import _run_discovery
+        from dqt_server.api.v1.causal_review import _store as _review_store
+        _run_discovery(_review_store)
+    except Exception:
+        pass  # Never crash a metric mutation because causality failed
 
 # Narrative cache keyed by (fqn, lookback_days); TTL 6h
 _CACHE_TTL_SECS = 6 * 3600
@@ -124,7 +134,7 @@ class MetricCreate(PydanticBaseModel):
 
 
 @router.post("/metrics", status_code=201)
-async def create_metric(body: MetricCreate, db: AsyncSession = Depends(get_db)) -> dict:
+async def create_metric(body: MetricCreate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)) -> dict:
     import re
     slug = re.sub(r"[^a-z0-9_]", "_", body.display_name.lower())
     fqn = f"custom.default.{body.dataset}.{slug}"
@@ -145,6 +155,7 @@ async def create_metric(body: MetricCreate, db: AsyncSession = Depends(get_db)) 
     await db.commit()
     global _registry
     _registry = None
+    background_tasks.add_task(_run_causality_in_background)
     return {"fqn": fqn, "display_name": body.display_name}
 
 
@@ -162,7 +173,7 @@ class MetricBatchBody(PydanticBaseModel):
 
 
 @router.post("/metrics/batch", status_code=201)
-async def create_metrics_batch(body: MetricBatchBody, db: AsyncSession = Depends(get_db)) -> dict:
+async def create_metrics_batch(body: MetricBatchBody, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)) -> dict:
     import re
     created = 0
     for item in body.metrics:
@@ -184,11 +195,13 @@ async def create_metrics_batch(body: MetricBatchBody, db: AsyncSession = Depends
     await db.commit()
     global _registry
     _registry = None
+    if created > 0:
+        background_tasks.add_task(_run_causality_in_background)
     return {"created": created}
 
 
 @router.delete("/metrics/{fqn:path}")
-async def delete_metric(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
+async def delete_metric(fqn: str, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)) -> dict:
     m = await db.get(MetricDefinition, fqn)
     if m is None:
         raise HTTPException(404, detail=f"Metric '{fqn}' not found")
@@ -196,6 +209,7 @@ async def delete_metric(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
     await db.commit()
     global _registry
     _registry = None
+    background_tasks.add_task(_run_causality_in_background)
     return {"fqn": fqn, "deleted": True}
 
 

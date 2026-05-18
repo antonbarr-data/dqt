@@ -49,6 +49,20 @@ def _run_health_check_sync(
         conn_str = f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{db_name}"
         adapter = PostgresAdapter(conn_str)
         hc = adapter.health_check()
+    elif engine_lc == "bigquery":
+        from dqt.adapters.bigquery.adapter import BigQueryAdapter
+        import json as _json
+        client_kwargs: dict = {}
+        if password:
+            from google.oauth2 import service_account
+            sa_info = _json.loads(password)
+            client_kwargs["credentials"] = service_account.Credentials.from_service_account_info(
+                sa_info,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+        # host field holds the GCP project ID for BigQuery
+        adapter = BigQueryAdapter(project=host, **client_kwargs)
+        hc = adapter.health_check()
     else:
         raise ValueError(f"Health check for engine '{engine}' is not yet supported")
     return {
@@ -653,6 +667,81 @@ async def get_incident(incident_id: int, db: AsyncSession = Depends(get_db)) -> 
 # ------------------------------------------------------------------
 # Overview
 # ------------------------------------------------------------------
+
+@router.get("/sources/{source_id}/export")
+async def export_source_bundle(source_id: str, db: AsyncSession = Depends(get_db)):
+    """Export a source + its datasets, checks, and metrics as a YAML bundle."""
+    import yaml
+    from fastapi.responses import Response
+    from dqt_server.models.core import MetricDefinition
+
+    s = await db.get(Source, source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{source_id}' not found")
+
+    datasets_q = await db.execute(select(Dataset).where(Dataset.source_id == source_id))
+    datasets = list(datasets_q.scalars().all())
+
+    dataset_ids = [d.id for d in datasets]
+    checks_q = await db.execute(
+        select(ColumnCheck).where(ColumnCheck.dataset_id.in_(dataset_ids))
+    ) if dataset_ids else None
+    checks = list(checks_q.scalars().all()) if checks_q else []
+
+    metrics_q = await db.execute(
+        select(MetricDefinition).where(MetricDefinition.dataset.in_(dataset_ids))
+    ) if dataset_ids else None
+    metrics = list(metrics_q.scalars().all()) if metrics_q else []
+
+    bundle = {
+        "apiVersion": "dqt/v1",
+        "kind": "Bundle",
+        "source": {
+            "id": s.id,
+            "name": s.name,
+            "engine": s.engine,
+            "host": s.host,
+            "port": s.port,
+            "db_name": s.db_name,
+            "username": s.username or "",
+            "secure": getattr(s, "secure", False),
+        },
+        "datasets": [
+            {"id": d.id, "schema": d.schema_name}
+            for d in datasets
+        ],
+        "checks": [
+            {
+                "dataset_id": c.dataset_id,
+                "column": c.column_name,
+                "detector": c.detector_slug,
+                "params": c.params or {},
+                "rationale": c.rationale or "",
+            }
+            for c in checks
+        ],
+        "metrics": [
+            {
+                "fqn": m.fqn,
+                "display_name": m.display_name,
+                "kind": m.kind,
+                "dataset": m.dataset,
+                "description": m.description,
+                "owners": m.owners or [],
+                "tags": m.tags or [],
+            }
+            for m in metrics
+        ],
+    }
+
+    content = yaml.dump(bundle, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    filename = f"dqt-bundle-{source_id}.yaml"
+    return Response(
+        content=content,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 @router.get("/overview")
 async def overview(db: AsyncSession = Depends(get_db)) -> dict:

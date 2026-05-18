@@ -139,9 +139,17 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     setHealthError(null);
 
     try {
-      const host = formValues.url || formValues.host || formValues.account || "";
-      const port = parseInt(formValues.port || "8443", 10);
-      const dbName = formValues.database || formValues.project || "default";
+      const isBQ = engine === "bigquery";
+      const host = isBQ
+        ? (formValues.project || "")
+        : (formValues.url || formValues.host || formValues.account || "");
+      const port = isBQ ? 0 : parseInt(formValues.port || "8443", 10);
+      const dbName = isBQ
+        ? (formValues.dataset || "")
+        : (formValues.database || formValues.project || "default");
+      const password = isBQ
+        ? (formValues.service_account_json || "")
+        : (formValues.password || "");
 
       const res = await fetch("/api/v1/sources/test", {
         method: "POST",
@@ -149,9 +157,9 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
         body: JSON.stringify({
           engine,
           host,
-          port: isNaN(port) ? 8443 : port,
+          port: isNaN(port) ? 0 : port,
           username: formValues.username || "",
-          password: formValues.password || "",
+          password,
           secure: formValues.secure === "true",
           db_name: dbName,
         }),
@@ -185,10 +193,18 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
 
   async function handleAdvanceToStep3() {
     if (mode === "create" && !activeSourceId) {
-      const host = formValues.url || formValues.host || formValues.account || "";
-      const port = parseInt(formValues.port || "8443", 10);
-      const dbName = formValues.database || formValues.project || "default";
-      const name = connectionName.trim() || `${engine}://${host}`;
+      const isBQ = engine === "bigquery";
+      const host = isBQ
+        ? (formValues.project || "")
+        : (formValues.url || formValues.host || formValues.account || "");
+      const port = isBQ ? 0 : parseInt(formValues.port || "8443", 10);
+      const dbName = isBQ
+        ? (formValues.dataset || "")
+        : (formValues.database || formValues.project || "default");
+      const password = isBQ
+        ? (formValues.service_account_json || "")
+        : (formValues.password || "");
+      const name = connectionName.trim() || (isBQ ? `bigquery://${host}` : `${engine}://${host}`);
 
       try {
         const res = await fetch("/api/v1/sources", {
@@ -198,9 +214,9 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
             name,
             engine,
             host,
-            port: isNaN(port) ? 8443 : port,
+            port: isNaN(port) ? 0 : port,
             username: formValues.username || "",
-            password: formValues.password || "",
+            password,
             secure: formValues.secure === "true",
             db_name: dbName,
           }),

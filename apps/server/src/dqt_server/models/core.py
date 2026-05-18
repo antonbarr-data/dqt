@@ -132,3 +132,19 @@ class MetricDefinition(Base):
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+
+class LineageEdgeRecord(Base):
+    __tablename__ = "lineage_edges"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    upstream_node: Mapped[str] = mapped_column(String, nullable=False)
+    upstream_label: Mapped[str] = mapped_column(String, nullable=False, default="")
+    downstream_node: Mapped[str] = mapped_column(String, nullable=False)
+    downstream_label: Mapped[str] = mapped_column(String, nullable=False, default="")
+    kind: Mapped[str] = mapped_column(String, nullable=False, default="column_lineage")
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
