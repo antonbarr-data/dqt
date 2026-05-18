@@ -59,16 +59,13 @@ def _bq_credentials_from_json(json_str: str):
         return service_account.Credentials.from_service_account_info(info, scopes=scopes)
     if cred_type == "authorized_user":
         from google.oauth2.credentials import Credentials
-        from google.auth.transport.requests import Request
-        creds = Credentials(
+        return Credentials(
             token=None,
             refresh_token=info["refresh_token"],
             token_uri="https://oauth2.googleapis.com/token",
             client_id=info["client_id"],
             client_secret=info["client_secret"],
         )
-        creds.refresh(Request())
-        return creds
     raise ValueError(
         f"Unsupported credentials type '{cred_type}'. "
         "Paste a service account JSON key or application default credentials."
