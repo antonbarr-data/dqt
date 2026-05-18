@@ -25,13 +25,8 @@ sys.path.insert(0, str(SERVER_SRC))
 
 
 def _load_dotenv() -> None:
-    """Parse env files from repo root without requiring python-dotenv.
-
-    Load order (later files do NOT override earlier ones):
-      1. local.env  -- local dev overrides (DATABASE_URL for localhost)
-      2. .env       -- secrets (API keys, production credentials)
-    """
-    for candidate in [REPO_ROOT / "local.env", REPO_ROOT / ".env"]:
+    """Parse .env from repo root without requiring python-dotenv."""
+    for candidate in [REPO_ROOT / ".env"]:
         if not candidate.exists():
             continue
         with open(candidate) as f:
