@@ -51,15 +51,10 @@ def _run_health_check_sync(
         hc = adapter.health_check()
     elif engine_lc == "bigquery":
         from dqt.adapters.bigquery.adapter import BigQueryAdapter
-        import json as _json
+        from dqt_server.check_runner import _bq_credentials_from_json
         client_kwargs: dict = {}
         if password:
-            from google.oauth2 import service_account
-            sa_info = _json.loads(password)
-            client_kwargs["credentials"] = service_account.Credentials.from_service_account_info(
-                sa_info,
-                scopes=["https://www.googleapis.com/auth/cloud-platform"],
-            )
+            client_kwargs["credentials"] = _bq_credentials_from_json(password)
         # host field holds the GCP project ID for BigQuery
         adapter = BigQueryAdapter(project=host, **client_kwargs)
         hc = adapter.health_check()

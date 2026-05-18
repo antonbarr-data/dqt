@@ -48,6 +48,33 @@ class TableCheckResult:
     error: str | None = None
 
 
+def _bq_credentials_from_json(json_str: str):
+    """Build Google credentials from either a service-account or authorized_user JSON."""
+    import json as _json
+    info = _json.loads(json_str)
+    cred_type = info.get("type", "")
+    scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+    if cred_type == "service_account":
+        from google.oauth2 import service_account
+        return service_account.Credentials.from_service_account_info(info, scopes=scopes)
+    if cred_type == "authorized_user":
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        creds = Credentials(
+            token=None,
+            refresh_token=info["refresh_token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=info["client_id"],
+            client_secret=info["client_secret"],
+        )
+        creds.refresh(Request())
+        return creds
+    raise ValueError(
+        f"Unsupported credentials type '{cred_type}'. "
+        "Paste a service account JSON key or application default credentials."
+    )
+
+
 def _make_adapter(source: Source) -> Any:
     """Create warehouse adapter from Source credentials."""
     engine_lc = source.engine.lower()
@@ -74,16 +101,10 @@ def _make_adapter(source: Source) -> Any:
         return PostgresAdapter(conn_str)
     elif engine_lc == "bigquery":
         from dqt.adapters.bigquery.adapter import BigQueryAdapter
-        import json as _json
         project = source.host  # host field stores GCP project ID
         client_kwargs: dict = {}
         if source.password:
-            from google.oauth2 import service_account
-            sa_info = _json.loads(source.password)
-            client_kwargs["credentials"] = service_account.Credentials.from_service_account_info(
-                sa_info,
-                scopes=["https://www.googleapis.com/auth/cloud-platform"],
-            )
+            client_kwargs["credentials"] = _bq_credentials_from_json(source.password)
         return BigQueryAdapter(project=project, **client_kwargs)
     else:
         raise ValueError(f"Unsupported engine for refresh: {source.engine}")
