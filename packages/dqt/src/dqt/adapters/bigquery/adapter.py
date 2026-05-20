@@ -74,9 +74,15 @@ class BigQueryAdapter:
     def _step_auth(self) -> HealthCheckStep:
         t0 = time.perf_counter()
         try:
-            df = self._bq.query("SELECT SESSION_USER() AS u").to_dataframe()
-            user = df["u"].iloc[0] if not df.empty else "unknown"
-            return HealthCheckStep("auth", "pass", (time.perf_counter() - t0) * 1000, f"user={user}")
+            # Use the credentials directly to avoid requiring db-dtypes for a simple probe.
+            creds = self._bq._credentials
+            if hasattr(creds, "service_account_email"):
+                identity = creds.service_account_email
+            elif hasattr(creds, "client_id"):
+                identity = f"oauth:{creds.client_id[:12]}..."
+            else:
+                identity = self._project
+            return HealthCheckStep("auth", "pass", (time.perf_counter() - t0) * 1000, f"identity={identity}")
         except Exception as exc:
             return HealthCheckStep("auth", "fail", 0.0, str(exc))
 
@@ -105,7 +111,8 @@ class BigQueryAdapter:
     def _step_latency(self) -> HealthCheckStep:
         t0 = time.perf_counter()
         try:
-            self._bq.query("SELECT 1").to_dataframe()
+            # list_datasets avoids db-dtypes and is a representative round-trip probe.
+            list(self._bq.list_datasets(max_results=1))
             latency = (time.perf_counter() - t0) * 1000
             return HealthCheckStep("latency_probe", "pass", latency, f"{latency:.1f}ms")
         except Exception as exc:

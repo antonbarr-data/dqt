@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -134,10 +136,49 @@ async def _setup_db() -> None:
             log.info("seeded_super_admin", email=SEEDED_SYSADMIN_EMAIL)
 
 
+async def _scheduler_loop() -> None:
+    """Every 60 s: fire check_runner.refresh() for any due enabled schedules."""
+    from sqlalchemy import select as _select
+    from dqt_server.api.v1.schedules import compute_next_run
+    from dqt_server.check_runner import check_runner
+    from dqt_server.models.core import CheckSchedule
+
+    while True:
+        await asyncio.sleep(60)
+        if AsyncSessionLocal is None:
+            continue
+        try:
+            now = datetime.now(timezone.utc)
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    _select(CheckSchedule).where(
+                        CheckSchedule.enabled.is_(True),
+                        CheckSchedule.next_run_at <= now,
+                    )
+                )
+                due = result.scalars().all()
+                if due:
+                    asyncio.create_task(check_runner.refresh())
+                    for s in due:
+                        s.last_run_at = now
+                        s.next_run_at = compute_next_run(
+                            s.cadence, s.run_hour, s.run_minute,
+                            list(s.days_of_week or []), s.day_of_month or 1, now,
+                        )
+                    await db.commit()
+                    log.info("scheduled_refresh_fired", count=len(due))
+        except Exception as exc:
+            log.error("scheduler_loop_error", error=str(exc))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _setup_db()
-    yield
+    sched_task = asyncio.create_task(_scheduler_loop())
+    try:
+        yield
+    finally:
+        sched_task.cancel()
 
 
 app = FastAPI(title="dqt API", version="0.1.0", lifespan=lifespan)
@@ -163,6 +204,7 @@ from dqt_server.api.v1.causal_review import router as causal_review_router
 from dqt_server.api.v1.checks import router as checks_router
 from dqt_server.api.v1.detectors import router as detectors_router
 from dqt_server.api.v1.causal_compute import router as causal_compute_router
+from dqt_server.api.v1.schedules import router as schedules_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -179,6 +221,7 @@ app.include_router(causal_review_router)
 app.include_router(checks_router)
 app.include_router(detectors_router)
 app.include_router(causal_compute_router)
+app.include_router(schedules_router)
 
 
 @app.get("/health", tags=["ops"])

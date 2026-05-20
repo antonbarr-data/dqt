@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ChevronRight, ChevronDown, Database, Table2, Plus, Columns } from "lucide-react";
+import { ChevronRight, ChevronDown, Database, Table2, Plus, Columns, Trash2, Loader2 } from "lucide-react";
 import { SuggestPanel } from "@/components/checks/suggest-panel";
 
 // ---------------------------------------------------------------------------
@@ -129,15 +129,19 @@ function extractColumns(checks: CheckResult[]): Array<{ name: string; verdict: s
 function ColumnExpanded({
   datasetId,
   column,
+  onColumnDeleted,
 }: {
   datasetId: string;
   column: string;
+  onColumnDeleted?: () => void;
 }) {
   const [checks, setChecks] = useState<ColumnCheck[]>([]);
   const [loading, setLoading] = useState(true);
   const [slug, setSlug] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [deletingColumn, setDeletingColumn] = useState(false);
+  const [confirmDeleteCol, setConfirmDeleteCol] = useState(false);
 
   const loadChecks = useCallback(() => {
     setLoading(true);
@@ -151,6 +155,14 @@ function ColumnExpanded({
   useEffect(() => {
     loadChecks();
   }, [loadChecks]);
+
+  function handleDeleteColumn() {
+    setDeletingColumn(true);
+    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}`, { method: "DELETE" })
+      .then(() => { onColumnDeleted?.(); })
+      .catch(() => setDeletingColumn(false))
+      .finally(() => { setDeletingColumn(false); setConfirmDeleteCol(false); });
+  }
 
   function handleAdd() {
     if (!slug.trim()) return;
@@ -257,6 +269,38 @@ function ColumnExpanded({
         </p>
         <SuggestPanel datasetId={datasetId} column={column} />
       </div>
+
+      {/* Delete column */}
+      <div className="py-3 flex items-center justify-end gap-2">
+        {confirmDeleteCol ? (
+          <>
+            <button
+              onClick={handleDeleteColumn}
+              disabled={deletingColumn}
+              className="flex items-center gap-1 px-2 py-0.5 t-micro border transition-colors"
+              style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
+            >
+              {deletingColumn ? <Loader2 size={10} strokeWidth={2} className="animate-spin" /> : "remove column"}
+            </button>
+            <button
+              onClick={() => setConfirmDeleteCol(false)}
+              className="t-micro px-1 hover:opacity-60"
+              style={{ color: "var(--fg-3)" }}
+            >
+              ✕
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setConfirmDeleteCol(true)}
+            className="t-micro flex items-center gap-1 hover:opacity-70 transition-opacity"
+            style={{ color: "var(--fg-3)" }}
+          >
+            <Trash2 size={10} strokeWidth={1.6} />
+            remove from monitoring
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -281,6 +325,8 @@ export default function DatasetsPage() {
   const [datasetDetail, setDatasetDetail] = useState<DatasetDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [confirmDeleteDataset, setConfirmDeleteDataset] = useState<string | null>(null);
+  const [deletingDataset, setDeletingDataset] = useState(false);
 
   // Load sources
   useEffect(() => {
@@ -321,6 +367,27 @@ export default function DatasetsPage() {
       .catch((e: unknown) => setDetailError(String(e)))
       .finally(() => setDetailLoading(false));
   }, [selectedDatasetId]);
+
+  function handleDeleteDataset(datasetId: string) {
+    setDeletingDataset(true);
+    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}`, { method: "DELETE" })
+      .then(() => {
+        setDatasets((prev) => prev.filter((d) => d.id !== datasetId));
+        if (selectedDatasetId === datasetId) {
+          setSelectedDatasetId(null);
+          setDatasetDetail(null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { setDeletingDataset(false); setConfirmDeleteDataset(null); });
+  }
+
+  function handleColumnDeleted(col: string) {
+    setDatasetDetail((prev) => {
+      if (!prev) return prev;
+      return { ...prev, checks: prev.checks.filter((c) => c.column !== col) };
+    });
+  }
 
   // When source selection changes, clear dataset selection
   function handleSelectSource(id: string) {
@@ -538,39 +605,73 @@ export default function DatasetsPage() {
                     schemaDatassets.map((ds) => {
                       const isSelected = selectedDatasetId === ds.id;
                       return (
-                        <button
+                        <div
                           key={ds.id}
-                          onClick={() => setSelectedDatasetId(ds.id)}
-                          className="w-full flex items-center gap-2 pl-6 pr-3 py-2 text-left border-b transition-colors"
+                          className="flex items-center border-b"
                           style={{
                             borderColor: "var(--line)",
                             background: isSelected ? "var(--accent-bg)" : "transparent",
                             borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
-                            cursor: "pointer",
                           }}
                         >
-                          <Table2
-                            size={12}
-                            strokeWidth={1.6}
-                            style={{
-                              color: isSelected ? "var(--accent)" : "var(--fg-3)",
-                              flexShrink: 0,
-                            }}
-                          />
-                          <span
-                            className="t-small flex-1 truncate"
-                            style={{
-                              color: isSelected ? "var(--fg-0)" : "var(--fg-1)",
-                              fontFamily: "var(--font-jetbrains-mono)",
-                            }}
+                          <button
+                            onClick={() => setSelectedDatasetId(ds.id)}
+                            className="flex-1 flex items-center gap-2 pl-6 pr-2 py-2 text-left transition-colors"
+                            style={{ cursor: "pointer", minWidth: 0 }}
                           >
-                            {ds.id}
-                          </span>
-                          <StatusDot status={ds.status} />
-                          <span className="t-micro" style={{ color: "var(--fg-3)" }}>
-                            {ds.column_count ?? "--"}
-                          </span>
-                        </button>
+                            <Table2
+                              size={12}
+                              strokeWidth={1.6}
+                              style={{
+                                color: isSelected ? "var(--accent)" : "var(--fg-3)",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span
+                              className="t-small flex-1 truncate"
+                              style={{
+                                color: isSelected ? "var(--fg-0)" : "var(--fg-1)",
+                                fontFamily: "var(--font-jetbrains-mono)",
+                              }}
+                            >
+                              {ds.id}
+                            </span>
+                            <StatusDot status={ds.status} />
+                            <span className="t-micro" style={{ color: "var(--fg-3)" }}>
+                              {ds.column_count ?? "--"}
+                            </span>
+                          </button>
+                          <div className="px-1 flex items-center" onClick={(e) => e.stopPropagation()}>
+                            {confirmDeleteDataset === ds.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleDeleteDataset(ds.id)}
+                                  disabled={deletingDataset}
+                                  className="t-micro px-1.5 py-0.5 border transition-colors"
+                                  style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
+                                >
+                                  {deletingDataset ? <Loader2 size={9} strokeWidth={2} className="animate-spin" /> : "del"}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteDataset(null)}
+                                  className="t-micro hover:opacity-60"
+                                  style={{ color: "var(--fg-3)" }}
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteDataset(ds.id)}
+                                className="w-5 h-5 flex items-center justify-center border border-transparent hover:border-line transition-colors"
+                                style={{ color: "var(--fg-3)" }}
+                                title="Remove dataset"
+                              >
+                                <Trash2 size={10} strokeWidth={1.6} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
                 </div>
@@ -643,7 +744,7 @@ export default function DatasetsPage() {
             </div>
           )}
           {!detailLoading && !detailError && datasetDetail && (
-            <ColumnList dataset={datasetDetail} />
+            <ColumnList dataset={datasetDetail} onColumnDeleted={handleColumnDeleted} />
           )}
         </div>
       </div>
@@ -655,7 +756,7 @@ export default function DatasetsPage() {
 // Column list component (separated to isolate expanded state)
 // ---------------------------------------------------------------------------
 
-function ColumnList({ dataset }: { dataset: DatasetDetail }) {
+function ColumnList({ dataset, onColumnDeleted }: { dataset: DatasetDetail; onColumnDeleted?: (col: string) => void }) {
   const [expandedCol, setExpandedCol] = useState<string | null>(null);
   const columns = extractColumns(dataset.checks);
 
@@ -726,7 +827,14 @@ function ColumnList({ dataset }: { dataset: DatasetDetail }) {
                 )}
               </button>
               {isExpanded && (
-                <ColumnExpanded datasetId={dataset.id} column={col.name} />
+                <ColumnExpanded
+                  datasetId={dataset.id}
+                  column={col.name}
+                  onColumnDeleted={() => {
+                    setExpandedCol(null);
+                    onColumnDeleted?.(col.name);
+                  }}
+                />
               )}
             </div>
           );

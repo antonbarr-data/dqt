@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RefreshCw, Plus, Download } from "lucide-react";
+import { Download, Trash2, Loader2 } from "lucide-react";
 
 interface Source {
   id: string;
@@ -71,7 +71,8 @@ export default function SourcesPage() {
   const router = useRouter();
   const [sources, setSources] = useState<Source[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadSources = useCallback(async () => {
     try {
@@ -86,13 +87,14 @@ export default function SourcesPage() {
 
   useEffect(() => { loadSources(); }, [loadSources]);
 
-  async function handleSyncAll() {
-    setSyncing(true);
+  async function handleDelete(id: string) {
+    setDeleting(true);
     try {
-      await fetch("/api/v1/checks/refresh", { method: "POST" });
-      setTimeout(() => { loadSources(); setSyncing(false); }, 2000);
-    } catch {
-      setSyncing(false);
+      await fetch(`/api/v1/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
+      setSources((prev) => prev.filter((s) => s.id !== id));
+    } finally {
+      setDeleting(false);
+      setConfirmDeleteId(null);
     }
   }
 
@@ -112,25 +114,6 @@ export default function SourcesPage() {
               Warehouses dqt watches. Tables here become <strong style={{ color: "var(--fg-1)", fontWeight: 500 }}>datasets</strong> in the semantic layer; metrics defined on top of them are what dqt baselines and explains.
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleSyncAll}
-              disabled={syncing}
-              className="flex items-center gap-1.5 px-3 py-1.5 t-small border border-line transition-colors hover:bg-bg-2 disabled:opacity-50"
-              style={{ color: "var(--fg-1)" }}
-            >
-              <RefreshCw size={11} strokeWidth={1.6} className={syncing ? "animate-spin" : ""} />
-              {syncing ? "Syncing..." : "Sync all"}
-            </button>
-            <Link
-              href="/sources/new/postgres"
-              className="flex items-center gap-1.5 px-3 py-1.5 t-small border transition-colors hover:opacity-80"
-              style={{ background: "var(--bg-2)", color: "var(--fg-0)", borderColor: "var(--line-3)" }}
-            >
-              <Plus size={11} strokeWidth={1.6} />
-              Add connection
-            </Link>
-          </div>
         </div>
       </div>
 
@@ -139,7 +122,7 @@ export default function SourcesPage() {
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line">
-              {["", "Name", "Engine", "Endpoint", "Tables", "Last sync", "", ""].map((h, i) => (
+              {["", "Name", "Engine", "Endpoint", "Tables", "Last sync", "", "", ""].map((h, i) => (
                 <th
                   key={i}
                   className={`px-3 py-2 t-micro ${i === 4 || i === 5 ? "text-right" : "text-left"}`}
@@ -153,13 +136,13 @@ export default function SourcesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center t-small" style={{ color: "var(--fg-3)" }}>
+                <td colSpan={9} className="px-3 py-6 text-center t-small" style={{ color: "var(--fg-3)" }}>
                   Loading sources...
                 </td>
               </tr>
             ) : sources.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center t-small" style={{ color: "var(--fg-3)" }}>
+                <td colSpan={9} className="px-3 py-6 text-center t-small" style={{ color: "var(--fg-3)" }}>
                   No sources connected yet. Add a connection below.
                 </td>
               </tr>
@@ -198,6 +181,42 @@ export default function SourcesPage() {
                   >
                     <Download size={11} strokeWidth={1.6} />
                   </a>
+                </td>
+                <td
+                  className="px-3 py-2 text-right"
+                  style={{ width: 120 }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {confirmDeleteId === s.id ? (
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        onClick={() => handleDelete(s.id)}
+                        disabled={deleting}
+                        className="flex items-center gap-1 px-2 py-0.5 t-micro border transition-colors"
+                        style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
+                      >
+                        {deleting
+                          ? <Loader2 size={10} strokeWidth={2} className="animate-spin" />
+                          : "delete"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="t-micro px-1 transition-colors hover:opacity-60"
+                        style={{ color: "var(--fg-3)" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(s.id)}
+                      className="inline-flex items-center justify-center w-6 h-6 border border-transparent hover:border-line transition-colors ml-auto"
+                      style={{ color: "var(--fg-3)" }}
+                      title="Delete source"
+                    >
+                      <Trash2 size={11} strokeWidth={1.6} />
+                    </button>
+                  )}
                 </td>
                 <td className="px-3 py-2 t-small text-right" style={{ color: "var(--fg-3)" }}>›</td>
               </tr>

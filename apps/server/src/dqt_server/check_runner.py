@@ -59,17 +59,45 @@ def _bq_credentials_from_json(json_str: str):
         return service_account.Credentials.from_service_account_info(info, scopes=scopes)
     if cred_type == "authorized_user":
         from google.oauth2.credentials import Credentials
-        return Credentials(
+        creds = Credentials(
             token=None,
             refresh_token=info["refresh_token"],
             token_uri="https://oauth2.googleapis.com/token",
             client_id=info["client_id"],
             client_secret=info["client_secret"],
         )
+        quota_project = info.get("quota_project_id")
+        if quota_project:
+            creds = creds.with_quota_project(quota_project)
+        return creds
     raise ValueError(
         f"Unsupported credentials type '{cred_type}'. "
         "Paste a service account JSON key or application default credentials."
     )
+
+
+def _bq_credentials_from_password(password: str | None):
+    """Resolve BQ credentials from the stored password field.
+
+    Empty/None → Application Default Credentials (ADC).
+    Non-empty  → service-account / authorized_user JSON string.
+    Returns (credentials, project_id_or_None).
+    """
+    if not password:
+        import google.auth
+        creds, project = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        return creds, project
+    return _bq_credentials_from_json(password), _bq_project_from_json(password)
+
+
+def _bq_project_from_json(json_str: str) -> str | None:
+    """Extract the GCP project ID from a credentials JSON string, or None."""
+    try:
+        import json as _json
+        info = _json.loads(json_str)
+        return info.get("quota_project_id") or info.get("project_id")
+    except Exception:
+        return None
 
 
 def _make_adapter(source: Source) -> Any:
@@ -98,11 +126,9 @@ def _make_adapter(source: Source) -> Any:
         return PostgresAdapter(conn_str)
     elif engine_lc == "bigquery":
         from dqt.adapters.bigquery.adapter import BigQueryAdapter
-        project = source.host  # host field stores GCP project ID
-        client_kwargs: dict = {}
-        if source.password:
-            client_kwargs["credentials"] = _bq_credentials_from_json(source.password)
-        return BigQueryAdapter(project=project, **client_kwargs)
+        creds, inferred_project = _bq_credentials_from_password(source.password)
+        project = source.host or inferred_project or ""
+        return BigQueryAdapter(project=project, credentials=creds)
     else:
         raise ValueError(f"Unsupported engine for refresh: {source.engine}")
 

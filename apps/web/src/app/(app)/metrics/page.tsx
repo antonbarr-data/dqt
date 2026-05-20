@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
 
 interface MetricSummary {
   fqn: string;
@@ -36,6 +36,8 @@ export default function MetricsPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const [confirmDeleteFqn, setConfirmDeleteFqn] = useState<string | null>(null);
+  const [deletingFqn, setDeletingFqn] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formName, setFormName] = useState("");
   const [formKind, setFormKind] = useState<"ratio" | "count" | "sum" | "model">("ratio");
@@ -60,6 +62,14 @@ export default function MetricsPage() {
   }, []);
 
   useEffect(() => { loadMetrics(); }, [loadMetrics]);
+
+  function handleDeleteMetric(fqn: string) {
+    setDeletingFqn(true);
+    fetch(`/api/v1/metrics/${encodeURIComponent(fqn)}`, { method: "DELETE" })
+      .then(() => setMetrics((prev) => prev.filter((m) => m.fqn !== fqn)))
+      .catch(() => {})
+      .finally(() => { setDeletingFqn(false); setConfirmDeleteFqn(null); });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -228,7 +238,7 @@ export default function MetricsPage() {
             <table className="w-full" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr className="border-b border-line">
-                  {["", "Metric", "Dataset", "Kind", "Owners", "Last run"].map((h, i) => (
+                  {["", "Metric", "Dataset", "Kind", "Owners", "Last run", ""].map((h, i) => (
                     <th key={i} className="px-3 py-2 text-left t-micro"
                         style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                       {h}
@@ -254,6 +264,36 @@ export default function MetricsPage() {
                     <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-2)" }}>{m.kind}</td>
                     <td className="px-3 py-2 t-small" style={{ color: "var(--fg-2)" }}>{m.owners.join(", ")}</td>
                     <td className="px-3 py-2 t-small" style={{ color: "var(--fg-3)" }}>{m.last_run ?? "--"}</td>
+                    <td className="px-3 py-2 text-right" style={{ width: 100 }} onClick={(e) => e.stopPropagation()}>
+                      {confirmDeleteFqn === m.fqn ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleDeleteMetric(m.fqn)}
+                            disabled={deletingFqn}
+                            className="flex items-center gap-1 px-2 py-0.5 t-micro border transition-colors"
+                            style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
+                          >
+                            {deletingFqn ? <Loader2 size={10} strokeWidth={2} className="animate-spin" /> : "delete"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteFqn(null)}
+                            className="t-micro px-1 hover:opacity-60"
+                            style={{ color: "var(--fg-3)" }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteFqn(m.fqn)}
+                          className="inline-flex items-center justify-center w-6 h-6 border border-transparent hover:border-line transition-colors ml-auto"
+                          style={{ color: "var(--fg-3)" }}
+                          title="Delete metric"
+                        >
+                          <Trash2 size={11} strokeWidth={1.6} />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

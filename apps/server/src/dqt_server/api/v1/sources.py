@@ -10,8 +10,9 @@ from pathlib import Path
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete as sa_delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
@@ -19,7 +20,7 @@ from dqt_server.check_runner import (
     _make_adapter, _default_schema_for_source, _list_tables_for_source_sync,
     check_runner,
 )
-from dqt_server.models.core import CheckRun, ColumnCheck, Dataset, Incident, Source
+from dqt_server.models.core import CheckRun, ColumnCheck, Dataset, Incident, MetricDefinition, Source
 
 _STEP_DISPLAY = {
     "tcp_reach": "TCP Reach",
@@ -51,12 +52,10 @@ def _run_health_check_sync(
         hc = adapter.health_check()
     elif engine_lc == "bigquery":
         from dqt.adapters.bigquery.adapter import BigQueryAdapter
-        from dqt_server.check_runner import _bq_credentials_from_json
-        client_kwargs: dict = {}
-        if password:
-            client_kwargs["credentials"] = _bq_credentials_from_json(password)
-        # host field holds the GCP project ID for BigQuery
-        adapter = BigQueryAdapter(project=host, **client_kwargs)
+        from dqt_server.check_runner import _bq_credentials_from_password
+        creds, inferred_project = _bq_credentials_from_password(password or "")
+        project = host or inferred_project or ""
+        adapter = BigQueryAdapter(project=project, credentials=creds)
         hc = adapter.health_check()
     else:
         raise ValueError(f"Health check for engine '{engine}' is not yet supported")
@@ -229,6 +228,31 @@ async def get_source(source_id: str, db: AsyncSession = Depends(get_db)) -> dict
     if s is None:
         raise HTTPException(404, detail=f"Source '{source_id}' not found")
     return _source_dict(s)
+
+
+@router.delete("/sources/{source_id}", status_code=204)
+async def delete_source(source_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    s = await db.get(Source, source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{source_id}' not found")
+
+    datasets_q = await db.execute(select(Dataset).where(Dataset.source_id == source_id))
+    datasets = list(datasets_q.scalars().all())
+    dataset_ids = [d.id for d in datasets]
+
+    if dataset_ids:
+        # ColumnChecks and MetricDefinitions have no ORM cascade — delete manually first.
+        await db.execute(sa_delete(ColumnCheck).where(ColumnCheck.dataset_id.in_(dataset_ids)))
+        await db.execute(
+            sa_delete(MetricDefinition).where(MetricDefinition.dataset.in_(dataset_ids))
+        )
+        # ORM delete triggers cascade for CheckRuns + Incidents.
+        for d in datasets:
+            await db.delete(d)
+
+    await db.delete(s)
+    await db.commit()
+    return Response(status_code=204)
 
 
 class UpdateTablesBody(BaseModel):
@@ -413,6 +437,14 @@ def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
     try:
         adapter = _make_adapter(source)
         schema = _default_schema_for_source(source)
+        # If schema is empty (e.g. BigQuery with no dataset configured), pick the first available.
+        if not schema:
+            try:
+                schemas = adapter.list_schemas()
+                if schemas:
+                    schema = schemas[0]
+            except Exception:
+                pass
     except Exception as exc:
         log.warning("suggest_adapter_failed", source_id=source.id, error=str(exc))
         return results
@@ -547,6 +579,20 @@ async def list_datasets(db: AsyncSession = Depends(get_db)) -> list[dict]:
     return [_dataset_dict(d) for d in result.scalars().all()]
 
 
+@router.delete("/datasets/{dataset_id}", status_code=204)
+async def delete_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    d = await db.get(Dataset, dataset_id)
+    if d is None:
+        raise HTTPException(404, detail=f"Dataset '{dataset_id}' not found")
+    await db.execute(sa_delete(ColumnCheck).where(ColumnCheck.dataset_id == dataset_id))
+    await db.execute(
+        sa_delete(MetricDefinition).where(MetricDefinition.dataset == dataset_id)
+    )
+    await db.delete(d)
+    await db.commit()
+    return Response(status_code=204)
+
+
 @router.get("/datasets/{dataset_id}")
 async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) -> dict:
     d = await db.get(Dataset, dataset_id)
@@ -668,7 +714,6 @@ async def export_source_bundle(source_id: str, db: AsyncSession = Depends(get_db
     """Export a source + its datasets, checks, and metrics as a YAML bundle."""
     import yaml
     from fastapi.responses import Response
-    from dqt_server.models.core import MetricDefinition
 
     s = await db.get(Source, source_id)
     if s is None:

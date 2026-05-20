@@ -25,6 +25,7 @@ dependencies = [
     "structlog>=24.0",
     "pyyaml>=6.0",
     "google-cloud-bigquery>=3.0",
+    "db-dtypes>=1.0",
     "dqtlib>=0.9.1",
 ]
 

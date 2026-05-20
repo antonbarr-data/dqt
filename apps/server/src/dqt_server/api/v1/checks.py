@@ -7,11 +7,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.core import ColumnCheck
+from dqt_server.models.core import CheckRun, ColumnCheck
 
 router = APIRouter(prefix="/api/v1", tags=["checks"])
 
@@ -92,6 +92,20 @@ async def update_check(
     return _to_dict(check)
 
 
+@router.delete("/datasets/{dataset_id}/columns/{column}", status_code=204)
+async def delete_column(
+    dataset_id: str, column: str, db: AsyncSession = Depends(get_db)
+) -> None:
+    from sqlalchemy import delete as sa_delete
+    await db.execute(
+        sa_delete(ColumnCheck).where(
+            ColumnCheck.dataset_id == dataset_id,
+            ColumnCheck.column_name == column,
+        )
+    )
+    await db.commit()
+
+
 @router.delete("/checks/{check_id}")
 async def delete_check(check_id: str, db: AsyncSession = Depends(get_db)) -> dict:
     check = await db.get(ColumnCheck, check_id)
@@ -100,3 +114,44 @@ async def delete_check(check_id: str, db: AsyncSession = Depends(get_db)) -> dic
     await db.delete(check)
     await db.commit()
     return {"id": check_id, "deleted": True}
+
+
+_VERDICT_SCORE = {"pass": 100, "warn": 60, "fail": 0}
+
+
+@router.get("/score")
+async def get_platform_score(db: AsyncSession = Depends(get_db)) -> dict:
+    checks_q = await db.execute(select(ColumnCheck))
+    checks = checks_q.scalars().all()
+
+    results = []
+    for c in checks:
+        run_q = await db.execute(
+            select(CheckRun)
+            .where(
+                CheckRun.dataset_id == c.dataset_id,
+                CheckRun.column_name == c.column_name,
+                CheckRun.detector_slug == c.detector_slug,
+            )
+            .order_by(desc(CheckRun.ran_at))
+            .limit(1)
+        )
+        run = run_q.scalars().first()
+        if run is None:
+            continue
+        verdict = run.verdict or "fail"
+        results.append({
+            "id": c.id,
+            "dataset_id": c.dataset_id,
+            "column": c.column_name,
+            "detector_slug": c.detector_slug,
+            "score": _VERDICT_SCORE.get(verdict, 0),
+            "verdict": verdict,
+            "ran_at": run.ran_at.isoformat(),
+        })
+
+    platform_score = (
+        round(sum(r["score"] for r in results) / len(results))
+        if results else None
+    )
+    return {"platform_score": platform_score, "checks": results}

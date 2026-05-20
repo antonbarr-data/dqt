@@ -13,24 +13,19 @@ import {
   AlertTriangle,
   CheckSquare,
   Users,
-  BookOpen,
-  Shield,
-  ScrollText,
   Phone,
   ClipboardList,
   MessageSquare,
-  Bell,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { isSysAdmin } from "@/lib/auth";
 
 const NAV_GROUPS = [
   {
-    label: null, // no section header for the top items
+    label: null,
     items: [
       { label: "Overview", href: "/overview", icon: LayoutDashboard, count: null },
       { label: "Ask", href: "/ask", icon: MessageSquare, count: null },
-      { label: "Subscriptions", href: "/subscriptions", icon: Bell, count: null },
     ],
   },
   {
@@ -53,14 +48,6 @@ const NAV_GROUPS = [
     items: [
       { label: "Incidents", href: "/incidents", icon: AlertTriangle, count: null, countFail: true },
       { label: "Checks", href: "/checks", icon: CheckSquare, count: null },
-    ],
-  },
-  {
-    label: "Govern",
-    items: [
-      { label: "Catalog", href: "/catalog", icon: BookOpen, count: null },
-      { label: "Policies", href: "/policies", icon: Shield, count: null },
-      { label: "Audit", href: "/audit", icon: ScrollText, count: null },
     ],
   },
   {
