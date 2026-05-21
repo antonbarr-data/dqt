@@ -40,22 +40,6 @@ The core library (`packages/dqt`) is zero-dependency on web or server infrastruc
 
 ---
 
-## Screenshots
-
-**Overview** — fleet KPIs, dataset health table with sparklines, live activity feed
-
-![Overview dashboard](docs/screenshots/overview.png)
-
-**Incident detail** — statistical evidence, distribution overlay, causal trace, AI explanation
-
-![Incident detail](docs/screenshots/incident.png)
-
-**Causality DAG** — confirmed metric→metric graph, Shapley attribution, KL divergence matrix
-
-![Causality DAG](docs/screenshots/causality.png)
-
----
-
 ## Core capability hierarchy
 
 ### Data Lineage
