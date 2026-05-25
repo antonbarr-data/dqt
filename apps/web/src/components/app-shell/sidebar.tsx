@@ -293,23 +293,23 @@ function NavItem({ item, pathname, open, pinned, hovered, onHover, onPin, itemH 
         {open && <span className="flex-1 whitespace-nowrap">{item.label}</span>}
       </Link>
 
-      {/* Pin button — only visible when open and hovering */}
-      {open && hovered && (
+      {/* Pin button — always visible when pinned; visible on hover otherwise */}
+      {open && (pinned || hovered) && (
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPin(item.label); }}
-          className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center transition-opacity hover:opacity-100"
+          className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center"
           style={{
-            width: 18,
-            height: 18,
-            color: pinned ? "var(--accent)" : "var(--fg-3)",
-            opacity: pinned ? 1 : 0.6,
+            width: 20,
+            height: 20,
+            color: pinned ? "var(--accent)" : "var(--fg-1)",
+            opacity: 1,
           }}
           title={pinned ? "Unpin" : "Pin to top"}
         >
           <Pin
-            size={12}
-            strokeWidth={1.6}
+            size={13}
+            strokeWidth={2}
             style={{ transform: pinned ? "rotate(45deg)" : "none", transition: "transform 0.12s" }}
           />
         </button>
