@@ -68,6 +68,12 @@ async def _setup_db() -> None:
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS good_direction VARCHAR",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS refresh_cadence VARCHAR",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS lineage JSONB",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS expr_type VARCHAR",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS expr_sql TEXT",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS numerator_sql TEXT",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS denominator_sql TEXT",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS filter_sql TEXT",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS time_column VARCHAR",
         ]:
             try:
                 await conn.execute(text(stmt))
