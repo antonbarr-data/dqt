@@ -131,7 +131,7 @@ export default function MetricsPage() {
   // Suggest state
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [datasets, setDatasets] = useState<DatasetItem[]>([]);
-  const [selectedDataset, setSelectedDataset] = useState("");
+  const [selectedDatasets, setSelectedDatasets] = useState<string[]>([]);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestedMetric[]>([]);
   const [addedFqns, setAddedFqns] = useState<Set<string>>(new Set());
@@ -161,41 +161,42 @@ export default function MetricsPage() {
       if (res?.ok) {
         const data: DatasetItem[] = await res.json();
         setDatasets(data);
-        if (data.length > 0) setSelectedDataset(data[0].id);
       }
     }
   }
 
+  function toggleDataset(id: string) {
+    setSelectedDatasets((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+    );
+  }
+
   async function runSuggest() {
-    if (!selectedDataset) return;
+    if (selectedDatasets.length === 0) return;
     setSuggesting(true);
     setSuggestError(null);
     setSuggestions([]);
     try {
-      const colsRes = await fetch(`${API}/api/v1/datasets/${encodeURIComponent(selectedDataset)}/columns`);
-      if (!colsRes.ok) throw new Error("Could not fetch columns for this dataset");
-      const cols: { name: string; data_type: string; nullable: boolean }[] = await colsRes.json();
-      if (cols.length === 0) throw new Error("No columns found in this dataset");
-
-      const dataset = datasets.find((d) => d.id === selectedDataset);
-      const tableName = dataset?.id ?? selectedDataset;
+      const results = await Promise.all(
+        selectedDatasets.map(async (datasetId) => {
+          const res = await fetch(`${API}/api/v1/datasets/${encodeURIComponent(datasetId)}/columns`);
+          if (!res.ok) throw new Error(`Could not fetch columns for ${datasetId}`);
+          const cols: { name: string; data_type: string; nullable: boolean }[] = await res.json();
+          return cols.map((c) => ({ dataset: datasetId, column: c.name, data_type: c.data_type, null_rate: 0.0 }));
+        })
+      );
+      const allCols = results.flat();
+      if (allCols.length === 0) throw new Error("No columns found in the selected datasets");
 
       const sugRes = await fetch(`${API}/api/v1/metrics/suggest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          columns: cols.map((c) => ({
-            dataset: tableName,
-            column: c.name,
-            data_type: c.data_type,
-            null_rate: 0.0,
-          })),
-        }),
+        body: JSON.stringify({ columns: allCols }),
       });
       if (!sugRes.ok) throw new Error("Suggestion failed");
       const result = await sugRes.json();
       if (!result.metrics || result.metrics.length === 0) {
-        setSuggestError("No metric candidates found in this dataset. Try a fact or aggregation table.");
+        setSuggestError("No metric candidates found in the selected datasets. Try fact or aggregation tables.");
       } else {
         setSuggestions(result.metrics);
       }
@@ -324,28 +325,44 @@ export default function MetricsPage() {
               <p className="t-small" style={{ color: "var(--fg-3)" }}>No datasets found. Connect a source first.</p>
             )}
             {datasets.length > 0 && suggestions.length === 0 && !suggesting && (
-              <div className="flex items-center gap-3">
-                <div>
-                  <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Dataset</label>
-                  <select
-                    value={selectedDataset}
-                    onChange={(e) => setSelectedDataset(e.target.value)}
-                    className="px-2 py-1.5 t-small border border-line font-mono"
-                    style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none", minWidth: 260 }}
-                  >
-                    {datasets.map((d) => (
-                      <option key={d.id} value={d.id}>{d.id}</option>
-                    ))}
-                  </select>
+              <div>
+                <label className="t-micro block mb-2" style={{ color: "var(--fg-2)" }}>
+                  Select datasets
+                  {selectedDatasets.length > 0 && (
+                    <span className="ml-2 font-mono" style={{ color: "var(--accent)" }}>
+                      {selectedDatasets.length} selected
+                    </span>
+                  )}
+                </label>
+                <div className="border border-line mb-3" style={{ maxHeight: 200, overflowY: "auto" }}>
+                  {datasets.map((d) => {
+                    const checked = selectedDatasets.includes(d.id);
+                    return (
+                      <label
+                        key={d.id}
+                        className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-bg-2 border-b border-line last:border-0"
+                        style={{ color: checked ? "var(--fg-0)" : "var(--fg-2)" }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDataset(d.id)}
+                          className="accent-accent"
+                          style={{ width: 13, height: 13, flexShrink: 0 }}
+                        />
+                        <span className="t-small font-mono">{d.id}</span>
+                      </label>
+                    );
+                  })}
                 </div>
                 <button
                   onClick={runSuggest}
-                  disabled={!selectedDataset}
-                  className="mt-5 flex items-center gap-1.5 px-4 py-1.5 t-small border transition-colors hover:opacity-80 disabled:opacity-40"
+                  disabled={selectedDatasets.length === 0}
+                  className="flex items-center gap-1.5 px-4 py-1.5 t-small border transition-colors hover:opacity-80 disabled:opacity-40"
                   style={{ color: "var(--accent)", borderColor: "var(--accent)" }}
                 >
                   <Sparkles size={12} strokeWidth={1.8} />
-                  Analyze
+                  Analyze {selectedDatasets.length > 1 ? `${selectedDatasets.length} datasets` : ""}
                 </button>
               </div>
             )}
@@ -362,14 +379,18 @@ export default function MetricsPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="t-small" style={{ color: "var(--fg-2)" }}>
-                    <span style={{ color: "var(--fg-0)" }}>{suggestions.length}</span> suggestions for <span className="font-mono" style={{ color: "var(--fg-1)" }}>{selectedDataset}</span>
+                    <span style={{ color: "var(--fg-0)" }}>{suggestions.length}</span> suggestions
+                    {selectedDatasets.length === 1
+                      ? <> for <span className="font-mono" style={{ color: "var(--fg-1)" }}>{selectedDatasets[0]}</span></>
+                      : <> across <span style={{ color: "var(--fg-1)" }}>{selectedDatasets.length} datasets</span></>
+                    }
                   </p>
                   <button
                     onClick={() => { setSuggestions([]); setSuggestError(null); }}
                     className="t-micro border border-line px-2 py-0.5 hover:opacity-80"
                     style={{ color: "var(--fg-3)" }}
                   >
-                    Try another dataset
+                    Change selection
                   </button>
                 </div>
                 <div className="divide-y divide-line border border-line">
