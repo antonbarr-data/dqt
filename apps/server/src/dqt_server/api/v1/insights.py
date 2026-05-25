@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.core import MetricCausalEdge, MetricDefinition
+from dqt_server.models.core import MetricCausalEdge, MetricDefinition, MetricRun
 
 from dqt.metrics import Metric, MetricKind, MetricRegistry
 
@@ -135,6 +135,13 @@ class MetricCreate(PydanticBaseModel):
     description: str = ""
     owners: list[str] = []
     tags: list[str] = []
+    source_id: str | None = None
+    expr_type: str | None = None
+    expr_sql: str | None = None
+    numerator_sql: str | None = None
+    denominator_sql: str | None = None
+    filter_sql: str | None = None
+    time_column: str | None = None
 
 
 @router.post("/metrics", status_code=201)
@@ -153,6 +160,13 @@ async def create_metric(body: MetricCreate, background_tasks: BackgroundTasks, d
         description=body.description,
         owners=body.owners,
         tags=body.tags,
+        source_id=body.source_id,
+        expr_type=body.expr_type,
+        expr_sql=body.expr_sql,
+        numerator_sql=body.numerator_sql,
+        denominator_sql=body.denominator_sql,
+        filter_sql=body.filter_sql,
+        time_column=body.time_column,
         created_at=datetime.now(timezone.utc),
     )
     db.add(m)
@@ -176,6 +190,12 @@ class MetricBatchItem(PydanticBaseModel):
     additivity: str | None = None
     good_direction: str | None = None
     refresh_cadence: str | None = None
+    expr_type: str | None = None
+    expr_sql: str | None = None
+    numerator_sql: str | None = None
+    denominator_sql: str | None = None
+    filter_sql: str | None = None
+    time_column: str | None = None
 
 
 class MetricBatchBody(PydanticBaseModel):
@@ -205,6 +225,12 @@ async def create_metrics_batch(body: MetricBatchBody, background_tasks: Backgrou
                 additivity=item.additivity,
                 good_direction=item.good_direction,
                 refresh_cadence=item.refresh_cadence,
+                expr_type=item.expr_type,
+                expr_sql=item.expr_sql,
+                numerator_sql=item.numerator_sql,
+                denominator_sql=item.denominator_sql,
+                filter_sql=item.filter_sql,
+                time_column=item.time_column,
                 created_at=datetime.now(timezone.utc),
             ))
             created += 1
@@ -237,6 +263,12 @@ class MetricPatch(PydanticBaseModel):
     good_direction: str | None = None
     refresh_cadence: str | None = None
     lineage: list | None = None
+    expr_type: str | None = None
+    expr_sql: str | None = None
+    numerator_sql: str | None = None
+    denominator_sql: str | None = None
+    filter_sql: str | None = None
+    time_column: str | None = None
 
 
 @router.patch("/metrics/{fqn:path}", status_code=200)
@@ -266,6 +298,18 @@ async def patch_metric(fqn: str, body: MetricPatch, db: AsyncSession = Depends(g
         m.refresh_cadence = body.refresh_cadence or None
     if body.lineage is not None:
         m.lineage = body.lineage
+    if body.expr_type is not None:
+        m.expr_type = body.expr_type or None
+    if body.expr_sql is not None:
+        m.expr_sql = body.expr_sql or None
+    if body.numerator_sql is not None:
+        m.numerator_sql = body.numerator_sql or None
+    if body.denominator_sql is not None:
+        m.denominator_sql = body.denominator_sql or None
+    if body.filter_sql is not None:
+        m.filter_sql = body.filter_sql or None
+    if body.time_column is not None:
+        m.time_column = body.time_column or None
     await db.commit()
     global _registry
     _registry = None
@@ -486,6 +530,86 @@ async def suggest_metrics(body: MetricSuggestBody) -> dict:
     return {"metrics": heuristic, "rejected_candidates": rejected}
 
 
+class ExpressionPreviewBody(PydanticBaseModel):
+    dataset: str
+    source_id: str
+    expr_sql: str
+
+
+@router.post("/metrics/evaluate-expression")
+async def evaluate_expression(body: ExpressionPreviewBody, db: AsyncSession = Depends(get_db)) -> dict:
+    """Run an aggregate expression against a warehouse dataset and return the scalar result.
+    Does not require an existing metric. Used for expression preview during metric creation."""
+    from dqt_server.models.core import Dataset, Source
+    from dqt_server.check_runner import _make_adapter, _default_schema_for_source
+    from dqt.adapters._protocol import AggExpr
+
+    d = await db.get(Dataset, body.dataset)
+    if d is None:
+        raise HTTPException(404, detail=f"Dataset '{body.dataset}' not found")
+    s = await db.get(Source, body.source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{body.source_id}' not found")
+
+    loop = asyncio.get_event_loop()
+
+    def _run() -> dict:
+        adapter = _make_adapter(s)
+        if s.engine == "bigquery" and "." in body.dataset:
+            schema, table = body.dataset.split(".", 1)
+        else:
+            schema = _default_schema_for_source(s) or d.schema_name or "public"
+            table = body.dataset
+        try:
+            result = adapter.aggregate(schema, table, [AggExpr("result", body.expr_sql)])
+            val = result.get("result")
+            return {"value": float(val) if val is not None else None, "error": None}
+        except Exception as exc:
+            return {"value": None, "error": str(exc)}
+
+    return await loop.run_in_executor(None, _run)
+
+
+@router.post("/metrics/{fqn:path}/evaluate")
+async def evaluate_metric(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Run the saved expression for an existing metric, store the result in metric_runs."""
+    from dqt_server.models.core import Dataset, Source, MetricRun
+    from dqt_server.check_runner import _make_adapter, _default_schema_for_source
+    from dqt.adapters._protocol import AggExpr
+
+    row = await db.get(MetricDefinition, fqn)
+    if row is None:
+        raise HTTPException(404, detail=f"Metric '{fqn}' not found")
+    if not row.expr_sql or not row.source_id:
+        raise HTTPException(400, detail="Metric has no expression or source configured")
+
+    d = await db.get(Dataset, row.dataset)
+    s = await db.get(Source, row.source_id)
+    if d is None or s is None:
+        raise HTTPException(400, detail="Dataset or source not found for this metric")
+
+    loop = asyncio.get_event_loop()
+
+    def _run() -> float | None:
+        adapter = _make_adapter(s)
+        if s.engine == "bigquery" and "." in row.dataset:
+            schema, table = row.dataset.split(".", 1)
+        else:
+            schema = _default_schema_for_source(s) or d.schema_name or "public"
+            table = row.dataset
+        result = adapter.aggregate(schema, table, [AggExpr("result", row.expr_sql)])
+        val = result.get("result")
+        return float(val) if val is not None else None
+
+    value = await loop.run_in_executor(None, _run)
+    ran_at = datetime.now(timezone.utc)
+    db.add(MetricRun(fqn=fqn, value=value, ran_at=ran_at))
+    await db.commit()
+    global _registry
+    _registry = None
+    return {"value": value, "ran_at": ran_at.isoformat()}
+
+
 @router.delete("/metrics/{fqn:path}")
 async def delete_metric(fqn: str, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)) -> dict:
     m = await db.get(MetricDefinition, fqn)
@@ -662,6 +786,12 @@ async def get_metric(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
         "current_verdict": m.current_verdict if m else None,
         "last_run": m.last_run if m else None,
         "pinned": fqn in _pinned,
+        "expr_type": row.expr_type,
+        "expr_sql": row.expr_sql,
+        "numerator_sql": row.numerator_sql,
+        "denominator_sql": row.denominator_sql,
+        "filter_sql": row.filter_sql,
+        "time_column": row.time_column,
     }
 
 
