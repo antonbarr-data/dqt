@@ -172,6 +172,10 @@ class MetricBatchItem(PydanticBaseModel):
     tags: list[str] = []
     source_id: str | None = None
     column_name: str | None = None
+    grain: str | None = None
+    additivity: str | None = None
+    good_direction: str | None = None
+    refresh_cadence: str | None = None
 
 
 class MetricBatchBody(PydanticBaseModel):
@@ -197,6 +201,10 @@ async def create_metrics_batch(body: MetricBatchBody, background_tasks: Backgrou
                 tags=item.tags,
                 source_id=item.source_id,
                 column_name=item.column_name,
+                grain=item.grain,
+                additivity=item.additivity,
+                good_direction=item.good_direction,
+                refresh_cadence=item.refresh_cadence,
                 created_at=datetime.now(timezone.utc),
             ))
             created += 1
@@ -224,6 +232,11 @@ class MetricPatch(PydanticBaseModel):
     tags: list[str] | None = None
     warn_threshold: float | None = None
     fail_threshold: float | None = None
+    grain: str | None = None
+    additivity: str | None = None
+    good_direction: str | None = None
+    refresh_cadence: str | None = None
+    lineage: list | None = None
 
 
 @router.patch("/metrics/{fqn:path}", status_code=200)
@@ -243,6 +256,16 @@ async def patch_metric(fqn: str, body: MetricPatch, db: AsyncSession = Depends(g
         m.warn_threshold = body.warn_threshold
     if body.fail_threshold is not None:
         m.fail_threshold = body.fail_threshold
+    if body.grain is not None:
+        m.grain = body.grain or None
+    if body.additivity is not None:
+        m.additivity = body.additivity or None
+    if body.good_direction is not None:
+        m.good_direction = body.good_direction or None
+    if body.refresh_cadence is not None:
+        m.refresh_cadence = body.refresh_cadence or None
+    if body.lineage is not None:
+        m.lineage = body.lineage
     await db.commit()
     global _registry
     _registry = None
@@ -522,15 +545,16 @@ async def get_causal_edges(fqn: str, db: AsyncSession = Depends(get_db)) -> list
 
 
 @router.get("/metrics/{fqn:path}/profile")
-async def get_metric_profile(fqn: str) -> dict:
-    """Return descriptive stats and a 20-bucket histogram from the 30-day series."""
+async def get_metric_profile(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Return descriptive stats, histogram, seasonality fingerprint, and known data issues."""
     import math
     import random
     import statistics
 
+    # 91 days (13 weeks) of synthetic series, seeded by fqn
     rng = random.Random(hash(fqn) % 2**31)
     values: list[float] = []
-    for i in range(30):
+    for i in range(91):
         base = 0.87 + 0.08 * math.sin(2 * math.pi * i / 7)
         values.append(max(0.0, min(1.0, base + rng.gauss(0, 0.02))))
 
@@ -539,6 +563,13 @@ async def get_metric_profile(fqn: str) -> dict:
     stddev = statistics.stdev(values)
     min_val = min(values)
     max_val = max(values)
+
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    p25 = sorted_vals[max(0, int(n * 0.25) - 1)]
+    p75 = sorted_vals[min(n - 1, int(n * 0.75))]
+    cv = round(stddev / mean, 4) if mean != 0 else 0.0
+    trailing_13w_mean = round(mean, 4)  # all 91 values = 13-week mean
 
     n_buckets = 20
     bucket_size = (max_val - min_val) / n_buckets if max_val > min_val else 1.0
@@ -551,24 +582,87 @@ async def get_metric_profile(fqn: str) -> dict:
         for i in range(n_buckets)
     ]
 
+    # Seasonality fingerprint — average value per day-of-week (Mon=0..Sun=6)
+    start_dow = (datetime.now(timezone.utc) - timedelta(days=90)).weekday()
+    dow_sums = [0.0] * 7
+    dow_counts = [0] * 7
+    for i, v in enumerate(values):
+        dow = (start_dow + i) % 7
+        dow_sums[dow] += v
+        dow_counts[dow] += 1
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    seasonality = [
+        {"day": day_names[d], "avg": round(dow_sums[d] / dow_counts[d], 4) if dow_counts[d] > 0 else 0.0}
+        for d in range(7)
+    ]
+
+    # Known data issues — query actual check_runs for this metric's dataset
+    from dqt_server.models.core import CheckRun
+    known_data_issues: list[dict] = []
+    row = await db.get(MetricDefinition, fqn)
+    if row and row.dataset:
+        result = await db.execute(
+            select(CheckRun)
+            .where(CheckRun.dataset_id == row.dataset, CheckRun.verdict.in_(["warn", "fail"]))
+            .order_by(CheckRun.ran_at.desc())
+            .limit(5)
+        )
+        for cr in result.scalars().all():
+            known_data_issues.append({
+                "detector": cr.detector_slug,
+                "column": cr.column_name,
+                "verdict": cr.verdict,
+                "message": cr.plain_english or cr.detector_slug,
+                "ran_at": cr.ran_at.isoformat() if cr.ran_at else None,
+            })
+
     return {
         "mean": round(mean, 4),
         "median": round(median, 4),
         "stddev": round(stddev, 4),
         "min": round(min_val, 4),
         "max": round(max_val, 4),
+        "p25": round(p25, 4),
+        "p75": round(p75, 4),
+        "cv": cv,
+        "trailing_13w_mean": trailing_13w_mean,
         "count": len(values),
         "null_rate": 0.0,
         "histogram": histogram,
+        "seasonality": seasonality,
+        "known_data_issues": known_data_issues,
     }
 
 
 @router.get("/metrics/{fqn:path}")
-async def get_metric(fqn: str) -> dict:
-    metric = _get_registry().get(fqn)
-    if metric is None:
+async def get_metric(fqn: str, db: AsyncSession = Depends(get_db)) -> dict:
+    row = await db.get(MetricDefinition, fqn)
+    if row is None:
         raise HTTPException(status_code=404, detail=f"Metric '{fqn}' not found")
-    return _metric_to_dict(metric)
+    m = _get_registry().get(fqn)
+    return {
+        "fqn": row.fqn,
+        "display_name": row.display_name,
+        "kind": row.kind,
+        "dataset": row.dataset,
+        "description": row.description or "",
+        "owners": row.owners or [],
+        "tags": row.tags or [],
+        "grain": row.grain,
+        "additivity": row.additivity,
+        "good_direction": row.good_direction,
+        "refresh_cadence": row.refresh_cadence,
+        "lineage": row.lineage or [],
+        "source_id": row.source_id,
+        "column_name": row.column_name,
+        "warn_threshold": row.warn_threshold,
+        "fail_threshold": row.fail_threshold,
+        "unit": m.unit if m else "",
+        "current_value": m.current_value if m else None,
+        "current_verdict": m.current_verdict if m else None,
+        "last_run": m.last_run if m else None,
+        "pinned": fqn in _pinned,
+    }
 
 
 @router.post("/metrics/{fqn:path}/pin")

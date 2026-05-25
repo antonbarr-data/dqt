@@ -133,6 +133,11 @@ class MetricDefinition(Base):
     column_name: Mapped[str | None] = mapped_column(String, nullable=True)
     warn_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     fail_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    grain: Mapped[str | None] = mapped_column(String, nullable=True)
+    additivity: Mapped[str | None] = mapped_column(String, nullable=True)
+    good_direction: Mapped[str | None] = mapped_column(String, nullable=True)
+    refresh_cadence: Mapped[str | None] = mapped_column(String, nullable=True)
+    lineage: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),

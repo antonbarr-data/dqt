@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { InsightClient } from "./insight-client";
 import { SubscribeButton } from "@/components/subscriptions/subscribe-button";
+import { MetricProfilePanel } from "./metric-profile-panel";
+import { SeasonalityChart } from "./seasonality-chart";
 
 interface MetricDetail {
   fqn: string;
@@ -20,6 +22,11 @@ interface MetricDetail {
   current_verdict: string | null;
   last_run: string | null;
   pinned: boolean;
+  grain: string | null;
+  additivity: string | null;
+  good_direction: string | null;
+  refresh_cadence: string | null;
+  lineage: { label: string; kind?: string }[];
 }
 
 interface MetricProfile {
@@ -28,9 +35,21 @@ interface MetricProfile {
   stddev: number;
   min: number;
   max: number;
+  p25: number;
+  p75: number;
+  cv: number;
+  trailing_13w_mean: number;
   count: number;
   null_rate: number;
   histogram: { x: number; count: number }[];
+  seasonality: { day: string; avg: number }[];
+  known_data_issues: { detector: string; column: string | null; verdict: string; message: string; ran_at: string | null }[];
+}
+
+function fmt(v: number): string {
+  if (Math.abs(v) >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (Math.abs(v) >= 1) return v.toFixed(3);
+  return v.toFixed(4);
 }
 
 export default async function MetricInsightPage({
@@ -51,6 +70,17 @@ export default async function MetricInsightPage({
     metric.current_verdict === "warn" ? "var(--warn)" :
     metric.current_verdict === "pass" ? "var(--pass)" : "var(--fg-3)";
 
+  const stats: { label: string; value: string; dim?: boolean }[] = profile ? [
+    { label: "Current", value: metric.current_value != null ? fmt(metric.current_value) : "—", dim: metric.current_value == null },
+    { label: "p25", value: fmt(profile.p25) },
+    { label: "Median", value: fmt(profile.median) },
+    { label: "p75", value: fmt(profile.p75) },
+    { label: "13w Mean", value: fmt(profile.trailing_13w_mean) },
+    { label: "CV", value: (profile.cv * 100).toFixed(1) + "%" },
+    { label: "Min", value: fmt(profile.min) },
+    { label: "Max", value: fmt(profile.max) },
+  ] : [];
+
   return (
     <div className="p-6 max-w-5xl">
       {/* Breadcrumb */}
@@ -64,9 +94,9 @@ export default async function MetricInsightPage({
       </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-2">
+      <div className="flex items-start justify-between mb-1">
         <div>
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex items-center gap-3 mb-0.5">
             <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>{metric.display_name}</h1>
             {metric.current_verdict && (
               <span className="t-micro px-1.5 py-0.5 font-mono"
@@ -76,10 +106,7 @@ export default async function MetricInsightPage({
               </span>
             )}
           </div>
-          <p className="t-small font-mono mb-1" style={{ color: "var(--fg-3)" }}>{metric.fqn}</p>
-          {metric.description && (
-            <p className="t-small" style={{ color: "var(--fg-2)", maxWidth: 560 }}>{metric.description}</p>
-          )}
+          <p className="t-micro font-mono mb-2" style={{ color: "var(--fg-3)" }}>{metric.fqn}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {metric.owners.map((o) => (
@@ -90,9 +117,20 @@ export default async function MetricInsightPage({
         </div>
       </div>
 
+      {/* Profile panel: definition, grain, additivity, direction, cadence, lineage — editable */}
+      <MetricProfilePanel
+        fqn={decodedFqn}
+        description={metric.description}
+        grain={metric.grain}
+        additivity={metric.additivity}
+        good_direction={metric.good_direction}
+        refresh_cadence={metric.refresh_cadence}
+        lineage={metric.lineage}
+      />
+
       {/* Meta line */}
-      <div className="flex items-center gap-4 mb-8 t-micro"
-           style={{ color: "var(--fg-3)", borderBottom: "1px solid var(--line)", paddingBottom: "12px" }}>
+      <div className="flex items-center gap-4 mb-5 t-micro"
+           style={{ color: "var(--fg-3)", borderTop: "1px solid var(--line)", paddingTop: "10px" }}>
         <span>dataset: <span className="font-mono">{metric.dataset}</span></span>
         <span>kind: <span className="font-mono">{metric.kind}</span></span>
         {metric.last_run && <span>last run: {metric.last_run}</span>}
@@ -101,22 +139,58 @@ export default async function MetricInsightPage({
         ))}
       </div>
 
-      {/* Stats strip */}
-      {profile && (
-        <div className="grid grid-cols-6 gap-px mb-8" style={{ background: "var(--line)" }}>
-          {([
-            { label: "Mean", value: profile.mean.toFixed(4) },
-            { label: "Median", value: profile.median.toFixed(4) },
-            { label: "Stddev", value: profile.stddev.toFixed(4) },
-            { label: "Min", value: profile.min.toFixed(4) },
-            { label: "Max", value: profile.max.toFixed(4) },
-            { label: "Points", value: profile.count.toLocaleString() },
-          ] as { label: string; value: string }[]).map(({ label, value }) => (
-            <div key={label} className="px-3 py-2" style={{ background: "var(--bg-1)" }}>
+      {/* Stats strip — 8 cells */}
+      {profile && stats.length > 0 && (
+        <div className="grid grid-cols-8 gap-px mb-5" style={{ background: "var(--line)" }}>
+          {stats.map(({ label, value, dim }) => (
+            <div key={label} className="px-3 py-2.5" style={{ background: "var(--bg-1)" }}>
               <p className="t-micro mb-0.5" style={{ color: "var(--fg-3)" }}>{label}</p>
-              <p className="t-small font-mono" style={{ color: "var(--fg-0)" }}>{value}</p>
+              <p className="t-small font-mono" style={{ color: dim ? "var(--fg-3)" : "var(--fg-0)" }}>{value}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Seasonality + Known issues */}
+      {profile && (profile.seasonality.length > 0 || profile.known_data_issues.length > 0) && (
+        <div className="grid grid-cols-[1fr_1fr] gap-4 mb-6">
+          {profile.seasonality.length > 0 && (
+            <div className="border border-line p-3" style={{ background: "var(--bg-1)" }}>
+              <SeasonalityChart data={profile.seasonality} mean={profile.mean} />
+            </div>
+          )}
+          {(
+            <div className="border border-line p-3" style={{ background: "var(--bg-1)" }}>
+              <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Known data issues
+              </p>
+              {profile.known_data_issues.length === 0 ? (
+                <p className="t-small" style={{ color: "var(--pass)" }}>No recent issues</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {profile.known_data_issues.map((issue, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span
+                        className="t-micro px-1.5 py-0.5 flex-shrink-0 font-mono"
+                        style={{
+                          background: issue.verdict === "fail" ? "var(--fail-bg)" : "rgba(217,181,102,0.1)",
+                          color: issue.verdict === "fail" ? "var(--fail)" : "var(--warn)",
+                        }}
+                      >
+                        {issue.verdict}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="t-micro" style={{ color: "var(--fg-1)" }}>{issue.message}</p>
+                        {issue.column && (
+                          <p className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{issue.column}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
