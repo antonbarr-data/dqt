@@ -108,6 +108,7 @@ class ColumnCheck(Base):
     detector_slug: Mapped[str] = mapped_column(String, nullable=False)
     params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     rationale: Mapped[str] = mapped_column(String, nullable=False, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
@@ -128,7 +129,29 @@ class MetricDefinition(Base):
     description: Mapped[str] = mapped_column(String, nullable=False, default="")
     owners: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    source_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    column_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    warn_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fail_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class MetricCausalEdge(Base):
+    __tablename__ = "metric_causal_edges"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # "{cause_fqn}->{effect_fqn}"
+    cause_fqn: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    effect_fqn: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    lag: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    p_value: Mapped[float] = mapped_column(Float, nullable=False)
+    adjusted_p_value: Mapped[float] = mapped_column(Float, nullable=False)
+    evidence_strength: Mapped[float] = mapped_column(Float, nullable=False)
+    shap_attribution: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
