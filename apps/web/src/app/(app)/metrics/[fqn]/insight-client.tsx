@@ -3,10 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  BarChart, Bar, XAxis, YAxis, ResponsiveContainer,
+} from "recharts";
 import { ReconciliationBar } from "./reconciliation-bar";
 import { EvidenceTable } from "./evidence-table";
 import { SeriesChart } from "./series-chart";
 import { AuditDrawer } from "./audit-drawer";
+import { CausalGraph } from "./causal-graph";
 
 interface LineageNode {
   id: string;
@@ -85,7 +89,19 @@ const INITIAL_STATE: StreamState = {
   done: false, error: null, loading: false,
 };
 
-export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_value: number | null } }) {
+export function InsightClient({
+  fqn,
+  metric,
+  histogram = [],
+  warnThreshold = null,
+  failThreshold = null,
+}: {
+  fqn: string;
+  metric: { current_value: number | null };
+  histogram?: { x: number; count: number }[];
+  warnThreshold?: number | null;
+  failThreshold?: number | null;
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [state, setState] = useState<StreamState>(INITIAL_STATE);
@@ -95,6 +111,9 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
     return n > 0 ? n : 7;
   });
   const abortRef = useRef<AbortController | null>(null);
+  const [editWarn, setEditWarn] = useState<string>(warnThreshold != null ? String(warnThreshold) : "");
+  const [editFail, setEditFail] = useState<string>(failThreshold != null ? String(failThreshold) : "");
+  const [thresholdSaving, setThresholdSaving] = useState(false);
 
   const setLookbackAndUrl = useCallback((days: number) => {
     setLookback(days);
@@ -112,6 +131,19 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
 
   // Derive dataset table name from fqn (format: source.schema.table.quality)
   const datasetTable = fqn.split(".")[2] ?? fqn;
+
+  async function handleSaveThresholds() {
+    setThresholdSaving(true);
+    await fetch(`/api/v1/metrics/${encodeURIComponent(fqn)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        warn_threshold: editWarn !== "" ? parseFloat(editWarn) : null,
+        fail_threshold: editFail !== "" ? parseFloat(editFail) : null,
+      }),
+    }).catch(() => {});
+    setThresholdSaving(false);
+  }
 
   async function runExplain(days: number) {
     abortRef.current?.abort();
@@ -195,6 +227,9 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
 
   return (
     <div>
+      {histogram.length > 0 && (
+        <DistributionChart histogram={histogram} />
+      )}
       <div className="flex items-center gap-2 mb-6">
         {WINDOWS.map((w) => (
           <button
@@ -342,6 +377,57 @@ export function InsightClient({ fqn, metric }: { fqn: string; metric: { current_
       )}
 
       <SeriesChart fqn={fqn} />
+
+      {/* Causality DAG */}
+      <div className="mb-6">
+        <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Causal graph
+        </p>
+        <div className="border border-line p-4" style={{ background: "var(--bg-1)" }}>
+          <CausalGraph fqn={fqn} />
+        </div>
+      </div>
+
+      {/* Threshold editor */}
+      <div className="mb-6">
+        <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Alert thresholds
+        </p>
+        <div className="border border-line p-3 flex items-center gap-4" style={{ background: "var(--bg-1)" }}>
+          <label className="flex items-center gap-2 t-small">
+            <span style={{ color: "var(--warn)", minWidth: 32 }}>warn</span>
+            <input
+              type="number"
+              step="any"
+              value={editWarn}
+              onChange={(e) => setEditWarn(e.target.value)}
+              className="border border-line px-2 py-1 t-small font-mono w-24"
+              style={{ background: "var(--bg-0)", color: "var(--fg-0)" }}
+              placeholder="none"
+            />
+          </label>
+          <label className="flex items-center gap-2 t-small">
+            <span style={{ color: "var(--fail)", minWidth: 32 }}>fail</span>
+            <input
+              type="number"
+              step="any"
+              value={editFail}
+              onChange={(e) => setEditFail(e.target.value)}
+              className="border border-line px-2 py-1 t-small font-mono w-24"
+              style={{ background: "var(--bg-0)", color: "var(--fg-0)" }}
+              placeholder="none"
+            />
+          </label>
+          <button
+            onClick={handleSaveThresholds}
+            disabled={thresholdSaving}
+            className="t-small px-3 py-1 border border-line ml-auto transition-colors hover:bg-bg-2"
+            style={{ color: "var(--fg-2)" }}
+          >
+            {thresholdSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
 
       {/* Lineage strip */}
       {lineageNodes.length > 0 && (
@@ -495,6 +581,32 @@ function LineageStrip({
           <NodeChip node={n} dim />
         </span>
       ))}
+    </div>
+  );
+}
+
+function DistributionChart({ histogram }: { histogram: { x: number; count: number }[] }) {
+  return (
+    <div className="mb-6">
+      <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        Distribution
+      </p>
+      <div className="border border-line p-4" style={{ background: "var(--bg-1)" }}>
+        <ResponsiveContainer width="100%" height={100}>
+          <BarChart data={histogram} margin={{ top: 4, right: 8, bottom: 4, left: 8 }} barCategoryGap="2%">
+            <XAxis
+              dataKey="x"
+              tick={{ fill: "var(--fg-3)", fontSize: 9 }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v: number) => v.toFixed(2)}
+              interval="preserveStartEnd"
+            />
+            <YAxis hide />
+            <Bar dataKey="count" fill="var(--accent)" opacity={0.55} radius={0} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

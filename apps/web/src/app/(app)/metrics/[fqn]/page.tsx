@@ -22,6 +22,17 @@ interface MetricDetail {
   pinned: boolean;
 }
 
+interface MetricProfile {
+  mean: number;
+  median: number;
+  stddev: number;
+  min: number;
+  max: number;
+  count: number;
+  null_rate: number;
+  histogram: { x: number; count: number }[];
+}
+
 export default async function MetricInsightPage({
   params,
 }: {
@@ -29,7 +40,10 @@ export default async function MetricInsightPage({
 }) {
   const { fqn } = await params;
   const decodedFqn = decodeURIComponent(fqn);
-  const metric = await serverFetch<MetricDetail>(`/metrics/${encodeURIComponent(decodedFqn)}`, 30);
+  const [metric, profile] = await Promise.all([
+    serverFetch<MetricDetail>(`/metrics/${encodeURIComponent(decodedFqn)}`, 30),
+    serverFetch<MetricProfile>(`/metrics/${encodeURIComponent(decodedFqn)}/profile`, 30),
+  ]);
   if (!metric) notFound();
 
   const verdictColor =
@@ -87,9 +101,34 @@ export default async function MetricInsightPage({
         ))}
       </div>
 
+      {/* Stats strip */}
+      {profile && (
+        <div className="grid grid-cols-6 gap-px mb-8" style={{ background: "var(--line)" }}>
+          {([
+            { label: "Mean", value: profile.mean.toFixed(4) },
+            { label: "Median", value: profile.median.toFixed(4) },
+            { label: "Stddev", value: profile.stddev.toFixed(4) },
+            { label: "Min", value: profile.min.toFixed(4) },
+            { label: "Max", value: profile.max.toFixed(4) },
+            { label: "Points", value: profile.count.toLocaleString() },
+          ] as { label: string; value: string }[]).map(({ label, value }) => (
+            <div key={label} className="px-3 py-2" style={{ background: "var(--bg-1)" }}>
+              <p className="t-micro mb-0.5" style={{ color: "var(--fg-3)" }}>{label}</p>
+              <p className="t-small font-mono" style={{ color: "var(--fg-0)" }}>{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Client component handles streaming narrative, reconciliation, evidence, chart */}
       <Suspense>
-        <InsightClient fqn={decodedFqn} metric={metric} />
+        <InsightClient
+          fqn={decodedFqn}
+          metric={metric}
+          histogram={profile?.histogram ?? []}
+          warnThreshold={metric.warn_threshold}
+          failThreshold={metric.fail_threshold}
+        />
       </Suspense>
     </div>
   );
