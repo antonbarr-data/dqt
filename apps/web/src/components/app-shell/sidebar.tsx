@@ -39,10 +39,10 @@ const NAV_GROUPS = [
   },
   {
     label: "Watch",
-    items: ["Overview", "Ask", "Checks"],
+    items: ["Overview", "Checks", "Ask"],
   },
   {
-    label: "Semantic Layer",
+    label: "Intelligence",
     items: ["Metrics", "Causality"],
   },
   {
@@ -56,20 +56,35 @@ const SYSADMIN_NAV = [
 ];
 
 const PINS_KEY = "dqt-nav-pins";
+const PINS_CUSTOMIZED_KEY = "dqt-nav-pins-set";
+const DEFAULT_PINS = ["Ask"];
 const LABEL_H = 24;
 const ITEM_H = 36;
 
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function setCookie(name: string, value: string) {
+  const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires};path=/;SameSite=Lax`;
+}
+
 function loadPins(): string[] {
+  if (!getCookie(PINS_CUSTOMIZED_KEY)) return DEFAULT_PINS;
   try {
-    const raw = localStorage.getItem(PINS_KEY);
+    const raw = getCookie(PINS_KEY);
     return raw ? (JSON.parse(raw) as string[]) : [];
   } catch {
-    return [];
+    return DEFAULT_PINS;
   }
 }
 
 function savePins(pins: string[]) {
-  localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+  setCookie(PINS_CUSTOMIZED_KEY, "1");
+  setCookie(PINS_KEY, JSON.stringify(pins));
 }
 
 export function Sidebar() {
