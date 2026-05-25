@@ -402,10 +402,19 @@ async def suggest_metrics(body: MetricSuggestBody) -> dict:
         else:
             rejected.append({"column": fqn, "reason": bucket.replace("_", " ")})
 
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+    # No heuristic hits — let LLM judge over all non-rejected columns
+    if not candidates and api_key and dimensions:
+        for d in dimensions:
+            d["additivity"] = _infer_additivity(d["column"])
+            d["grain_hint"] = _infer_grain(d["dataset"])
+        candidates = list(dimensions)
+        dimensions = []
+
     if not candidates:
         return {"metrics": [], "rejected_candidates": rejected}
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if api_key:
         loop = asyncio.get_event_loop()
         try:

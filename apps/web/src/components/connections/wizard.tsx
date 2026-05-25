@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Loader2, ChevronLeft, X, Sparkles, TrendingUp, RefreshCw, Upload } from "lucide-react";
+import { Check, Loader2, ChevronLeft, ChevronRight, X, Sparkles, TrendingUp, RefreshCw, Upload } from "lucide-react";
 import { clsx } from "clsx";
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ function getWizardSteps(engine: string): { id: StepId; label: string }[] {
   return steps;
 }
 
-const HEALTH_STEP_LABELS = ["TCP Reach", "Authentication", "Info Schema Read", "Sample SELECT", "Latency Probe", "Clock Skew"];
+const HEALTH_STEP_LABELS = ["TCP Reach", "Authentication", "Info Schema Read", "Sample SELECT", "Latency Probe"];
 
 const TIER_LABELS: Record<CheckTier, string> = {
   essential: "Essential",
@@ -1164,6 +1164,7 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
                     style={{ background: "var(--bg-2)", color: "var(--fg-3)", borderColor: "var(--line)", opacity: 0.5 }}
                   >
                     {isBQ ? "Choose Datasets" : "Choose Tables"}
+                    <ChevronRight size={13} strokeWidth={2} />
                   </button>
                 </>
               ) : (
@@ -1178,6 +1179,7 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
                 >
                   {healthLoading && <Loader2 size={12} strokeWidth={2} className="animate-spin" />}
                   {isBQ ? "Choose Datasets" : "Choose Tables"}
+                  {!healthLoading && <ChevronRight size={13} strokeWidth={2} />}
                 </button>
               )}
             </div>
@@ -1239,6 +1241,7 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
                 style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
               >
                 Choose Tables
+                <ChevronRight size={13} strokeWidth={2} />
               </button>
               {selectedBQDatasets.size === 0 && !tablesLoading && (
                 <span className="t-micro" style={{ color: "var(--fg-3)" }}>Select at least one dataset</span>
@@ -1305,6 +1308,7 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
                 style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
               >
                 Review Checks
+                <ChevronRight size={13} strokeWidth={2} />
               </button>
               {selectedTables.size === 0 && !tablesLoading && (
                 <span className="t-micro" style={{ color: "var(--fg-3)" }}>Select at least one table</span>
@@ -1421,7 +1425,7 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
                 )}
                 style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
               >
-                {savingChecks ? "Saving..." : "Add Metrics"}
+                {savingChecks ? "Saving..." : <><span>Add Metrics</span><ChevronRight size={13} strokeWidth={2} /></>}
               </button>
             </div>
           </div>

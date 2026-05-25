@@ -4,10 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
-  LayoutDashboard,
   Database,
   Table2,
-  GitBranch,
   BarChart2,
   Network,
   AlertTriangle,
@@ -16,73 +14,95 @@ import {
   Phone,
   ClipboardList,
   MessageSquare,
+  LayoutDashboard,
+  Pin,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { isSysAdmin } from "@/lib/auth";
 
+const ALL_NAV_ITEMS = [
+  { label: "Overview", href: "/overview", icon: LayoutDashboard },
+  { label: "Ask", href: "/ask", icon: MessageSquare },
+  { label: "Sources", href: "/sources", icon: Database },
+  { label: "Datasets", href: "/datasets", icon: Table2 },
+  { label: "Checks", href: "/checks", icon: CheckSquare },
+  { label: "Metrics", href: "/metrics", icon: BarChart2 },
+  { label: "Causality", href: "/causality", icon: Network },
+  { label: "On-call", href: "/oncall", icon: Phone },
+  { label: "Tasks", href: "/tasks", icon: ClipboardList },
+];
+
 const NAV_GROUPS = [
   {
-    label: null,
-    items: [
-      { label: "Overview", href: "/overview", icon: LayoutDashboard, count: null },
-      { label: "Ask", href: "/ask", icon: MessageSquare, count: null },
-    ],
-  },
-  {
     label: "Warehouse",
-    items: [
-      { label: "Sources", href: "/sources", icon: Database, count: null },
-      { label: "Datasets", href: "/datasets", icon: Table2, count: null },
-      { label: "Lineage", href: "/lineage", icon: GitBranch, count: null },
-    ],
-  },
-  {
-    label: "Semantic Layer",
-    items: [
-      { label: "Metrics", href: "/metrics", icon: BarChart2, count: null },
-      { label: "Causality", href: "/causality", icon: Network, count: null },
-    ],
+    items: ["Sources", "Datasets"],
   },
   {
     label: "Watch",
-    items: [
-      { label: "Incidents", href: "/incidents", icon: AlertTriangle, count: null, countFail: true },
-      { label: "Checks", href: "/checks", icon: CheckSquare, count: null },
-    ],
+    items: ["Overview", "Ask", "Checks"],
+  },
+  {
+    label: "Semantic Layer",
+    items: ["Metrics", "Causality"],
   },
   {
     label: "Team",
-    items: [
-      { label: "On-call", href: "/oncall", icon: Phone, count: null },
-      { label: "Tasks", href: "/tasks", icon: ClipboardList, count: null },
-    ],
+    items: ["On-call", "Tasks"],
   },
 ];
 
 const SYSADMIN_NAV = [
-  { label: "Users", href: "/settings/users", icon: Users, count: null },
+  { label: "Users", href: "/settings/users", icon: Users },
 ];
 
-const LABEL_H = 24; // explicit px height for every section label — same in open & closed
-const ITEM_H  = 36; // explicit px height for every nav item    — same in open & closed
+const PINS_KEY = "dqt-nav-pins";
+const LABEL_H = 24;
+const ITEM_H = 36;
+
+function loadPins(): string[] {
+  try {
+    const raw = localStorage.getItem(PINS_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePins(pins: string[]) {
+  localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [sysAdmin, setSysAdmin] = useState(false);
+  const [pins, setPins] = useState<string[]>([]);
+  const [hoverPin, setHoverPin] = useState<string | null>(null);
 
   useEffect(() => {
     setSysAdmin(isSysAdmin());
+    setPins(loadPins());
   }, []);
 
+  function togglePin(label: string) {
+    setPins((prev) => {
+      const next = prev.includes(label)
+        ? prev.filter((p) => p !== label)
+        : [...prev, label];
+      savePins(next);
+      return next;
+    });
+  }
+
+  const itemMap = Object.fromEntries(ALL_NAV_ITEMS.map((i) => [i.label, i]));
+
+  const pinnedItems = pins.map((p) => itemMap[p]).filter(Boolean);
+
   return (
-    <aside
-      style={{ width: 52, flexShrink: 0, position: "relative", zIndex: 40 }}
-    >
-      {/* overlay panel — always absolute, width animates */}
+    <aside style={{ width: 52, flexShrink: 0, position: "relative", zIndex: 40 }}>
       <div
         onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onMouseLeave={() => { setOpen(false); setHoverPin(null); }}
         style={{
           position: "absolute",
           top: 0,
@@ -98,11 +118,12 @@ export function Sidebar() {
           boxShadow: open ? "2px 0 12px rgba(0,0,0,0.2)" : "none",
         }}
       >
-      <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label ?? "__overview"} className="mb-2">
-            {group.label !== null && (
-              open ? (
+        <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
+
+          {/* Pinned section */}
+          {pinnedItems.length > 0 && (
+            <div className="mb-2">
+              {open ? (
                 <div
                   className="px-4 t-small whitespace-nowrap overflow-hidden"
                   style={{
@@ -114,99 +135,185 @@ export function Sidebar() {
                     lineHeight: `${LABEL_H}px`,
                   }}
                 >
-                  {group.label}
+                  Pinned
                 </div>
               ) : (
                 <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
                   <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
                 </div>
-              )
-            )}
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
+              )}
+              {pinnedItems.map((item) => (
+                <NavItem
                   key={item.href}
-                  href={item.href as never}
-                  className={clsx(
-                    "flex items-center gap-3 px-4 t-small transition-colors",
-                    active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
-                  )}
-                  style={{ color: active ? "var(--fg-0)" : "var(--fg-1)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
-                  title={!open ? item.label : undefined}
-                >
-                  <Icon
-                    size={16}
-                    strokeWidth={1.6}
-                    style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }}
-                  />
-                  {open && (
-                    <>
-                      <span className="flex-1 whitespace-nowrap">{item.label}</span>
-                      {item.count !== null && (
-                        <span
-                          className="t-small tabular-nums"
-                          style={{
-                            color: "countFail" in item && item.countFail ? "var(--fail)" : "var(--fg-2)",
-                            fontFamily: "var(--font-jetbrains-mono)",
-                          }}
-                        >
-                          {item.count}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+                  item={item}
+                  pathname={pathname}
+                  open={open}
+                  pinned
+                  hovered={hoverPin === item.label}
+                  onHover={setHoverPin}
+                  onPin={togglePin}
+                  itemH={ITEM_H}
+                />
+              ))}
+            </div>
+          )}
 
-        {sysAdmin && (
-          <div className="mb-2">
-            {open ? (
-              <div
-                className="px-4 t-small whitespace-nowrap overflow-hidden"
-                style={{
-                  color: "var(--fg-1)",
-                  letterSpacing: "0.10em",
-                  textTransform: "uppercase",
-                  fontWeight: 500,
-                  height: LABEL_H,
-                  lineHeight: `${LABEL_H}px`,
-                }}
-              >
-                Admin
+          {/* Regular groups */}
+          {NAV_GROUPS.map((group) => {
+            const groupItems = group.items
+              .map((label) => itemMap[label])
+              .filter(Boolean);
+            return (
+              <div key={group.label} className="mb-2">
+                {open ? (
+                  <div
+                    className="px-4 t-small whitespace-nowrap overflow-hidden"
+                    style={{
+                      color: "var(--fg-1)",
+                      letterSpacing: "0.10em",
+                      textTransform: "uppercase",
+                      fontWeight: 500,
+                      height: LABEL_H,
+                      lineHeight: `${LABEL_H}px`,
+                    }}
+                  >
+                    {group.label}
+                  </div>
+                ) : (
+                  <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
+                    <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
+                  </div>
+                )}
+                {groupItems.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    open={open}
+                    pinned={pins.includes(item.label)}
+                    hovered={hoverPin === item.label}
+                    onHover={setHoverPin}
+                    onPin={togglePin}
+                    itemH={ITEM_H}
+                  />
+                ))}
               </div>
-            ) : (
-              <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
-                <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
-              </div>
-            )}
-            {SYSADMIN_NAV.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href as never}
-                  className={clsx(
-                    "flex items-center gap-3 px-4 t-small transition-colors",
-                    active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
-                  )}
-                  style={{ color: active ? "var(--fg-0)" : "var(--fg-1)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
-                  title={!open ? item.label : undefined}
+            );
+          })}
+
+          {/* Sysadmin */}
+          {sysAdmin && (
+            <div className="mb-2">
+              {open ? (
+                <div
+                  className="px-4 t-small whitespace-nowrap overflow-hidden"
+                  style={{
+                    color: "var(--fg-1)",
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    fontWeight: 500,
+                    height: LABEL_H,
+                    lineHeight: `${LABEL_H}px`,
+                  }}
                 >
-                  <Icon size={16} strokeWidth={1.6} style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }} />
-                  {open && <span className="flex-1 whitespace-nowrap">{item.label}</span>}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </nav>
+                  Admin
+                </div>
+              ) : (
+                <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
+                  <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
+                </div>
+              )}
+              {SYSADMIN_NAV.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href as never}
+                    className={clsx(
+                      "flex items-center gap-3 px-4 t-small transition-colors",
+                      active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
+                    )}
+                    style={{ color: active ? "var(--fg-0)" : "var(--fg-1)", background: active ? "var(--bg-2)" : undefined, height: ITEM_H, flexShrink: 0 }}
+                    title={!open ? item.label : undefined}
+                  >
+                    <Icon size={16} strokeWidth={1.6} style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }} />
+                    {open && <span className="flex-1 whitespace-nowrap">{item.label}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </nav>
       </div>
     </aside>
+  );
+}
+
+interface NavItemProps {
+  item: { label: string; href: string; icon: React.ElementType };
+  pathname: string;
+  open: boolean;
+  pinned: boolean;
+  hovered: boolean;
+  onHover: (label: string | null) => void;
+  onPin: (label: string) => void;
+  itemH: number;
+}
+
+function NavItem({ item, pathname, open, pinned, hovered, onHover, onPin, itemH }: NavItemProps) {
+  const Icon = item.icon;
+  const active = pathname === item.href || pathname.startsWith(item.href + "/");
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => onHover(item.label)}
+      onMouseLeave={() => onHover(null)}
+      style={{ height: itemH }}
+    >
+      <Link
+        href={item.href as never}
+        className={clsx(
+          "flex items-center gap-3 px-4 t-small transition-colors h-full",
+          active ? "border-l-2 border-accent" : "border-l-2 border-transparent hover:bg-bg-2"
+        )}
+        style={{
+          color: active ? "var(--fg-0)" : "var(--fg-1)",
+          background: active ? "var(--bg-2)" : undefined,
+          flexShrink: 0,
+        }}
+        title={!open ? item.label : undefined}
+      >
+        <Icon
+          size={16}
+          strokeWidth={1.6}
+          style={{ flexShrink: 0, color: active ? "var(--accent)" : "var(--fg-1)" }}
+        />
+        {open && <span className="flex-1 whitespace-nowrap">{item.label}</span>}
+      </Link>
+
+      {/* Pin button — only visible when open and hovering */}
+      {open && hovered && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPin(item.label); }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center transition-opacity hover:opacity-100"
+          style={{
+            width: 18,
+            height: 18,
+            color: pinned ? "var(--accent)" : "var(--fg-3)",
+            opacity: pinned ? 1 : 0.6,
+          }}
+          title={pinned ? "Unpin" : "Pin to top"}
+        >
+          <Pin
+            size={12}
+            strokeWidth={1.6}
+            style={{ transform: pinned ? "rotate(45deg)" : "none", transition: "transform 0.12s" }}
+          />
+        </button>
+      )}
+    </div>
   );
 }

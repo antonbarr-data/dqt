@@ -1,70 +1,42 @@
 import { serverFetch } from "@/lib/server-api";
-import Link from "next/link";
 
-interface IncidentRow {
-  id: number;
+interface CheckItem {
+  id: string;
   dataset_id: string;
   column: string | null;
   detector: string;
-  severity: string;
-  message: string;
-  status: string;
-  opened_ago: string;
+  verdict: string;
+  score: number | null;
+  ran_at: string | null;
+  ran_at_ago: string | null;
+  plain_english: string | null;
 }
 
 interface Task {
   id: string;
-  kind: "acknowledge" | "investigate" | "mitigate" | "postmortem" | "hitl";
+  kind: "investigate" | "review" | "hitl";
   title: string;
   subtitle: string;
-  incidentId: number | null;
   severity: string;
   due: string;
   assignee: string;
   done: boolean;
 }
 
-const HITL_TASKS: Task[] = [
-  {
-    id: "hitl-1",
-    kind: "hitl",
-    title: "Confirm: amount_usd → platform_fee_usd causal edge",
-    subtitle: "Stability score 0.61 — below 0.70 threshold. Review proposed edge.",
-    incidentId: null,
-    severity: "warn",
-    due: "today",
-    assignee: "me",
-    done: false,
-  },
-  {
-    id: "hitl-2",
-    kind: "hitl",
-    title: "Review AI-suggested check: row_count_in_range on gig_vendor_stats",
-    subtitle: "Confidence 0.88. Accept to add to test suite.",
-    incidentId: null,
-    severity: "warn",
-    due: "today",
-    assignee: "me",
-    done: false,
-  },
-];
+const HITL_TASKS: Task[] = [];
 
 function kindLabel(kind: Task["kind"]): string {
   switch (kind) {
-    case "acknowledge": return "Acknowledge";
     case "investigate": return "Investigate";
-    case "mitigate": return "Mitigate";
-    case "postmortem": return "Postmortem";
+    case "review": return "Review";
     case "hitl": return "HITL Review";
   }
 }
 
 function kindColor(kind: Task["kind"]): string {
   switch (kind) {
-    case "acknowledge": return "var(--warn)";
-    case "investigate": return "var(--accent)";
-    case "mitigate": return "var(--fail)";
-    case "postmortem": return "var(--fg-2)";
+    case "investigate": return "var(--fail)";
+    case "review": return "var(--warn)";
     case "hitl": return "var(--accent)";
   }
 }
@@ -76,41 +48,29 @@ function severityStyle(severity: string): { bg: string; color: string } {
 }
 
 export default async function TasksPage() {
-  const incidents = await serverFetch<IncidentRow[]>("/incidents?status=open", 15) ?? [];
+  const checks = await serverFetch<CheckItem[]>("/checks", 15) ?? [];
+  const alertChecks = checks.filter((c) => c.verdict === "fail" || c.verdict === "warn");
 
-  const incidentTasks: Task[] = incidents.flatMap((inc) => [
-    {
-      id: `ack-${inc.id}`,
-      kind: "acknowledge" as const,
-      title: `Acknowledge: ${inc.dataset_id}${inc.column ? `.${inc.column}` : ""}`,
-      subtitle: inc.message,
-      incidentId: inc.id,
-      severity: inc.severity,
-      due: "now",
-      assignee: "me",
-      done: false,
-    },
-    {
-      id: `inv-${inc.id}`,
-      kind: "investigate" as const,
-      title: `Investigate: ${inc.detector} on ${inc.dataset_id}`,
-      subtitle: `Opened ${inc.opened_ago}`,
-      incidentId: inc.id,
-      severity: inc.severity,
-      due: "1h",
-      assignee: "me",
-      done: false,
-    },
-  ]);
+  const checkTasks: Task[] = alertChecks.map((c) => ({
+    id: `check-${c.id}`,
+    kind: c.verdict === "fail" ? "investigate" : "review",
+    title: `${c.verdict === "fail" ? "Investigate" : "Review"}: ${c.dataset_id}${c.column ? `.${c.column}` : ""} — ${c.detector}`,
+    subtitle: c.plain_english ?? (c.ran_at_ago ? `Last run ${c.ran_at_ago}` : "Not yet run"),
+    severity: c.verdict,
+    due: c.verdict === "fail" ? "now" : "4h",
+    assignee: "on-call",
+    done: false,
+  }));
 
-  const allTasks = [...incidentTasks, ...HITL_TASKS];
+  const allTasks = [...checkTasks, ...HITL_TASKS];
   const openCount = allTasks.filter((t) => !t.done).length;
+  const failCount = checkTasks.filter((t) => t.severity === "fail").length;
+  const warnCount = checkTasks.filter((t) => t.severity === "warn").length;
   const hitlCount = HITL_TASKS.filter((t) => !t.done).length;
-  const incCount = incidentTasks.filter((t) => !t.done).length;
 
   const grouped: Record<string, Task[]> = {
-    "Incidents": incidentTasks,
-    "HITL Reviews": HITL_TASKS,
+    "Check alerts": checkTasks,
+    "HITL reviews": HITL_TASKS,
   };
 
   return (
@@ -127,9 +87,9 @@ export default async function TasksPage() {
       >
         {[
           { label: "Open tasks", value: String(openCount), color: openCount > 0 ? "var(--warn)" : "var(--pass)" },
-          { label: "Incident tasks", value: String(incCount), color: incCount > 0 ? "var(--fail)" : "var(--fg-0)" },
+          { label: "Failures", value: String(failCount), color: failCount > 0 ? "var(--fail)" : "var(--fg-0)" },
+          { label: "Warnings", value: String(warnCount), color: warnCount > 0 ? "var(--warn)" : "var(--fg-0)" },
           { label: "HITL reviews", value: String(hitlCount), color: hitlCount > 0 ? "var(--accent)" : "var(--fg-0)" },
-          { label: "Completed today", value: "0", color: "var(--fg-0)" },
         ].map((k) => (
           <div key={k.label} className="px-5 py-4" style={{ background: "var(--bg-1)" }}>
             <p className="kpi-label mb-1" style={{ color: "var(--fg-2)" }}>{k.label}</p>
@@ -173,7 +133,6 @@ export default async function TasksPage() {
                       className="flex items-start gap-4 px-4 py-3 transition-colors hover:bg-bg-2"
                       style={task.severity === "fail" && !task.done ? { background: "var(--fail-bg)" } : undefined}
                     >
-                      {/* checkbox */}
                       <div
                         style={{
                           width: 16,
@@ -185,13 +144,11 @@ export default async function TasksPage() {
                         }}
                       />
 
-                      {/* content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                           <span
                             className="t-micro px-1.5 py-0.5"
                             style={{
-                              background: "transparent",
                               color: kindColor(task.kind),
                               border: `1px solid ${kindColor(task.kind)}`,
                               fontFamily: "var(--font-jetbrains-mono)",
@@ -214,27 +171,11 @@ export default async function TasksPage() {
                         <p className="t-micro mt-0.5" style={{ color: "var(--fg-3)" }}>{task.subtitle}</p>
                       </div>
 
-                      {/* meta */}
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>due: {task.due}</span>
-                        {task.incidentId && (
-                          <Link
-                            href={`/incidents/${task.incidentId}`}
-                            className="t-micro px-2 py-0.5 border border-line hover:border-accent transition-colors"
-                            style={{ color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)" }}
-                          >
-                            #{task.incidentId}
-                          </Link>
-                        )}
-                        {task.kind === "hitl" && (
-                          <Link
-                            href="/causality"
-                            className="t-micro px-2 py-0.5 border transition-colors"
-                            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-                          >
-                            Review →
-                          </Link>
-                        )}
+                        <span className="t-micro px-1.5 py-0.5 border border-line font-mono" style={{ color: "var(--fg-3)" }}>
+                          {task.assignee}
+                        </span>
                       </div>
                     </div>
                   );
