@@ -39,11 +39,11 @@ const NAV_GROUPS = [
   },
   {
     label: "Watch",
-    items: ["Overview", "Checks", "Ask"],
+    items: ["Overview", "Checks"],
   },
   {
     label: "Intelligence",
-    items: ["Metrics", "Causality"],
+    items: ["Metrics", "Causality", "Ask"],
   },
   {
     label: "Team",
@@ -135,28 +135,9 @@ export function Sidebar() {
       >
         <nav className="flex-1 overflow-y-auto py-3 no-scrollbar">
 
-          {/* Pinned section */}
+          {/* Pinned items — no heading, just appear at top */}
           {pinnedItems.length > 0 && (
             <div className="mb-2">
-              {open ? (
-                <div
-                  className="px-4 t-small whitespace-nowrap overflow-hidden"
-                  style={{
-                    color: "var(--fg-1)",
-                    letterSpacing: "0.10em",
-                    textTransform: "uppercase",
-                    fontWeight: 500,
-                    height: LABEL_H,
-                    lineHeight: `${LABEL_H}px`,
-                  }}
-                >
-                  Pinned
-                </div>
-              ) : (
-                <div style={{ height: LABEL_H, display: "flex", alignItems: "center", padding: "0 10px" }}>
-                  <div style={{ height: 1, width: "100%", background: "var(--fg-3)" }} />
-                </div>
-              )}
               {pinnedItems.map((item) => (
                 <NavItem
                   key={item.href}
