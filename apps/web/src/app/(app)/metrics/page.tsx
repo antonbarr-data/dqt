@@ -9,10 +9,10 @@ interface MetricSummary {
   display_name: string;
   kind: string;
   dataset: string;
-  owners: string[];
+  source_id: string | null;
+  column_name: string | null;
   tags: string[];
   current_verdict: string | null;
-  last_run: string | null;
   pinned: boolean;
 }
 
@@ -31,10 +31,26 @@ function VerdictDot({ verdict }: { verdict: string | null }) {
 
 const METRIC_KINDS = ["ratio", "count", "sum", "model"] as const;
 
+const KIND_HINT: Record<string, string> = {
+  ratio: "fraction, rate, or average",
+  count: "row or event count",
+  sum: "summed total",
+  model: "ML model output",
+};
+
+const KIND_FILTERS = [
+  { label: "All",   value: null   as string | null },
+  { label: "Ratio", value: "ratio"  },
+  { label: "Count", value: "count"  },
+  { label: "Sum",   value: "sum"    },
+  { label: "Model", value: "model"  },
+];
+
 export default function MetricsPage() {
   const [metrics, setMetrics] = useState<MetricSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<string | null>(null);
 
   const [confirmDeleteFqn, setConfirmDeleteFqn] = useState<string | null>(null);
   const [deletingFqn, setDeletingFqn] = useState(false);
@@ -45,6 +61,8 @@ export default function MetricsPage() {
   const [formDescription, setFormDescription] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [reinfering, setReinfering] = useState(false);
+  const [editingKindFqn, setEditingKindFqn] = useState<string | null>(null);
 
   const loadMetrics = useCallback(async () => {
     try {
@@ -110,197 +128,264 @@ export default function MetricsPage() {
     }
   }
 
+  async function handlePatchKind(fqn: string, kind: string) {
+    await fetch(`/api/v1/metrics/${encodeURIComponent(fqn)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind }),
+    });
+    setMetrics((prev) => prev.map((m) => m.fqn === fqn ? { ...m, kind } : m));
+    setEditingKindFqn(null);
+  }
+
+  async function handleReinfer() {
+    setReinfering(true);
+    try {
+      const res = await fetch("/api/v1/metrics/reinfer-kinds", { method: "POST" });
+      if (res.ok) await loadMetrics();
+    } finally {
+      setReinfering(false);
+    }
+  }
+
+  const filtered = kindFilter ? metrics.filter((m) => m.kind === kindFilter) : metrics;
+
   return (
-    <div className="p-6">
-      <div className="flex items-baseline justify-between mb-6">
-        <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>Metrics</h1>
-        <div className="flex items-center gap-3">
-          {!loading && (
-            <span className="t-small" style={{ color: "var(--fg-3)" }}>{metrics.length} tracked</span>
-          )}
-          <button
-            onClick={() => { setFormOpen((v) => !v); setFormError(null); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 t-small border transition-colors hover:opacity-80"
-            style={{
-              background: formOpen ? "var(--accent-bg)" : "var(--bg-2)",
-              color: formOpen ? "var(--accent)" : "var(--fg-0)",
-              borderColor: formOpen ? "var(--accent)" : "var(--line-3)",
-            }}
-          >
-            <Plus size={11} strokeWidth={1.6} />
-            New metric
-          </button>
+    <div className="flex h-full">
+      {/* Left kind filter */}
+      <div className="flex-shrink-0 border-r border-line" style={{ width: 180 }}>
+        <div className="p-3">
+          <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Kind</p>
+          {KIND_FILTERS.map((f) => (
+            <button
+              key={String(f.value)}
+              onClick={() => setKindFilter(f.value)}
+              className="w-full text-left px-2 py-1.5 t-small flex items-center justify-between"
+              style={{
+                background: kindFilter === f.value ? "var(--bg-3)" : "transparent",
+                color: kindFilter === f.value ? "var(--fg-0)" : "var(--fg-2)",
+              }}
+            >
+              <span>{f.label}</span>
+              <span className="t-micro" style={{ color: "var(--fg-3)" }}>
+                {f.value === null
+                  ? metrics.length
+                  : metrics.filter((m) => m.kind === f.value).length}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* New metric inline form */}
-      {formOpen && (
-        <form
-          onSubmit={handleSubmit}
-          className="mb-6 border border-line p-4 space-y-3"
-          style={{ background: "var(--bg-1)" }}
-        >
-          <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>New metric</p>
+      {/* Main content */}
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="flex items-baseline justify-between mb-6">
+          <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>Metrics</h1>
+          <div className="flex items-center gap-3">
+            {!loading && (
+              <span className="t-small" style={{ color: "var(--fg-3)" }}>{metrics.length} tracked</span>
+            )}
+            <button
+              onClick={handleReinfer}
+              disabled={reinfering || loading}
+              className="px-3 py-1.5 t-small border border-line transition-colors hover:border-line-3 disabled:opacity-40"
+              style={{ color: "var(--fg-2)", background: "var(--bg-2)" }}
+              title="Re-infer kind from column name for all metrics"
+            >
+              {reinfering ? "Re-inferring..." : "Re-infer kinds"}
+            </button>
+            <button
+              onClick={() => { setFormOpen((v) => !v); setFormError(null); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 t-small border transition-colors hover:opacity-80"
+              style={{
+                background: formOpen ? "var(--accent-bg)" : "var(--bg-2)",
+                color: formOpen ? "var(--accent)" : "var(--fg-0)",
+                borderColor: formOpen ? "var(--accent)" : "var(--line-3)",
+              }}
+            >
+              <Plus size={11} strokeWidth={1.6} />
+              New metric
+            </button>
+          </div>
+        </div>
 
-          <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <div>
-              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Name</label>
-              <input
-                type="text"
-                value={formName}
-                onChange={(e) => setFormName(e.target.value)}
-                placeholder="e.g. Conversion rate"
-                className="w-full px-3 py-2 border border-line t-small outline-none"
-                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
-              />
+        {/* New metric inline form */}
+        {formOpen && (
+          <form
+            onSubmit={handleSubmit}
+            className="mb-6 border border-line p-4 space-y-3"
+            style={{ background: "var(--bg-1)" }}
+          >
+            <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>New metric</p>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div>
+                <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Name</label>
+                <input
+                  type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
+                  placeholder="e.g. Conversion rate"
+                  className="w-full px-3 py-2 border border-line t-small outline-none"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+                />
+              </div>
+              <div>
+                <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Dataset</label>
+                <input
+                  type="text" value={formDataset} onChange={(e) => setFormDataset(e.target.value)}
+                  placeholder="e.g. fct_orders"
+                  className="w-full px-3 py-2 border border-line t-small outline-none"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+                />
+              </div>
+              <div>
+                <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Kind</label>
+                <select
+                  value={formKind} onChange={(e) => setFormKind(e.target.value as typeof formKind)}
+                  className="w-full px-3 py-2 border border-line t-small outline-none"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+                >
+                  {METRIC_KINDS.map((k) => (<option key={k} value={k}>{k}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Description</label>
+                <input
+                  type="text" value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Optional"
+                  className="w-full px-3 py-2 border border-line t-small outline-none"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+                />
+              </div>
             </div>
-            <div>
-              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Dataset</label>
-              <input
-                type="text"
-                value={formDataset}
-                onChange={(e) => setFormDataset(e.target.value)}
-                placeholder="e.g. fct_orders"
-                className="w-full px-3 py-2 border border-line t-small outline-none"
-                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
-              />
-            </div>
-            <div>
-              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Kind</label>
-              <select
-                value={formKind}
-                onChange={(e) => setFormKind(e.target.value as typeof formKind)}
-                className="w-full px-3 py-2 border border-line t-small outline-none"
-                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+            {formError && <p className="t-small" style={{ color: "var(--fail)" }}>{formError}</p>}
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="submit" disabled={submitting}
+                className="px-4 py-1.5 t-small font-medium border transition-colors hover:opacity-90 disabled:opacity-40"
+                style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
               >
-                {METRIC_KINDS.map((k) => (
-                  <option key={k} value={k}>{k}</option>
-                ))}
-              </select>
+                {submitting ? "Creating..." : "Create metric"}
+              </button>
+              <button
+                type="button" onClick={() => { setFormOpen(false); setFormError(null); }}
+                className="px-3 py-1.5 t-small border border-line transition-colors hover:bg-bg-2"
+                style={{ color: "var(--fg-1)" }}
+              >
+                Cancel
+              </button>
             </div>
-            <div>
-              <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Description</label>
-              <input
-                type="text"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="Optional"
-                className="w-full px-3 py-2 border border-line t-small outline-none"
-                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
-              />
-            </div>
+          </form>
+        )}
+
+        {loading && (
+          <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
+            <p className="t-small" style={{ color: "var(--fg-3)" }}>Loading metrics...</p>
           </div>
+        )}
 
-          {formError && (
-            <p className="t-small" style={{ color: "var(--fail)" }}>{formError}</p>
-          )}
-
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-4 py-1.5 t-small font-medium border transition-colors hover:opacity-90 disabled:opacity-40"
-              style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
-            >
-              {submitting ? "Creating..." : "Create metric"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setFormOpen(false); setFormError(null); }}
-              className="px-3 py-1.5 t-small border border-line transition-colors hover:bg-bg-2"
-              style={{ color: "var(--fg-1)" }}
-            >
-              Cancel
-            </button>
+        {fetchError && (
+          <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
+            <p className="t-small" style={{ color: "var(--fail)" }}>{fetchError}</p>
           </div>
-        </form>
-      )}
+        )}
 
-      {loading && (
-        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
-          <p className="t-small" style={{ color: "var(--fg-3)" }}>Loading metrics...</p>
-        </div>
-      )}
-
-      {fetchError && (
-        <div className="border border-line p-8 text-center" style={{ background: "var(--bg-1)" }}>
-          <p className="t-small" style={{ color: "var(--fail)" }}>{fetchError}</p>
-        </div>
-      )}
-
-      {!loading && !fetchError && (
-        <div className="border border-line" style={{ background: "var(--bg-1)" }}>
-          {metrics.length === 0 ? (
-            <div className="px-4 py-12 text-center t-small" style={{ color: "var(--fg-3)" }}>
-              No metrics tracked yet. Connect a source and run checks to generate metrics.
-            </div>
-          ) : (
-            <table className="w-full" style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr className="border-b border-line">
-                  {["", "Metric", "Dataset", "Kind", "Owners", "Last run", ""].map((h, i) => (
-                    <th key={i} className="px-3 py-2 text-left t-micro"
-                        style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((m) => (
-                  <tr key={m.fqn} className="border-b border-line last:border-0 hover:bg-bg-2 transition-colors">
-                    <td className="px-3 py-2" style={{ width: 32 }}>
-                      <VerdictDot verdict={m.current_verdict} />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link href={`/metrics/${encodeURIComponent(m.fqn)}`}
-                            className="t-small font-mono hover:underline"
-                            style={{ color: "var(--accent)" }}>
-                        {m.display_name}
-                      </Link>
-                      <p className="t-micro mt-0.5 font-mono" style={{ color: "var(--fg-3)" }}>{m.fqn}</p>
-                    </td>
-                    <td className="px-3 py-2 t-small" style={{ color: "var(--fg-1)" }}>{m.dataset}</td>
-                    <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-2)" }}>{m.kind}</td>
-                    <td className="px-3 py-2 t-small" style={{ color: "var(--fg-2)" }}>{m.owners.join(", ")}</td>
-                    <td className="px-3 py-2 t-small" style={{ color: "var(--fg-3)" }}>{m.last_run ?? "--"}</td>
-                    <td className="px-3 py-2 text-right" style={{ width: 100 }} onClick={(e) => e.stopPropagation()}>
-                      {confirmDeleteFqn === m.fqn ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleDeleteMetric(m.fqn)}
-                            disabled={deletingFqn}
-                            className="flex items-center gap-1 px-2 py-0.5 t-micro border transition-colors"
-                            style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
-                          >
-                            {deletingFqn ? <Loader2 size={10} strokeWidth={2} className="animate-spin" /> : "delete"}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteFqn(null)}
-                            className="t-micro px-1 hover:opacity-60"
-                            style={{ color: "var(--fg-3)" }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDeleteFqn(m.fqn)}
-                          className="inline-flex items-center justify-center w-6 h-6 border border-transparent hover:border-line transition-colors ml-auto"
-                          style={{ color: "var(--fg-3)" }}
-                          title="Delete metric"
-                        >
-                          <Trash2 size={11} strokeWidth={1.6} />
-                        </button>
-                      )}
-                    </td>
+        {!loading && !fetchError && (
+          <div className="border border-line" style={{ background: "var(--bg-1)" }}>
+            {filtered.length === 0 ? (
+              <div className="px-4 py-12 text-center t-small" style={{ color: "var(--fg-3)" }}>
+                {kindFilter ? `No ${kindFilter} metrics.` : "No metrics tracked yet. Connect a source and run checks to generate metrics."}
+              </div>
+            ) : (
+              <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                <thead>
+                  <tr className="border-b border-line">
+                    {["", "Metric", "Path", "Kind", ""].map((h, i) => (
+                      <th key={i} className="px-3 py-2 text-left t-micro"
+                          style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+                </thead>
+                <tbody>
+                  {filtered.map((m) => (
+                    <tr key={m.fqn} className="border-b border-line last:border-0 hover:bg-bg-2 transition-colors">
+                      <td className="px-3 py-2" style={{ width: 32 }}>
+                        <VerdictDot verdict={m.current_verdict} />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link href={`/metrics/${encodeURIComponent(m.fqn)}`}
+                              className="t-small font-mono hover:underline"
+                              style={{ color: "var(--accent)" }}>
+                          {m.display_name}
+                        </Link>
+                        <p className="t-micro mt-0.5 font-mono" style={{ color: "var(--fg-3)" }}>{m.fqn}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="t-micro font-mono" style={{ color: "var(--fg-2)" }}>
+                          {[m.source_id, m.dataset, m.column_name].filter(Boolean).join(" / ") || m.dataset}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5" onClick={(e) => { e.stopPropagation(); setEditingKindFqn(m.fqn); }}>
+                        {editingKindFqn === m.fqn ? (
+                          <select
+                            autoFocus defaultValue={m.kind}
+                            onChange={(e) => handlePatchKind(m.fqn, e.target.value)}
+                            onBlur={() => setEditingKindFqn(null)}
+                            className="t-small font-mono border border-accent outline-none px-1 py-0.5"
+                            style={{ background: "var(--bg-2)", color: "var(--accent)" }}
+                          >
+                            {METRIC_KINDS.map((k) => (
+                              <option key={k} value={k} title={KIND_HINT[k]}>{k}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            className="t-small font-mono cursor-pointer hover:opacity-70"
+                            style={{ color: "var(--fg-2)" }}
+                            title={`${KIND_HINT[m.kind] ?? m.kind} — click to edit`}
+                          >
+                            {m.kind}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right" style={{ width: 100 }} onClick={(e) => e.stopPropagation()}>
+                        {confirmDeleteFqn === m.fqn ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleDeleteMetric(m.fqn)}
+                              disabled={deletingFqn}
+                              className="flex items-center gap-1 px-2 py-0.5 t-micro border transition-colors"
+                              style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
+                            >
+                              {deletingFqn ? <Loader2 size={10} strokeWidth={2} className="animate-spin" /> : "delete"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteFqn(null)}
+                              className="t-micro px-1 hover:opacity-60"
+                              style={{ color: "var(--fg-3)" }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteFqn(m.fqn)}
+                            className="inline-flex items-center justify-center w-6 h-6 border border-transparent hover:border-line transition-colors ml-auto"
+                            style={{ color: "var(--fg-3)" }}
+                            title="Delete metric"
+                          >
+                            <Trash2 size={11} strokeWidth={1.6} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
