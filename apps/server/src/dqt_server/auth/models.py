@@ -20,6 +20,7 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
     hashed_password: Mapped[str | None] = mapped_column(String, nullable=True)
     google_id: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     role: Mapped[str] = mapped_column(String, default=ROLE_VIEWER, nullable=False)

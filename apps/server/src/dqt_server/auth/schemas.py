@@ -13,12 +13,14 @@ class UserCreate(BaseModel):
 
 class UserCreateAdmin(BaseModel):
     email: EmailStr
+    name: str = ""
     password: str = ""
     role: str = "viewer"
     oncall_eligible: bool = False
 
 
 class UserPatch(BaseModel):
+    name: str | None = None
     role: str | None = None
     is_active: bool | None = None
     oncall_eligible: bool | None = None
@@ -27,6 +29,7 @@ class UserPatch(BaseModel):
 class UserRead(BaseModel):
     id: uuid.UUID
     email: str
+    name: str | None
     role: str
     tenant_id: str
     is_active: bool

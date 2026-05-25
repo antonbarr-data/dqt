@@ -64,6 +64,7 @@ async def _shifts_with_users(db: AsyncSession) -> list[dict]:
         out.append({
             "user_id": s.user_id,
             "email": user.email if user else s.user_id,
+            "name": user.name if user else None,
             "days_of_week": _parse_days(s.days_of_week),
         })
     return sorted(out, key=lambda x: min(x["days_of_week"]) if x["days_of_week"] else 99)

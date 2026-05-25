@@ -62,6 +62,7 @@ async def _setup_db() -> None:
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS warn_threshold DOUBLE PRECISION",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS fail_threshold DOUBLE PRECISION",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS oncall_eligible BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR",
         ]:
             try:
                 await conn.execute(text(stmt))

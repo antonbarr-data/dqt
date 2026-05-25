@@ -154,6 +154,7 @@ async def create_user(
     hashed = service.hash_password(data.password) if data.password else None
     user = User(
         email=data.email,
+        name=data.name or None,
         hashed_password=hashed,
         role=data.role,
         oncall_eligible=data.oncall_eligible,
@@ -179,6 +180,8 @@ async def patch_user(
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
     oncall_changed = False
+    if body.name is not None:
+        user.name = body.name or None
     if body.role is not None:
         user.role = body.role
     if body.is_active is not None:

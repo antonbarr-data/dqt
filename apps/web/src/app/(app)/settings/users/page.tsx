@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Shield, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Pencil, Plus, Shield, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { authHeaders, isSysAdmin } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +10,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 interface User {
   id: string;
   email: string;
+  name: string | null;
   role: string;
   is_active: boolean;
   oncall_eligible: boolean;
@@ -34,9 +35,48 @@ const ROLES = ["viewer", "editor", "admin", "sysadmin"];
 
 interface AddUserForm {
   email: string;
+  name: string;
   password: string;
   role: string;
   oncall_eligible: boolean;
+}
+
+function InlineName({ user, onSave }: { user: User; onSave: (name: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(user.name ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function start() { setVal(user.name ?? ""); setEditing(true); setTimeout(() => inputRef.current?.focus(), 0); }
+  function save() { setEditing(false); onSave(val); }
+  function cancel() { setEditing(false); setVal(user.name ?? ""); }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          ref={inputRef}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") cancel(); }}
+          className="px-1.5 py-0.5 t-small border border-line font-mono w-36"
+          style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
+        />
+        <button onClick={save} className="hover:opacity-70"><Check size={11} style={{ color: "var(--pass)" }} /></button>
+        <button onClick={cancel} className="hover:opacity-70"><X size={11} style={{ color: "var(--fg-3)" }} /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 group">
+      <span className="t-small" style={{ color: user.name ? "var(--fg-0)" : "var(--fg-3)" }}>
+        {user.name || <span style={{ fontStyle: "italic" }}>—</span>}
+      </span>
+      <button onClick={start} className="opacity-0 group-hover:opacity-100 transition-opacity">
+        <Pencil size={10} style={{ color: "var(--fg-3)" }} />
+      </button>
+    </div>
+  );
 }
 
 export default function UsersPage() {
@@ -45,7 +85,7 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState<AddUserForm>({ email: "", password: "", role: "viewer", oncall_eligible: false });
+  const [form, setForm] = useState<AddUserForm>({ email: "", name: "", password: "", role: "viewer", oncall_eligible: false });
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -84,7 +124,7 @@ export default function UsersPage() {
       const created: User = await res.json();
       setUsers((prev) => [...prev, created]);
       setShowAdd(false);
-      setForm({ email: "", password: "", role: "viewer", oncall_eligible: false });
+      setForm({ email: "", name: "", password: "", role: "viewer", oncall_eligible: false });
     } catch (e: unknown) {
       setAddError(e instanceof Error ? e.message : "Error");
     } finally {
@@ -92,8 +132,8 @@ export default function UsersPage() {
     }
   }
 
-  async function patchUser(userId: string, patch: Partial<Pick<User, "role" | "is_active" | "oncall_eligible">>) {
-    setBusy(userId + JSON.stringify(patch));
+  async function patchUser(userId: string, patch: Record<string, unknown>) {
+    setBusy(userId + Object.keys(patch).join());
     try {
       const res = await fetch(`${API}/api/v1/admin/users/${userId}`, {
         method: "PATCH",
@@ -144,7 +184,6 @@ export default function UsersPage() {
         Manage user roles, access, and on-call eligibility. Only Super Admins can promote other Super Admins.
       </p>
 
-      {/* Add User form */}
       {showAdd && (
         <div className="border border-line p-4 space-y-3" style={{ background: "var(--bg-1)" }}>
           <div className="flex items-center justify-between">
@@ -154,6 +193,17 @@ export default function UsersPage() {
             </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Name</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Full name"
+                className="w-full px-2 py-1.5 t-small border border-line"
+                style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
+              />
+            </div>
             <div>
               <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Email</label>
               <input
@@ -166,7 +216,7 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Password <span style={{ color: "var(--fg-3)" }}>(optional — user can use Google OAuth)</span></label>
+              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Password <span style={{ color: "var(--fg-3)" }}>(optional)</span></label>
               <input
                 type="password"
                 value={form.password}
@@ -176,35 +226,35 @@ export default function UsersPage() {
                 style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
               />
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Role</label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                className="px-2 py-1.5 t-small border border-line"
-                style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
-              >
-                {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-              </select>
+            <div className="flex items-end gap-4">
+              <div>
+                <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Role</label>
+                <select
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  className="px-2 py-1.5 t-small border border-line"
+                  style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
+                >
+                  {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer mb-1.5">
+                <input
+                  type="checkbox"
+                  checked={form.oncall_eligible}
+                  onChange={(e) => setForm((f) => ({ ...f, oncall_eligible: e.target.checked }))}
+                  className="w-3.5 h-3.5"
+                />
+                <span className="t-small" style={{ color: "var(--fg-1)" }}>On-call eligible</span>
+              </label>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer mt-4">
-              <input
-                type="checkbox"
-                checked={form.oncall_eligible}
-                onChange={(e) => setForm((f) => ({ ...f, oncall_eligible: e.target.checked }))}
-                className="w-3.5 h-3.5"
-              />
-              <span className="t-small" style={{ color: "var(--fg-1)" }}>On-call eligible</span>
-            </label>
           </div>
           {addError && <p className="t-micro" style={{ color: "var(--fail)" }}>{addError}</p>}
           <div className="flex gap-2">
             <button
               onClick={addUser}
               disabled={adding || !form.email}
-              className="px-3 py-1.5 t-small border border-line transition-colors hover:opacity-80 disabled:opacity-40"
+              className="px-3 py-1.5 t-small border transition-colors hover:opacity-80 disabled:opacity-40"
               style={{ color: "var(--accent)", borderColor: "var(--accent)" }}
             >
               {adding ? "Creating..." : "Create User"}
@@ -227,7 +277,7 @@ export default function UsersPage() {
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line" style={{ background: "var(--bg-1)" }}>
-              {["Email", "Role", "On-call", "Status", "Joined", "Actions"].map((h) => (
+              {["Name", "Email", "Role", "On-call", "Status", "Joined", "Actions"].map((h) => (
                 <th key={h} className="px-3 py-2 text-left t-micro" style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   {h}
                 </th>
@@ -238,7 +288,10 @@ export default function UsersPage() {
             {users.map((u) => (
               <tr key={u.id} className="border-b border-line last:border-0" style={{ opacity: u.is_active ? 1 : 0.5 }}>
                 <td className="px-3 py-2.5">
-                  <span className="t-small font-mono" style={{ color: "var(--fg-0)" }}>{u.email}</span>
+                  <InlineName user={u} onSave={(name) => patchUser(u.id, { name })} />
+                </td>
+                <td className="px-3 py-2.5">
+                  <span className="t-small font-mono" style={{ color: "var(--fg-2)" }}>{u.email}</span>
                 </td>
                 <td className="px-3 py-2.5">
                   <select
@@ -270,18 +323,8 @@ export default function UsersPage() {
                       color: u.oncall_eligible ? "var(--pass)" : "var(--fg-3)",
                       borderColor: u.oncall_eligible ? "var(--pass)" : "var(--line)",
                     }}
-                    title={u.oncall_eligible ? "Remove from on-call rotation" : "Add to on-call rotation"}
                   >
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: u.oncall_eligible ? "var(--pass)" : "var(--fg-3)",
-                        flexShrink: 0,
-                        display: "inline-block",
-                      }}
-                    />
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: u.oncall_eligible ? "var(--pass)" : "var(--fg-3)", flexShrink: 0, display: "inline-block" }} />
                     {u.oncall_eligible ? "Eligible" : "Not eligible"}
                   </button>
                 </td>
@@ -311,7 +354,6 @@ export default function UsersPage() {
                         disabled={busy !== null}
                         className="flex items-center gap-1 px-2 py-1 t-micro border border-line transition-colors hover:opacity-80 disabled:opacity-40"
                         style={{ color: "var(--fail)" }}
-                        title="Deactivate"
                       >
                         <UserX size={10} strokeWidth={2} />
                         Deactivate
@@ -322,7 +364,6 @@ export default function UsersPage() {
                         disabled={busy !== null}
                         className="flex items-center gap-1 px-2 py-1 t-micro border border-line transition-colors hover:opacity-80 disabled:opacity-40"
                         style={{ color: "var(--pass)" }}
-                        title="Reactivate"
                       >
                         <UserCheck size={10} strokeWidth={2} />
                         Reactivate

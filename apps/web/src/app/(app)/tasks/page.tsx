@@ -1,8 +1,8 @@
 import { serverFetch } from "@/lib/server-api";
 
 interface OncallStatus {
-  current_oncall: { email: string } | null;
-  upcoming_oncall: { email: string } | null;
+  current_oncall: { email: string; name: string | null } | null;
+  upcoming_oncall: { email: string; name: string | null } | null;
 }
 
 interface CheckItem {
@@ -57,8 +57,10 @@ export default async function TasksPage() {
     serverFetch<CheckItem[]>("/checks", 15) ?? [],
     serverFetch<OncallStatus>("/oncall/status", 15),
   ]);
-  const assignee =
-    oncall?.current_oncall?.email ?? oncall?.upcoming_oncall?.email ?? "on-call";
+  const oncallPerson = oncall?.current_oncall ?? oncall?.upcoming_oncall;
+  const assignee = oncallPerson
+    ? (oncallPerson.name ?? oncallPerson.email)
+    : "on-call";
   const alertChecks = (checks as CheckItem[]).filter((c) => c.verdict === "fail" || c.verdict === "warn");
 
   const checkTasks: Task[] = alertChecks.map((c) => ({
