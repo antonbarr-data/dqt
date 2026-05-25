@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pencil, X, Check } from "lucide-react";
+import { ExpressionBuilder, ExpressionDef, emptyExpression } from "./expression-builder";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -37,6 +38,12 @@ interface Props {
   good_direction: string | null;
   refresh_cadence: string | null;
   lineage: { label: string; kind?: string }[];
+  source_id: string | null;
+  expr_type: string | null;
+  expr_sql: string | null;
+  numerator_sql: string | null;
+  denominator_sql: string | null;
+  filter_sql: string | null;
 }
 
 export function MetricProfilePanel({
@@ -47,6 +54,10 @@ export function MetricProfilePanel({
   good_direction: initialDirection,
   refresh_cadence: initialCadence,
   lineage: initialLineage,
+  source_id: initialSourceId,
+  expr_type: initialExprType,
+  expr_sql: initialExprSql,
+  filter_sql: initialFilterSql,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,6 +70,13 @@ export function MetricProfilePanel({
     initialLineage.length > 0 ? initialLineage.map((l) => l.label) : []
   );
   const [newStep, setNewStep] = useState("");
+  const [expr, setExpr] = useState<ExpressionDef>(() => ({
+    ...emptyExpression(),
+    type: (initialExprType as ExpressionDef["type"]) ?? "simple",
+    filterSql: initialFilterSql ?? "",
+    customSql: initialExprSql ?? "",
+    exprSql: initialExprSql ?? "",
+  }));
 
   async function save() {
     setSaving(true);
@@ -73,6 +91,9 @@ export function MetricProfilePanel({
           good_direction: direction || null,
           refresh_cadence: cadence || null,
           lineage: lineage.map((l) => ({ label: l })),
+          expr_type: expr.type || null,
+          expr_sql: expr.exprSql || null,
+          filter_sql: expr.filterSql || null,
         }),
       });
       setEditing(false);
@@ -146,6 +167,19 @@ export function MetricProfilePanel({
         <p className="t-small mb-2" style={{ color: "var(--fg-2)", maxWidth: 640 }}>
           {description}
         </p>
+      )}
+
+      {/* Expression formula — view mode */}
+      {initialExprSql && !editing && (
+        <div className="mb-2">
+          <p className="t-micro mb-1" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Expression</p>
+          <code
+            className="block t-micro font-mono px-2 py-1.5 border border-line overflow-x-auto"
+            style={{ background: "var(--bg-0)", color: "var(--fg-1)" }}
+          >
+            SELECT {initialExprSql} FROM {fqn.split(".").at(-2) ?? "…"}
+          </code>
+        </div>
       )}
 
       {/* Lineage strip */}
@@ -261,6 +295,15 @@ export function MetricProfilePanel({
                 Add
               </button>
             </div>
+          </div>
+          <div>
+            <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Expression</label>
+            <ExpressionBuilder
+              dataset={fqn.split(".").at(-2) ?? ""}
+              sourceId={initialSourceId}
+              value={expr}
+              onChange={setExpr}
+            />
           </div>
           <div className="flex gap-2">
             <button

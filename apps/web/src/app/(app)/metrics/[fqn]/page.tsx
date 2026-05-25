@@ -27,6 +27,12 @@ interface MetricDetail {
   good_direction: string | null;
   refresh_cadence: string | null;
   lineage: { label: string; kind?: string }[];
+  source_id: string | null;
+  expr_type: string | null;
+  expr_sql: string | null;
+  numerator_sql: string | null;
+  denominator_sql: string | null;
+  filter_sql: string | null;
 }
 
 interface MetricProfile {
@@ -126,6 +132,12 @@ export default async function MetricInsightPage({
         good_direction={metric.good_direction}
         refresh_cadence={metric.refresh_cadence}
         lineage={metric.lineage}
+        source_id={metric.source_id}
+        expr_type={metric.expr_type}
+        expr_sql={metric.expr_sql}
+        numerator_sql={metric.numerator_sql}
+        denominator_sql={metric.denominator_sql}
+        filter_sql={metric.filter_sql}
       />
 
       {/* Meta line */}

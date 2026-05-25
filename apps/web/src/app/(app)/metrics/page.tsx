@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ChevronDown, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ExpressionBuilder, ExpressionDef, emptyExpression } from "./[fqn]/expression-builder";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -22,6 +23,7 @@ interface DatasetItem {
   id: string;
   source: string;
   schema: string;
+  source_id?: string;
 }
 
 interface SuggestedMetric {
@@ -127,6 +129,10 @@ export default function MetricsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [editingKindFqn, setEditingKindFqn] = useState<string | null>(null);
+  const [formExprOpen, setFormExprOpen] = useState(false);
+  const [formExpr, setFormExpr] = useState<ExpressionDef>(emptyExpression());
+  const [formSourceId, setFormSourceId] = useState("");
+  const [formDatasets, setFormDatasets] = useState<DatasetItem[]>([]);
 
   // Suggest state
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -252,10 +258,25 @@ export default function MetricsPage() {
       const res = await fetch(`${API}/api/v1/metrics`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: formName.trim(), kind: formKind, dataset: formDataset.trim(), description: formDescription.trim() }),
+        body: JSON.stringify({
+          display_name: formName.trim(),
+          kind: formKind,
+          dataset: formDataset.trim(),
+          description: formDescription.trim(),
+          source_id: formSourceId || null,
+          ...(formExprOpen && formExpr.exprSql ? {
+            expr_type: formExpr.type,
+            expr_sql: formExpr.exprSql,
+            numerator_sql: formExpr.numeratorCol ? formExpr.numeratorAgg.toUpperCase() + "(" + formExpr.numeratorCol + ")" : null,
+            denominator_sql: formExpr.denominatorCol ? formExpr.denominatorAgg.toUpperCase() + "(" + formExpr.denominatorCol + ")" : null,
+            filter_sql: formExpr.filterSql || null,
+          } : {}),
+        }),
       });
       if (res.status === 201) {
-        setFormName(""); setFormKind("ratio"); setFormDataset(""); setFormDescription(""); setFormOpen(false);
+        setFormName(""); setFormKind("ratio"); setFormDataset(""); setFormDescription("");
+        setFormExpr(emptyExpression()); setFormExprOpen(false); setFormSourceId("");
+        setFormOpen(false);
         await loadMetrics();
       } else if (res.status === 409) {
         setFormError("A metric with this name already exists for that dataset.");
@@ -297,7 +318,16 @@ export default function MetricsPage() {
             Suggest metrics
           </button>
           <button
-            onClick={() => { setFormOpen((v) => !v); setFormError(null); }}
+            onClick={() => {
+              setFormOpen((v) => !v);
+              setFormError(null);
+              if (!formOpen && formDatasets.length === 0) {
+                fetch(`${API}/api/v1/datasets`)
+                  .then((r) => r.ok ? r.json() : [])
+                  .then((d: DatasetItem[]) => setFormDatasets(d))
+                  .catch(() => {});
+              }
+            }}
             className="flex items-center gap-1.5 px-3 py-1.5 t-small border transition-colors hover:opacity-80"
             style={{
               background: formOpen ? "var(--accent-bg)" : "var(--bg-2)",
@@ -465,12 +495,28 @@ export default function MetricsPage() {
             </div>
             <div>
               <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Dataset</label>
-              <input
-                type="text" value={formDataset} onChange={(e) => setFormDataset(e.target.value)}
-                placeholder="e.g. fct_orders"
-                className="w-full px-3 py-2 border border-line t-small outline-none"
-                style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
-              />
+              {formDatasets.length > 0 ? (
+                <select
+                  value={formDataset}
+                  onChange={(e) => {
+                    setFormDataset(e.target.value);
+                    const d = formDatasets.find((x) => x.id === e.target.value);
+                    setFormSourceId(d?.source_id ?? "");
+                  }}
+                  className="w-full px-3 py-2 border border-line t-small outline-none"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+                >
+                  <option value="">— select dataset —</option>
+                  {formDatasets.map((d) => <option key={d.id} value={d.id}>{d.id}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text" value={formDataset} onChange={(e) => setFormDataset(e.target.value)}
+                  placeholder="e.g. fct_orders"
+                  className="w-full px-3 py-2 border border-line t-small outline-none"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
+                />
+              )}
             </div>
             <div>
               <label className="block t-micro mb-1" style={{ color: "var(--fg-2)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Kind</label>
@@ -491,6 +537,30 @@ export default function MetricsPage() {
                 style={{ background: "var(--bg-2)", color: "var(--fg-0)" }}
               />
             </div>
+          </div>
+          {/* Expression section */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setFormExprOpen((v) => !v)}
+              className="flex items-center gap-1.5 t-micro hover:opacity-80"
+              style={{ color: formExprOpen ? "var(--accent)" : "var(--fg-3)" }}
+            >
+              <span style={{ fontSize: 10, fontFamily: "var(--font-jetbrains-mono)" }}>
+                {formExprOpen ? "▾" : "▸"}
+              </span>
+              Expression {formExprOpen ? "" : "(optional)"}
+            </button>
+            {formExprOpen && (
+              <div className="mt-2">
+                <ExpressionBuilder
+                  dataset={formDataset}
+                  sourceId={formSourceId || null}
+                  value={formExpr}
+                  onChange={setFormExpr}
+                />
+              </div>
+            )}
           </div>
           {formError && <p className="t-small" style={{ color: "var(--fail)" }}>{formError}</p>}
           <div className="flex items-center gap-2 pt-1">
