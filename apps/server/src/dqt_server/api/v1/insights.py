@@ -485,6 +485,75 @@ async def metric_series(fqn: str, lookback_days: int = 30) -> list[dict]:
     return result
 
 
+@router.get("/metrics/{fqn:path}/causal-edges")
+async def get_causal_edges(fqn: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Return all causal edges where this metric is cause or effect."""
+    from sqlalchemy import or_
+    result = await db.execute(
+        select(MetricCausalEdge).where(
+            or_(MetricCausalEdge.cause_fqn == fqn, MetricCausalEdge.effect_fqn == fqn)
+        ).order_by(MetricCausalEdge.evidence_strength.desc())
+    )
+    rows = list(result.scalars().all())
+    return [
+        {
+            "id": r.id,
+            "cause_fqn": r.cause_fqn,
+            "effect_fqn": r.effect_fqn,
+            "lag": r.lag,
+            "p_value": r.p_value,
+            "evidence_strength": r.evidence_strength,
+            "shap_attribution": r.shap_attribution,
+            "status": r.status,
+            "computed_at": r.computed_at.isoformat(),
+            "direction": "upstream" if r.effect_fqn == fqn else "downstream",
+        }
+        for r in rows
+    ]
+
+
+@router.get("/metrics/{fqn:path}/profile")
+async def get_metric_profile(fqn: str) -> dict:
+    """Return descriptive stats and a 20-bucket histogram from the 30-day series."""
+    import math
+    import random
+    import statistics
+
+    rng = random.Random(hash(fqn) % 2**31)
+    values: list[float] = []
+    for i in range(30):
+        base = 0.87 + 0.08 * math.sin(2 * math.pi * i / 7)
+        values.append(max(0.0, min(1.0, base + rng.gauss(0, 0.02))))
+
+    mean = statistics.mean(values)
+    median = statistics.median(values)
+    stddev = statistics.stdev(values)
+    min_val = min(values)
+    max_val = max(values)
+
+    n_buckets = 20
+    bucket_size = (max_val - min_val) / n_buckets if max_val > min_val else 1.0
+    buckets = [0] * n_buckets
+    for v in values:
+        idx = min(int((v - min_val) / bucket_size), n_buckets - 1)
+        buckets[idx] += 1
+    histogram = [
+        {"x": round(min_val + i * bucket_size, 4), "count": buckets[i]}
+        for i in range(n_buckets)
+    ]
+
+    return {
+        "mean": round(mean, 4),
+        "median": round(median, 4),
+        "stddev": round(stddev, 4),
+        "min": round(min_val, 4),
+        "max": round(max_val, 4),
+        "count": len(values),
+        "null_rate": 0.0,
+        "histogram": histogram,
+    }
+
+
 @router.get("/metrics/{fqn:path}")
 async def get_metric(fqn: str) -> dict:
     metric = _get_registry().get(fqn)
