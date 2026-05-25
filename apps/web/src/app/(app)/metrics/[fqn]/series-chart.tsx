@@ -11,7 +11,7 @@ import {
 } from "recharts";
 
 interface SeriesPoint {
-  run_at: string;
+  ts: string;
   value: number;
   verdict: string;
 }
@@ -105,7 +105,7 @@ export function SeriesChart({ fqn }: { fqn: string }) {
   const outlierFlags = markOutliers(values);
 
   const chartData = data.map((p, i) => ({
-    date: new Date(p.run_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: new Date(p.ts).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     value: p.value,
     trend: Math.round(trend[i] * 10000) / 10000,
     outlier: outlierFlags[i] ? p.value : undefined,
