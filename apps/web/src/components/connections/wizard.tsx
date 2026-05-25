@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Loader2, ChevronLeft, X, Sparkles, TrendingUp, RefreshCw } from "lucide-react";
+import { Check, Loader2, ChevronLeft, X, Sparkles, TrendingUp, RefreshCw, Upload } from "lucide-react";
 import { clsx } from "clsx";
 
 // ---------------------------------------------------------------------------
@@ -40,21 +40,14 @@ const ENGINE_FIELDS: Record<string, FieldDef[]> = {
     { key: "username", label: "User", type: "text", placeholder: "dqt_readonly" },
     { key: "password", label: "Password", type: "password", placeholder: "" },
   ],
+  // BigQuery: project is auto-detected from JSON key; no dataset field needed
   bigquery: [
     {
       key: "service_account_json",
       label: "Service Account Key",
       type: "textarea",
-      placeholder: "Paste JSON key here",
-      help: "Upload or paste your GCP service account key file (.json). The project ID is read from the key automatically.",
-    },
-    { key: "project", label: "GCP Project ID", type: "text", placeholder: "auto-detected from key" },
-    {
-      key: "dataset",
-      label: "Dataset",
-      type: "text",
-      placeholder: "analytics",
-      help: "Leave blank to scan all datasets in the project.",
+      placeholder: "",
+      help: "The project ID is read from the key automatically.",
     },
   ],
   snowflake: [
@@ -67,38 +60,29 @@ const ENGINE_FIELDS: Record<string, FieldDef[]> = {
 };
 
 // ---------------------------------------------------------------------------
-// Constants
+// Step types and wizard config
 // ---------------------------------------------------------------------------
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type StepId = "configure" | "verify" | "bq_datasets" | "tables" | "checks" | "metrics";
 type CheckTier = "essential" | "recommended" | "full_coverage";
 
+function getWizardSteps(engine: string): { id: StepId; label: string }[] {
+  const steps: { id: StepId; label: string }[] = [
+    { id: "configure", label: "Configure" },
+    { id: "verify", label: "Test & Verify" },
+  ];
+  if (engine === "bigquery") {
+    steps.push({ id: "bq_datasets", label: "Datasets" });
+  }
+  steps.push(
+    { id: "tables", label: "Choose Tables" },
+    { id: "checks", label: "Review Checks" },
+    { id: "metrics", label: "Add Metrics" },
+  );
+  return steps;
+}
+
 const HEALTH_STEP_LABELS = ["TCP Reach", "Authentication", "Info Schema Read", "Sample SELECT", "Latency Probe", "Clock Skew"];
-
-const HEALTH_CHECK_BULLETS = [
-  "TCP connectivity",
-  "Authentication",
-  "Schema inspection",
-  "Sample SELECT",
-  "Latency probe",
-  "Clock alignment",
-];
-
-const ENGINE_HINTS: Record<string, string> = {
-  bigquery:   "Service Account JSON: paste or drop a GCP key file. ADC: uses gcloud/GOOGLE_APPLICATION_CREDENTIALS on the server. Key File Path: absolute path to a JSON key on the server.",
-  postgres:   "Need a read-only user? CREATE USER dqt_readonly WITH PASSWORD '...' then GRANT SELECT ON ALL TABLES.",
-  mysql:      "Need a read-only user? GRANT SELECT ON *.* TO 'dqt_readonly'@'%' IDENTIFIED BY '...'",
-  clickhouse: "Need a read-only user? CREATE USER dqt_readonly IDENTIFIED BY '...' SETTINGS readonly = 1.",
-  snowflake:  "Need a read-only role? CREATE ROLE dqt_role; GRANT SELECT ON ALL TABLES IN DATABASE ... TO ROLE dqt_role.",
-};
-
-const WIZARD_STEPS: { id: Step; label: string }[] = [
-  { id: 1, label: "Configure" },
-  { id: 2, label: "Test & Verify" },
-  { id: 3, label: "Choose Datasets" },
-  { id: 4, label: "Review Checks" },
-  { id: 5, label: "Add Metrics" },
-];
 
 const TIER_LABELS: Record<CheckTier, string> = {
   essential: "Essential",
@@ -130,58 +114,17 @@ function tierIncludes(activeTier: CheckTier, itemTier: CheckTier): boolean {
   return order.indexOf(itemTier) <= order.indexOf(activeTier);
 }
 
-function getConnectionPreview(engine: string, values: Record<string, string>): string {
-  switch (engine.toLowerCase()) {
-    case "bigquery": {
-      const proj = values.project || "project";
-      const ds = values.dataset || "*";
-      return `bigquery://${proj}?dataset=${ds}`;
-    }
-    case "postgres": {
-      const user = values.username ? `${values.username}@` : "";
-      const host = values.host || "host";
-      const port = values.port || "5432";
-      const db = values.database || "db";
-      return `postgresql://${user}${host}:${port}/${db}`;
-    }
-    case "mysql": {
-      const user = values.username ? `${values.username}@` : "";
-      const host = values.host || "host";
-      const port = values.port || "3306";
-      const db = values.database || "db";
-      return `mysql://${user}${host}:${port}/${db}`;
-    }
-    case "clickhouse": {
-      const host = values.url || values.host || "host";
-      const port = values.port || "8443";
-      const scheme = values.secure === "true" ? "clickhouses" : "clickhouse";
-      return `${scheme}://${host}:${port}/default`;
-    }
-    case "snowflake": {
-      const account = values.account || "account";
-      const db = values.database || "DB";
-      const wh = values.warehouse ? `?warehouse=${values.warehouse}` : "";
-      return `snowflake://${account}/${db}${wh}`;
-    }
-    default:
-      return `${engine}://…`;
-  }
-}
-
 // ---------------------------------------------------------------------------
-// JsonDropZone — file drop + textarea for service account JSON
+// JsonDropZone — file browse/drop or paste, with mode toggle
 // ---------------------------------------------------------------------------
 
 function JsonDropZone({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [mode, setMode] = useState<"file" | "paste">("file");
   const [dragging, setDragging] = useState(false);
-  const [focused, setFocused] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const hasContent = value.trim().length > 0;
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
+  const readFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
@@ -192,41 +135,209 @@ function JsonDropZone({ value, onChange }: { value: string; onChange: (v: string
 
   return (
     <div className="space-y-2">
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        className="border border-dashed flex items-center justify-center py-4 transition-colors"
-        style={{
-          borderColor: dragging ? "var(--accent)" : hasContent ? "var(--pass)" : "var(--line)",
-          background: dragging ? "var(--accent-bg)" : hasContent ? "rgba(127,179,148,0.06)" : "var(--bg-1)",
-        }}
-      >
-        {hasContent ? (
-          <span className="t-small flex items-center gap-2" style={{ color: "var(--pass)" }}>
-            <Check size={13} strokeWidth={2.5} />
-            JSON loaded
-          </span>
+      {/* Mode toggle */}
+      <div className="flex" style={{ gap: 0 }}>
+        <button
+          type="button"
+          onClick={() => setMode("file")}
+          className="px-3 py-1.5 t-micro border transition-colors"
+          style={{
+            background: mode === "file" ? "var(--accent-bg)" : "var(--bg-1)",
+            color: mode === "file" ? "var(--accent)" : "var(--fg-3)",
+            borderColor: mode === "file" ? "var(--accent)" : "var(--line)",
+            borderRight: mode === "file" ? undefined : "none",
+          }}
+        >
+          Browse / Drop
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("paste")}
+          className="px-3 py-1.5 t-micro border transition-colors"
+          style={{
+            background: mode === "paste" ? "var(--accent-bg)" : "var(--bg-1)",
+            color: mode === "paste" ? "var(--accent)" : "var(--fg-3)",
+            borderColor: mode === "paste" ? "var(--accent)" : "var(--line)",
+          }}
+        >
+          Paste JSON
+        </button>
+      </div>
+
+      {mode === "file" ? (
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) readFile(file);
+              e.target.value = "";
+            }}
+          />
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              const file = e.dataTransfer.files[0];
+              if (file) readFile(file);
+            }}
+            className="border border-dashed flex flex-col items-center justify-center py-6 gap-3 transition-colors"
+            style={{
+              borderColor: dragging ? "var(--accent)" : hasContent ? "var(--pass)" : "var(--line)",
+              background: dragging ? "var(--accent-bg)" : hasContent ? "rgba(127,179,148,0.06)" : "var(--bg-1)",
+            }}
+          >
+            {hasContent ? (
+              <span className="t-small flex items-center gap-2" style={{ color: "var(--pass)" }}>
+                <Check size={13} strokeWidth={2.5} />
+                JSON loaded
+              </span>
+            ) : (
+              <>
+                <span className="t-small" style={{ color: dragging ? "var(--accent)" : "var(--fg-3)" }}>
+                  {dragging ? "Release to load" : "Drop key.json here"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 t-small border transition-colors hover:opacity-80"
+                  style={{ background: "var(--bg-2)", color: "var(--fg-1)", borderColor: "var(--line)" }}
+                >
+                  <Upload size={12} strokeWidth={1.6} />
+                  Browse
+                </button>
+              </>
+            )}
+          </div>
+          {hasContent && (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="t-micro mt-1 transition-colors hover:opacity-60"
+              style={{ color: "var(--fg-3)" }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      ) : (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={7}
+          placeholder="Paste service account JSON here..."
+          className="w-full px-4 py-3 border t-small font-mono outline-none resize-y"
+          style={{
+            background: "var(--bg-1)",
+            color: "var(--fg-0)",
+            borderColor: "var(--line)",
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit mode — simple form, no wizard steps
+// ---------------------------------------------------------------------------
+
+function EditSourceForm({
+  engine,
+  sourceId,
+  initialName,
+}: {
+  engine: string;
+  sourceId: string;
+  initialName: string;
+}) {
+  const router = useRouter();
+  const [name, setName] = useState(initialName);
+  const [credential, setCredential] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const isBQ = engine === "bigquery";
+
+  async function handleSave() {
+    setSaving(true);
+    setError("");
+    try {
+      const body: Record<string, string> = {};
+      if (name.trim()) body.name = name.trim();
+      if (credential.trim()) body.password = credential.trim();
+      const res = await fetch(`/api/v1/sources/${encodeURIComponent(sourceId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.detail || "Save failed");
+        return;
+      }
+      router.back();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5" style={{ maxWidth: 480 }}>
+      <div>
+        <label className="block t-small mb-1.5 font-medium" style={{ color: "var(--fg-1)" }}>
+          Connection name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full px-4 py-3 border t-body outline-none transition-colors"
+          style={{ background: "var(--bg-1)", color: "var(--fg-0)", borderColor: "var(--line)" }}
+        />
+      </div>
+      <div>
+        <label className="block t-small mb-1.5 font-medium" style={{ color: "var(--fg-1)" }}>
+          {isBQ ? "Service Account Key" : "Password"}
+        </label>
+        {isBQ ? (
+          <JsonDropZone value={credential} onChange={setCredential} />
         ) : (
-          <span className="t-small" style={{ color: dragging ? "var(--accent)" : "var(--fg-3)" }}>
-            {dragging ? "Release to load" : "Drop key.json here"}
-          </span>
+          <input
+            type="password"
+            value={credential}
+            onChange={(e) => setCredential(e.target.value)}
+            placeholder="Leave blank to keep existing"
+            className="w-full px-4 py-3 border t-body outline-none transition-colors"
+            style={{ background: "var(--bg-1)", color: "var(--fg-0)", borderColor: "var(--line)" }}
+          />
         )}
       </div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        rows={focused || hasContent ? 7 : 4}
-        placeholder="...or paste JSON below"
-        className="w-full px-4 py-3 border t-small font-mono outline-none resize-y"
-        style={{
-          background: "var(--bg-1)",
-          color: "var(--fg-0)",
-          borderColor: focused ? "var(--accent)" : "var(--line)",
-        }}
-      />
+      {error && <p className="t-small" style={{ color: "var(--fail)" }}>{error}</p>}
+      <div className="flex gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className={clsx(
+            "px-5 py-2.5 t-small font-medium border transition-colors",
+            !saving ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
+          )}
+          style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button
+          onClick={() => router.back()}
+          className="px-3 py-2.5 t-small transition-colors hover:opacity-60"
+          style={{ color: "var(--fg-2)" }}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }
@@ -255,6 +366,32 @@ interface CheckSuggestion {
   tier: CheckTier;
 }
 
+interface MetricSuggestion {
+  name: string;
+  definition: string;
+  sql_expression: string;
+  numerator_columns: string[];
+  denominator_columns: string[];
+  grain: string;
+  aggregation: string;
+  additivity: "full" | "semi" | "non";
+  kind: "ratio" | "count" | "sum";
+  good_direction: "up" | "down" | "in_band";
+  suggested_owner_role: string;
+  guardrail_for: string | null;
+  cadence: string;
+  confidence: number;
+  reasoning: string;
+  source_column: string;
+  dataset: string;
+  display_name: string;
+}
+
+interface RejectedCandidate {
+  column: string;
+  reason: string;
+}
+
 interface WizardProps {
   engine: string;
   sourceId?: string;
@@ -266,11 +403,28 @@ interface WizardProps {
 // Wizard
 // ---------------------------------------------------------------------------
 
-export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }: WizardProps) {
+// Thin dispatcher — avoids hooks-after-conditional-return
+export function Wizard(props: WizardProps) {
+  if (props.mode === "edit" && props.sourceId) {
+    return (
+      <EditSourceForm
+        engine={props.engine}
+        sourceId={props.sourceId}
+        initialName={props.initialValues?.name ?? ""}
+      />
+    );
+  }
+  return <WizardCreate {...props} />;
+}
+
+function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }: WizardProps) {
   const router = useRouter();
   const sessionKey = `wizard-draft-${engine}`;
+  const isBQ = engine === "bigquery";
 
-  const [step, setStep] = useState<Step>(1);
+  const wizardSteps = getWizardSteps(engine);
+
+  const [step, setStep] = useState<StepId>("configure");
   const [connectionName, setConnectionName] = useState(initialValues.name ?? "");
   const [activeSourceId, setActiveSourceId] = useState<string | undefined>(sourceId);
   const [activeField, setActiveField] = useState<string | null>(null);
@@ -305,7 +459,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
 
   // Save draft on change (non-sensitive fields only)
   useEffect(() => {
-    if (step !== 1) return;
+    if (step !== "configure") return;
     const toSave: Record<string, string> = { __name: connectionName };
     for (const [k, v] of Object.entries(formValues)) {
       if (!SENSITIVE_FIELDS.has(k)) toSave[k] = v;
@@ -323,22 +477,27 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
 
-  // Step 3 state
+  // Tables + BQ datasets state
   const [tables, setTables] = useState<TableItem[]>([]);
   const [tablesLoading, setTablesLoading] = useState(false);
+  const [selectedBQDatasets, setSelectedBQDatasets] = useState<Set<string>>(new Set());
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
 
   // Step 4 state
   const [suggestions, setSuggestions] = useState<CheckSuggestion[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
-  const [activeTier, setActiveTier] = useState<CheckTier>("essential");
+  const [activeTier, setActiveTier] = useState<CheckTier>("recommended");
+  // Keys use "::" separator: "table::column::detector_slug"
   const [selectedChecks, setSelectedChecks] = useState<Set<string>>(new Set());
   const [savingChecks, setSavingChecks] = useState(false);
 
   // Step 5 state
+  const [metricSuggestions, setMetricSuggestions] = useState<MetricSuggestion[]>([]);
+  const [rejectedCandidates, setRejectedCandidates] = useState<RejectedCandidate[]>([]);
+  const [metricSuggestLoading, setMetricSuggestLoading] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
   const [selectedMetrics, setSelectedMetrics] = useState<Set<string>>(new Set());
   const [savingMetrics, setSavingMetrics] = useState(false);
-
 
   const runHealthCheck = useCallback(async () => {
     setHealthSteps([]);
@@ -348,14 +507,11 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     setHealthError(null);
 
     try {
-      const isBQ = engine === "bigquery";
       const host = isBQ
         ? (formValues.project || "")
         : (formValues.url || formValues.host || formValues.account || "");
       const port = isBQ ? 0 : parseInt(formValues.port || "8443", 10);
-      const dbName = isBQ
-        ? (formValues.dataset || "")
-        : (formValues.database || formValues.project || "default");
+      const dbName = isBQ ? "" : (formValues.database || formValues.project || "default");
       const password = isBQ ? (formValues.service_account_json || "") : (formValues.password || "");
 
       const res = await fetch("/api/v1/sources/test", {
@@ -373,7 +529,6 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       });
 
       const data = await res.json();
-
       if (!res.ok) {
         setHealthError(data.detail || "Connection test failed");
         setHealthDone(true);
@@ -392,10 +547,10 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       setHealthDone(true);
       setHealthLoading(false);
     }
-  }, [engine, formValues]);
+  }, [engine, formValues, isBQ]);
 
   useEffect(() => {
-    if (step === 2) runHealthCheck();
+    if (step === "verify") runHealthCheck();
   }, [step, runHealthCheck]);
 
   function canProceedFromHealth(): boolean {
@@ -409,27 +564,44 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     );
   }
 
-  async function handleAdvanceToStep3() {
+  // Fetch tables when entering bq_datasets (BQ) or tables (non-BQ) step
+  useEffect(() => {
+    const shouldFetch =
+      (isBQ && step === "bq_datasets") ||
+      (!isBQ && step === "tables");
+    if (!shouldFetch || !activeSourceId) return;
+    setTablesLoading(true);
+    fetch(`/api/v1/sources/${encodeURIComponent(activeSourceId)}/tables`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: TableItem[]) => {
+        setTables(data);
+        if (isBQ) {
+          // Pre-select all BQ datasets
+          const schemas = new Set(data.map((t) => t.schema).filter(Boolean));
+          setSelectedBQDatasets(schemas);
+        } else {
+          setSelectedTables(new Set(data.filter((t) => t.watched).map((t) => t.name)));
+        }
+      })
+      .catch(() => setTables([]))
+      .finally(() => setTablesLoading(false));
+  }, [step, activeSourceId, isBQ]);
+
+  async function handleAdvanceToVerify() {
     if (mode === "create" && !activeSourceId) {
-      const isBQ = engine === "bigquery";
       const host = isBQ
         ? (formValues.project || "")
         : (formValues.url || formValues.host || formValues.account || "");
       const port = isBQ ? 0 : parseInt(formValues.port || "8443", 10);
-      const dbName = isBQ
-        ? (formValues.dataset || "")
-        : (formValues.database || formValues.project || "default");
+      const dbName = isBQ ? "" : (formValues.database || formValues.project || "default");
       const password = isBQ ? (formValues.service_account_json || "") : (formValues.password || "");
-      const name = connectionName.trim() || (isBQ ? `bigquery://${host}` : `${engine}://${host}`);
-
+      const name = connectionName.trim() || (isBQ ? `bigquery://${host || "project"}` : `${engine}://${host}`);
       try {
         const res = await fetch("/api/v1/sources", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name,
-            engine,
-            host,
+            name, engine, host,
             port: isNaN(port) ? 0 : port,
             username: formValues.username || "",
             password,
@@ -446,25 +618,28 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       }
     }
     sessionStorage.removeItem(sessionKey);
-    setStep(3);
+    setStep("verify");
   }
 
-  useEffect(() => {
-    if (step !== 3 || !activeSourceId) return;
-    setTablesLoading(true);
-    fetch(`/api/v1/sources/${encodeURIComponent(activeSourceId)}/tables`)
-      .then((r) => r.ok ? r.json() : [])
-      .then((data: TableItem[]) => {
-        setTables(data);
-        setSelectedTables(new Set(data.filter((t) => t.watched).map((t) => t.name)));
-      })
-      .catch(() => setTables([]))
-      .finally(() => setTablesLoading(false));
-  }, [step, activeSourceId]);
+  function handleAdvanceAfterVerify() {
+    setStep(isBQ ? "bq_datasets" : "tables");
+  }
 
-  async function handleAdvanceToStep4() {
-    if (!activeSourceId) { setStep(4); return; }
+  function handleAdvanceToTables() {
+    // For BQ: filter tables to those in selectedBQDatasets
+    if (isBQ) {
+      const filtered = tables
+        .filter((t) => selectedBQDatasets.has(t.schema))
+        .map((t) => `${t.schema}.${t.name}`);
+      setSelectedTables(new Set(filtered));
+    }
+    setStep("tables");
+  }
 
+  async function handleAdvanceToChecks() {
+    if (!activeSourceId) { setStep("checks"); return; }
+
+    // Save selected tables — for BQ, keys are "schema.table"
     await fetch(`/api/v1/sources/${encodeURIComponent(activeSourceId)}/tables`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -472,7 +647,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     }).catch(() => null);
 
     setSuggestLoading(true);
-    setStep(4);
+    setStep("checks");
     setSuggestions([]);
 
     try {
@@ -487,10 +662,11 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       if (res.ok) {
         const data: CheckSuggestion[] = await res.json();
         setSuggestions(data);
+        // Default activeTier is "recommended" — pre-select essential + recommended
         const keys = new Set(
           data
-            .filter((s) => s.tier === "essential")
-            .map((s) => `${s.table}.${s.column}.${s.detector_slug}`)
+            .filter((s) => tierIncludes("recommended", s.tier))
+            .map((s) => `${s.table}::${s.column}::${s.detector_slug}`)
         );
         setSelectedChecks(keys);
       }
@@ -506,7 +682,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     const keys = new Set(
       suggestions
         .filter((s) => tierIncludes(tier, s.tier))
-        .map((s) => `${s.table}.${s.column}.${s.detector_slug}`)
+        .map((s) => `${s.table}::${s.column}::${s.detector_slug}`)
     );
     setSelectedChecks(keys);
   }
@@ -520,27 +696,33 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     });
   }
 
+  // Parse check keys "table::column::detector" to get unique table/column pairs
   function checkedColumns(): Array<{ table: string; column: string; checkCount: number }> {
     const map = new Map<string, number>();
     selectedChecks.forEach((key) => {
-      const parts = key.split(".");
+      const parts = key.split("::");
       if (parts.length < 3) return;
-      const colKey = `${parts[0]}.${parts[1]}`;
+      const colKey = `${parts[0]}::${parts[1]}`;
       map.set(colKey, (map.get(colKey) ?? 0) + 1);
     });
     return Array.from(map.entries()).map(([k, count]) => {
-      const dot = k.indexOf(".");
-      return { table: k.slice(0, dot), column: k.slice(dot + 1), checkCount: count };
+      const sep = k.indexOf("::");
+      return { table: k.slice(0, sep), column: k.slice(sep + 2), checkCount: count };
     });
   }
 
-  async function handleAdvanceToStep5() {
+  async function handleAdvanceToMetrics() {
     if (!activeSourceId) { router.push("/sources"); return; }
     setSavingChecks(true);
+    setStep("metrics");
+    setMetricSuggestLoading(true);
+    setMetricSuggestions([]);
+    setRejectedCandidates([]);
+    setSelectedMetrics(new Set());
     try {
       if (selectedChecks.size > 0) {
         const checksToSave = suggestions
-          .filter((s) => selectedChecks.has(`${s.table}.${s.column}.${s.detector_slug}`))
+          .filter((s) => selectedChecks.has(`${s.table}::${s.column}::${s.detector_slug}`))
           .map((s) => ({
             dataset_id: s.table,
             column_name: s.column,
@@ -556,47 +738,82 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       }
 
       const cols = checkedColumns();
-      if (cols.length === 0) {
-        router.push(`/sources/${activeSourceId}`);
-        return;
+      if (cols.length > 0) {
+        try {
+          const res = await fetch("/api/v1/metrics/suggest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              columns: cols.map((c) => ({ dataset: c.table, column: c.column })),
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const fetched: MetricSuggestion[] = data.metrics ?? [];
+            setMetricSuggestions(fetched);
+            setRejectedCandidates(data.rejected_candidates ?? []);
+            setSelectedMetrics(new Set(
+              fetched.filter((m) => m.confidence >= 0.65).map((m) => m.source_column)
+            ));
+          }
+        } catch { /* empty — user can still finish */ }
       }
-      setSelectedMetrics(new Set(cols.map((c) => `${c.table}.${c.column}`)));
-      setStep(5);
     } finally {
       setSavingChecks(false);
+      setMetricSuggestLoading(false);
     }
+  }
+
+  function inferKind(col: string): "ratio" | "count" | "sum" {
+    const n = col.toLowerCase();
+    if (/^(n_|count_|num_)/.test(n) || /(_count|_n|_number)$/.test(n)) return "count";
+    if (/^(sum_|total_)/.test(n) || /(_sum|_total)$/.test(n)) return "sum";
+    return "ratio";
   }
 
   async function handleFinish() {
     if (!activeSourceId) { router.push("/sources"); return; }
     setSavingMetrics(true);
     try {
-      if (selectedMetrics.size > 0) {
-        const metricsToSave = checkedColumns()
-          .filter((c) => selectedMetrics.has(`${c.table}.${c.column}`))
-          .map((c) => ({
-            display_name: `${c.table}.${c.column}`,
-            kind: "count",
-            dataset: c.table,
-            description: `Auto-created from data quality checks on ${c.table}.${c.column}`,
-          }));
+      const toSave = metricSuggestions
+        .filter((m) => selectedMetrics.has(m.source_column))
+        .map((m) => ({
+          display_name: m.display_name || m.name,
+          kind: m.kind || inferKind(m.source_column.split(".").pop() ?? ""),
+          dataset: m.dataset,
+          description: m.definition,
+          owners: m.suggested_owner_role ? [m.suggested_owner_role] : [],
+          tags: [m.cadence, m.additivity].filter(Boolean),
+          source_id: activeSourceId ?? null,
+          column_name: m.source_column.split(".").pop() ?? m.source_column,
+        }));
+      if (toSave.length > 0) {
         await fetch("/api/v1/metrics/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ metrics: metricsToSave }),
+          body: JSON.stringify({ metrics: toSave }),
         }).catch(() => null);
       }
-      router.push(`/sources/${activeSourceId}`);
+      router.push("/sources");
     } finally {
       setSavingMetrics(false);
     }
   }
 
-  function toggleTable(t: string) {
+  function toggleTable(key: string) {
     setSelectedTables((prev) => {
       const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleBQDataset(schema: string) {
+    setSelectedBQDatasets((prev) => {
+      const next = new Set(prev);
+      if (next.has(schema)) next.delete(schema);
+      else next.add(schema);
       return next;
     });
   }
@@ -613,7 +830,8 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
   function setField(key: string, value: string) {
     setFormValues((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === "service_account_json" && engine === "bigquery" && !prev.project) {
+      // Auto-detect project from BQ JSON
+      if (key === "service_account_json" && engine === "bigquery") {
         try {
           const info = JSON.parse(value);
           const proj = info.quota_project_id || info.project_id;
@@ -629,9 +847,20 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     ["engine", engine],
     ["host", formValues.url || formValues.host || formValues.account || formValues.project || ""],
     ["port", formValues.port || ""],
-    ["database", formValues.database || formValues.dataset || ""],
+    ["database", formValues.database || ""],
     ["user", formValues.username || ""],
   ].filter(([, v]) => v) as [string, string][];
+
+  // Stepper helpers
+  const currentStepIndex = wizardSteps.findIndex((s) => s.id === step);
+
+  // BQ datasets derived from tables
+  const bqDatasets = Array.from(new Set(tables.map((t) => t.schema).filter(Boolean))).sort();
+
+  // Tables filtered for "tables" step when BQ
+  const visibleTables = isBQ
+    ? tables.filter((t) => selectedBQDatasets.has(t.schema))
+    : tables;
 
   // ---------------------------------------------------------------------------
   // Render
@@ -641,13 +870,12 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
     <div className="flex gap-10">
       {/* Vertical stepper */}
       <div style={{ width: 148, flexShrink: 0, paddingTop: 2 }}>
-        {WIZARD_STEPS.map((s, idx) => {
+        {wizardSteps.map((s, idx) => {
           const active = step === s.id;
-          const done = step > s.id;
+          const done = idx < currentStepIndex;
           return (
             <div key={s.id} className="flex gap-3">
               <div className="flex flex-col items-center" style={{ width: 20 }}>
-                {/* Circle: only for active and done; bare number for upcoming */}
                 {done ? (
                   <div
                     className="flex items-center justify-center flex-shrink-0"
@@ -668,22 +896,23 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                     style={{ width: 20, height: 20 }}
                   >
                     <span style={{ fontSize: 11, color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)", lineHeight: 1 }}>
-                      {s.id}
+                      {idx + 1}
                     </span>
                   </div>
                 )}
-                {idx < WIZARD_STEPS.length - 1 && (
+                {idx < wizardSteps.length - 1 && (
                   <div style={{ width: 1, height: 36, background: done ? "var(--accent)" : "var(--line)", opacity: done ? 0.3 : 1 }} />
                 )}
               </div>
-              <div style={{ paddingTop: 2 }}>
+              {/* Label aligned to center of the 20px circle */}
+              <div style={{ height: 20, display: "flex", alignItems: "center" }}>
                 <span
                   style={{
                     fontSize: 12,
                     color: active ? "var(--fg-0)" : done ? "var(--fg-2)" : "var(--fg-3)",
                     fontWeight: active ? 500 : 400,
                     fontFamily: "var(--font-jetbrains-mono)",
-                    lineHeight: 1.4,
+                    lineHeight: 1,
                   }}
                 >
                   {s.label}
@@ -697,162 +926,118 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
       {/* Content area */}
       <div className="flex-1 min-w-0">
 
-        {/* ---- Step 1: Configure ---- */}
-        {step === 1 && (
-          <div
-            className="grid gap-6"
-            style={{ gridTemplateColumns: "1fr 200px" }}
-          >
-            {/* Left: form */}
-            <div className="space-y-5">
-              <div>
-                <label className="block t-small mb-1.5 font-medium" style={{ color: "var(--fg-1)" }}>
-                  Connection name
-                </label>
-                <input
-                  type="text"
-                  value={connectionName}
-                  onChange={(e) => setConnectionName(e.target.value)}
-                  onFocus={() => setActiveField("__name")}
-                  onBlur={() => setActiveField(null)}
-                  placeholder={`My ${ENGINE_DISPLAY_NAMES[engine] ?? engine} connection`}
-                  className="w-full px-4 py-3 border t-body outline-none transition-colors"
-                  style={{
-                    background: "var(--bg-1)",
-                    color: "var(--fg-0)",
-                    borderColor: activeField === "__name" ? "var(--accent)" : "var(--line)",
-                  }}
-                />
-              </div>
-
-              {fields.map((f) => (
-                <div key={f.key}>
-                  <label className="block t-small mb-1.5 font-medium" style={{ color: "var(--fg-1)" }}>
-                    {f.label}
-                  </label>
-
-                  {f.type === "textarea" && f.key === "service_account_json" ? (
-                    <JsonDropZone
-                      value={formValues[f.key] ?? ""}
-                      onChange={(v) => setField(f.key, v)}
-                    />
-                  ) : f.type === "textarea" ? (
-                    <textarea
-                      value={formValues[f.key] ?? ""}
-                      onChange={(e) => setField(f.key, e.target.value)}
-                      onFocus={() => setActiveField(f.key)}
-                      onBlur={() => setActiveField(null)}
-                      placeholder={f.placeholder}
-                      rows={4}
-                      className="w-full px-4 py-3 border t-small font-mono outline-none resize-y"
-                      style={{
-                        background: "var(--bg-1)",
-                        color: "var(--fg-0)",
-                        borderColor: activeField === f.key ? "var(--accent)" : "var(--line)",
-                        minHeight: 80,
-                      }}
-                    />
-                  ) : f.type === "toggle" ? (
-                    <button
-                      type="button"
-                      onClick={() => setField(f.key, formValues[f.key] === "true" ? "false" : "true")}
-                      className="flex items-center gap-2 px-4 py-2.5 border t-small font-medium transition-colors"
-                      style={{
-                        borderColor: formValues[f.key] === "true" ? "var(--accent)" : "var(--line)",
-                        background: formValues[f.key] === "true" ? "var(--accent-bg)" : "var(--bg-1)",
-                        color: formValues[f.key] === "true" ? "var(--accent)" : "var(--fg-2)",
-                        minWidth: 96,
-                      }}
-                    >
-                      {formValues[f.key] === "true" ? "Enabled" : "Disabled"}
-                    </button>
-                  ) : (
-                    <input
-                      type={f.type}
-                      value={formValues[f.key] ?? ""}
-                      onChange={(e) => setField(f.key, e.target.value)}
-                      onFocus={() => setActiveField(f.key)}
-                      onBlur={() => setActiveField(null)}
-                      placeholder={f.placeholder}
-                      className="w-full px-4 py-3 border t-body outline-none transition-colors"
-                      style={{
-                        background: "var(--bg-1)",
-                        color: "var(--fg-0)",
-                        borderColor: activeField === f.key ? "var(--accent)" : "var(--line)",
-                      }}
-                    />
-                  )}
-
-                  {f.help && (
-                    <p className="t-micro mt-1.5" style={{ color: "var(--fg-3)", lineHeight: 1.5 }}>
-                      {f.help}
-                    </p>
-                  )}
-                </div>
-              ))}
-
-              <div className="pt-2 flex items-center gap-3">
-                <button
-                  onClick={() => setStep(2)}
-                  className="flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors hover:opacity-90"
-                  style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
-                >
-                  Test Connection
-                </button>
-                <Link
-                  href="/sources"
-                  className="t-small transition-colors hover:opacity-60"
-                  style={{ color: "var(--fg-3)" }}
-                >
-                  Cancel
-                </Link>
-                {draftSaved && (
-                  <span className="t-micro" style={{ color: "var(--fg-3)" }}>draft saved</span>
-                )}
-              </div>
+        {/* ---- Configure ---- */}
+        {step === "configure" && (
+          <div className="space-y-5" style={{ maxWidth: 520 }}>
+            <div>
+              <label className="block t-small mb-1.5 font-medium" style={{ color: "var(--fg-1)" }}>
+                Connection name
+              </label>
+              <input
+                type="text"
+                value={connectionName}
+                onChange={(e) => setConnectionName(e.target.value)}
+                onFocus={() => setActiveField("__name")}
+                onBlur={() => setActiveField(null)}
+                placeholder={`My ${ENGINE_DISPLAY_NAMES[engine] ?? engine} connection`}
+                className="w-full px-4 py-3 border t-body outline-none transition-colors"
+                style={{
+                  background: "var(--bg-1)",
+                  color: "var(--fg-0)",
+                  borderColor: activeField === "__name" ? "var(--accent)" : "var(--line)",
+                }}
+              />
             </div>
 
-            {/* Right: live preview + what happens next + hint */}
-            <div className="space-y-4">
-              <div className="border border-line p-4 space-y-3" style={{ background: "var(--bg-1)" }}>
-                <p className="t-micro font-medium uppercase" style={{ color: "var(--fg-3)", letterSpacing: "0.1em" }}>
-                  preview
-                </p>
-                <p
-                  className="t-small font-mono break-all"
-                  style={{ color: "var(--accent)", lineHeight: 1.6 }}
-                >
-                  {getConnectionPreview(engine, formValues)}
-                </p>
-              </div>
+            {fields.map((f) => (
+              <div key={f.key}>
+                <label className="block t-small mb-1.5 font-medium" style={{ color: "var(--fg-1)" }}>
+                  {f.label}
+                </label>
 
-              <div className="border border-line p-4 space-y-3" style={{ background: "var(--bg-1)" }}>
-                <p className="t-micro font-medium uppercase" style={{ color: "var(--fg-3)", letterSpacing: "0.1em" }}>
-                  what happens next
-                </p>
-                <div className="space-y-1.5">
-                  {HEALTH_CHECK_BULLETS.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--fg-3)", flexShrink: 0 }} />
-                      <span className="t-micro" style={{ color: "var(--fg-2)" }}>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                {f.type === "textarea" && f.key === "service_account_json" ? (
+                  <JsonDropZone
+                    value={formValues[f.key] ?? ""}
+                    onChange={(v) => setField(f.key, v)}
+                  />
+                ) : f.type === "textarea" ? (
+                  <textarea
+                    value={formValues[f.key] ?? ""}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    onFocus={() => setActiveField(f.key)}
+                    onBlur={() => setActiveField(null)}
+                    placeholder={f.placeholder}
+                    rows={4}
+                    className="w-full px-4 py-3 border t-small font-mono outline-none resize-y"
+                    style={{
+                      background: "var(--bg-1)",
+                      color: "var(--fg-0)",
+                      borderColor: activeField === f.key ? "var(--accent)" : "var(--line)",
+                    }}
+                  />
+                ) : f.type === "toggle" ? (
+                  <button
+                    type="button"
+                    onClick={() => setField(f.key, formValues[f.key] === "true" ? "false" : "true")}
+                    className="flex items-center gap-2 px-4 py-2.5 border t-small font-medium transition-colors"
+                    style={{
+                      borderColor: formValues[f.key] === "true" ? "var(--accent)" : "var(--line)",
+                      background: formValues[f.key] === "true" ? "var(--accent-bg)" : "var(--bg-1)",
+                      color: formValues[f.key] === "true" ? "var(--accent)" : "var(--fg-2)",
+                      minWidth: 96,
+                    }}
+                  >
+                    {formValues[f.key] === "true" ? "Enabled" : "Disabled"}
+                  </button>
+                ) : (
+                  <input
+                    type={f.type}
+                    value={formValues[f.key] ?? ""}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    onFocus={() => setActiveField(f.key)}
+                    onBlur={() => setActiveField(null)}
+                    placeholder={f.placeholder}
+                    className="w-full px-4 py-3 border t-body outline-none transition-colors"
+                    style={{
+                      background: "var(--bg-1)",
+                      color: "var(--fg-0)",
+                      borderColor: activeField === f.key ? "var(--accent)" : "var(--line)",
+                    }}
+                  />
+                )}
 
-              {ENGINE_HINTS[engine] && (
-                <div className="border border-line p-4" style={{ background: "var(--bg-1)" }}>
-                  <p className="t-micro" style={{ color: "var(--fg-3)", lineHeight: 1.6 }}>
-                    {ENGINE_HINTS[engine]}
+                {f.help && (
+                  <p className="t-micro mt-1.5" style={{ color: "var(--fg-3)", lineHeight: 1.5 }}>
+                    {f.help}
                   </p>
-                </div>
+                )}
+              </div>
+            ))}
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                onClick={handleAdvanceToVerify}
+                className="flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors hover:opacity-90"
+                style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+              >
+                Test Connection
+              </button>
+              <Link
+                href="/sources"
+                className="t-small transition-colors hover:opacity-60"
+                style={{ color: "var(--fg-3)" }}
+              >
+                Cancel
+              </Link>
+              {draftSaved && (
+                <span className="t-micro" style={{ color: "var(--fg-3)" }}>draft saved</span>
               )}
             </div>
           </div>
         )}
 
-        {/* ---- Step 2: Test & Verify ---- */}
-        {step === 2 && (
+        {/* ---- Test & Verify ---- */}
+        {step === "verify" && (
           <div className="space-y-5">
             <div className="flex gap-5">
               {/* Health check table */}
@@ -876,8 +1061,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                         <div
                           className="flex items-center justify-center border flex-shrink-0"
                           style={{
-                            width: 20,
-                            height: 20,
+                            width: 20, height: 20,
                             borderColor: done ? statusColor : isActive ? "var(--accent)" : "var(--line)",
                             background: done ? statusColor : isActive ? "var(--accent-bg)" : "transparent",
                           }}
@@ -956,7 +1140,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setStep(1)}
+                onClick={() => setStep("configure")}
                 className="flex items-center gap-1.5 px-3 py-2.5 t-small transition-colors hover:opacity-60"
                 style={{ color: "var(--fg-2)" }}
               >
@@ -972,20 +1156,19 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                     style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
                   >
                     <RefreshCw size={12} strokeWidth={2} />
-                    Retry Tests
+                    Retry
                   </button>
                   <button
                     disabled
-                    title="Fix connection issues to continue"
                     className="flex items-center gap-2 px-5 py-2.5 t-small font-medium border cursor-not-allowed"
                     style={{ background: "var(--bg-2)", color: "var(--fg-3)", borderColor: "var(--line)", opacity: 0.5 }}
                   >
-                    Choose Datasets
+                    {isBQ ? "Choose Datasets" : "Choose Tables"}
                   </button>
                 </>
               ) : (
                 <button
-                  onClick={handleAdvanceToStep3}
+                  onClick={handleAdvanceAfterVerify}
                   disabled={!canProceedFromHealth()}
                   className={clsx(
                     "flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors",
@@ -994,18 +1177,18 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                   style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
                 >
                   {healthLoading && <Loader2 size={12} strokeWidth={2} className="animate-spin" />}
-                  Choose Datasets
+                  {isBQ ? "Choose Datasets" : "Choose Tables"}
                 </button>
               )}
             </div>
           </div>
         )}
 
-        {/* ---- Step 3: Choose Datasets ---- */}
-        {step === 3 && (
+        {/* ---- BQ Datasets (BigQuery only) ---- */}
+        {step === "bq_datasets" && (
           <div className="space-y-5">
             <p className="t-small" style={{ color: "var(--fg-1)" }}>
-              Select the datasets you want to monitor. You can change this later.
+              Select the BigQuery datasets to watch. Only tables from the selected datasets will be available in the next step.
             </p>
 
             <div className="border border-line" style={{ background: "var(--bg-1)" }}>
@@ -1014,12 +1197,12 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                   <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
                   Loading datasets...
                 </div>
-              ) : tables.length === 0 ? (
+              ) : bqDatasets.length === 0 ? (
                 <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>No datasets found.</div>
               ) : (
-                tables.map((t, i) => (
+                bqDatasets.map((schema, i) => (
                   <label
-                    key={t.name}
+                    key={schema}
                     className={clsx(
                       "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors hover:bg-bg-2",
                       i > 0 && "border-t border-line"
@@ -1027,12 +1210,11 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                   >
                     <input
                       type="checkbox"
-                      checked={selectedTables.has(t.name)}
-                      onChange={() => toggleTable(t.name)}
+                      checked={selectedBQDatasets.has(schema)}
+                      onChange={() => toggleBQDataset(schema)}
                       style={{ accentColor: "var(--accent)" }}
                     />
-                    <span className="t-body font-mono" style={{ color: "var(--fg-0)" }}>{t.name}</span>
-                    <span className="t-micro ml-auto" style={{ color: "var(--fg-3)" }}>{t.schema}</span>
+                    <span className="t-body font-mono" style={{ color: "var(--fg-0)" }}>{schema}</span>
                   </label>
                 ))
               )}
@@ -1040,7 +1222,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setStep(2)}
+                onClick={() => setStep("verify")}
                 className="flex items-center gap-1.5 px-3 py-2.5 t-small transition-colors hover:opacity-60"
                 style={{ color: "var(--fg-2)" }}
               >
@@ -1048,7 +1230,73 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                 Back
               </button>
               <button
-                onClick={handleAdvanceToStep4}
+                onClick={handleAdvanceToTables}
+                disabled={selectedBQDatasets.size === 0 || tablesLoading}
+                className={clsx(
+                  "flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors",
+                  selectedBQDatasets.size > 0 && !tablesLoading ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
+                )}
+                style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
+              >
+                Choose Tables
+              </button>
+              {selectedBQDatasets.size === 0 && !tablesLoading && (
+                <span className="t-micro" style={{ color: "var(--fg-3)" }}>Select at least one dataset</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ---- Choose Tables ---- */}
+        {step === "tables" && (
+          <div className="space-y-5">
+            <p className="t-small" style={{ color: "var(--fg-1)" }}>
+              Select the tables you want to monitor. You can change this later.
+            </p>
+
+            <div className="border border-line" style={{ background: "var(--bg-1)" }}>
+              {tablesLoading ? (
+                <div className="px-4 py-4 flex items-center gap-2 t-small" style={{ color: "var(--fg-2)" }}>
+                  <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
+                  Loading tables...
+                </div>
+              ) : visibleTables.length === 0 ? (
+                <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>No tables found.</div>
+              ) : (
+                visibleTables.map((t, i) => {
+                  const key = isBQ ? `${t.schema}.${t.name}` : t.name;
+                  return (
+                    <label
+                      key={key}
+                      className={clsx(
+                        "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors hover:bg-bg-2",
+                        i > 0 && "border-t border-line"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedTables.has(key)}
+                        onChange={() => toggleTable(key)}
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      <span className="t-body font-mono" style={{ color: "var(--fg-0)" }}>{key}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setStep(isBQ ? "bq_datasets" : "verify")}
+                className="flex items-center gap-1.5 px-3 py-2.5 t-small transition-colors hover:opacity-60"
+                style={{ color: "var(--fg-2)" }}
+              >
+                <ChevronLeft size={14} strokeWidth={1.6} />
+                Back
+              </button>
+              <button
+                onClick={handleAdvanceToChecks}
                 disabled={selectedTables.size === 0 || tablesLoading}
                 className={clsx(
                   "flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors",
@@ -1059,14 +1307,14 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                 Review Checks
               </button>
               {selectedTables.size === 0 && !tablesLoading && (
-                <span className="t-micro" style={{ color: "var(--fg-3)" }}>Select at least one dataset</span>
+                <span className="t-micro" style={{ color: "var(--fg-3)" }}>Select at least one table</span>
               )}
             </div>
           </div>
         )}
 
-        {/* ---- Step 4: Review Checks ---- */}
-        {step === 4 && (
+        {/* ---- Review Checks ---- */}
+        {step === "checks" && (
           <div className="space-y-5">
             <div className="flex items-center gap-2">
               <Sparkles size={13} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
@@ -1116,7 +1364,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                   suggestions
                     .filter((s) => tierIncludes(activeTier, s.tier))
                     .map((s, i) => {
-                      const key = `${s.table}.${s.column}.${s.detector_slug}`;
+                      const key = `${s.table}::${s.column}::${s.detector_slug}`;
                       const checked = selectedChecks.has(key);
                       return (
                         <label
@@ -1157,7 +1405,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setStep(3)}
+                onClick={() => setStep("tables")}
                 className="flex items-center gap-1.5 px-3 py-2.5 t-small transition-colors hover:opacity-60"
                 style={{ color: "var(--fg-2)" }}
               >
@@ -1165,7 +1413,7 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
                 Back
               </button>
               <button
-                onClick={handleAdvanceToStep5}
+                onClick={handleAdvanceToMetrics}
                 disabled={savingChecks || suggestLoading}
                 className={clsx(
                   "flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors",
@@ -1179,64 +1427,132 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
           </div>
         )}
 
-        {/* ---- Step 5: Add Metrics ---- */}
-        {step === 5 && (
+        {/* ---- Add Metrics ---- */}
+        {step === "metrics" && (
           <div className="space-y-5">
             <div className="flex items-center gap-2">
-              <TrendingUp size={13} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
-              <span className="t-small font-medium" style={{ color: "var(--fg-0)" }}>Add columns as metrics</span>
-            </div>
-
-            <p className="t-small" style={{ color: "var(--fg-1)", lineHeight: 1.5 }}>
-              These columns have data quality checks. Add them to the semantic layer to track values over time and run causal analysis.
-            </p>
-
-            <div className="border border-line" style={{ background: "var(--bg-1)" }}>
-              {checkedColumns().length === 0 ? (
-                <div className="px-4 py-6 t-small text-center" style={{ color: "var(--fg-3)" }}>
-                  No columns with checks to add as metrics.
-                </div>
-              ) : (
-                checkedColumns().map((c, i) => {
-                  const key = `${c.table}.${c.column}`;
-                  const checked = selectedMetrics.has(key);
-                  return (
-                    <label
-                      key={key}
-                      className={clsx(
-                        "flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-bg-2",
-                        i > 0 && "border-t border-line"
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleMetric(key)}
-                        style={{ accentColor: "var(--accent)", flexShrink: 0 }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="t-small font-mono" style={{ color: "var(--fg-0)" }}>
-                          {c.table}.{c.column}
-                        </p>
-                      </div>
-                      <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>
-                        {c.checkCount} {c.checkCount === 1 ? "check" : "checks"}
-                      </span>
-                    </label>
-                  );
-                })
+              <Sparkles size={13} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
+              <span className="t-small font-medium" style={{ color: "var(--fg-0)" }}>Suggested metrics</span>
+              {metricSuggestLoading && (
+                <Loader2 size={12} strokeWidth={1.6} className="animate-spin" style={{ color: "var(--fg-3)" }} />
               )}
             </div>
 
-            {checkedColumns().length > 0 && (
-              <p className="t-micro" style={{ color: "var(--fg-3)" }}>
-                {selectedMetrics.size} of {checkedColumns().length} columns selected
-              </p>
+            {!metricSuggestLoading && (
+              <>
+                <p className="t-micro" style={{ color: "var(--fg-2)", lineHeight: 1.5 }}>
+                  Columns classified as measure candidates via heuristics and AI judgment.
+                  Pre-selected where confidence is high — deselect any you don&apos;t need.
+                </p>
+
+                <div className="border border-line" style={{ background: "var(--bg-1)" }}>
+                  {metricSuggestions.length === 0 ? (
+                    <div className="px-4 py-6 t-small text-center" style={{ color: "var(--fg-3)" }}>
+                      No measure candidates found in these columns. You can add metrics manually later.
+                    </div>
+                  ) : (
+                    metricSuggestions.map((m, i) => {
+                      const checked = selectedMetrics.has(m.source_column);
+                      const addColor =
+                        m.additivity === "full" ? "var(--pass)" :
+                        m.additivity === "semi" ? "var(--warn)" : "var(--fg-3)";
+                      return (
+                        <label
+                          key={m.source_column}
+                          className={clsx(
+                            "flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors hover:bg-bg-2",
+                            i > 0 && "border-t border-line"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleMetric(m.source_column)}
+                            className="mt-0.5"
+                            style={{ accentColor: "var(--accent)", flexShrink: 0 }}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="t-small font-medium" style={{ color: "var(--fg-0)" }}>
+                                {m.name}
+                              </span>
+                              <span
+                                className="t-micro font-mono px-1.5 py-0.5 border"
+                                style={{ borderColor: "var(--accent)", color: "var(--accent)", background: "var(--accent-bg)", fontSize: 10 }}
+                              >
+                                {m.kind}
+                              </span>
+                              <span
+                                className="t-micro font-mono px-1.5 py-0.5 border"
+                                style={{ borderColor: addColor, color: addColor, fontSize: 10 }}
+                              >
+                                {m.additivity}
+                              </span>
+                              <span className="t-micro font-mono" style={{ color: "var(--fg-3)", fontSize: 10 }}>
+                                {Math.round(m.confidence * 100)}%
+                              </span>
+                              {m.guardrail_for && (
+                                <span
+                                  className="t-micro px-1 border"
+                                  style={{ borderColor: "var(--line)", color: "var(--fg-3)", fontSize: 10 }}
+                                >
+                                  guardrail for {m.guardrail_for}
+                                </span>
+                              )}
+                            </div>
+                            <p className="t-micro" style={{ color: "var(--fg-2)", lineHeight: 1.4 }}>
+                              {m.definition}
+                            </p>
+                            <p className="t-micro font-mono" style={{ color: "var(--fg-3)", fontSize: 10 }}>
+                              {m.source_column}
+                              {m.cadence && (
+                                <span style={{ marginLeft: 8 }}>{m.cadence}</span>
+                              )}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {metricSuggestions.length > 0 && (
+                  <p className="t-micro" style={{ color: "var(--fg-3)" }}>
+                    {selectedMetrics.size} of {metricSuggestions.length} selected
+                  </p>
+                )}
+
+                {rejectedCandidates.length > 0 && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRejected((v) => !v)}
+                      className="t-micro transition-opacity hover:opacity-70"
+                      style={{ color: "var(--fg-3)" }}
+                    >
+                      {showRejected ? "Hide" : "Show"} {rejectedCandidates.length} filtered-out columns
+                    </button>
+                    {showRejected && (
+                      <div className="mt-2 border border-line" style={{ background: "var(--bg-1)" }}>
+                        {rejectedCandidates.map((r, i) => (
+                          <div
+                            key={r.column}
+                            className={clsx("px-3 py-1.5 flex items-center justify-between", i > 0 && "border-t border-line")}
+                          >
+                            <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{r.column}</span>
+                            <span className="t-micro" style={{ color: "var(--fg-3)", opacity: 0.6 }}>{r.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setStep(4)}
+                onClick={() => setStep("checks")}
                 className="flex items-center gap-1.5 px-3 py-2.5 t-small transition-colors hover:opacity-60"
                 style={{ color: "var(--fg-2)" }}
               >
@@ -1245,17 +1561,17 @@ export function Wizard({ engine, sourceId, initialValues = {}, mode = "create" }
               </button>
               <button
                 onClick={handleFinish}
-                disabled={savingMetrics}
+                disabled={savingMetrics || metricSuggestLoading}
                 className={clsx(
                   "flex items-center gap-2 px-5 py-2.5 t-small font-medium border transition-colors",
-                  !savingMetrics ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
+                  !savingMetrics && !metricSuggestLoading ? "hover:opacity-90" : "opacity-40 cursor-not-allowed"
                 )}
                 style={{ background: "var(--accent)", color: "var(--bg-0)", borderColor: "var(--accent)" }}
               >
                 {savingMetrics ? "Saving..." : "Finish"}
               </button>
               <button
-                onClick={() => router.push(`/sources/${activeSourceId}`)}
+                onClick={() => router.push("/sources")}
                 className="px-3 py-2.5 t-small transition-colors hover:opacity-60"
                 style={{ color: "var(--fg-2)" }}
               >

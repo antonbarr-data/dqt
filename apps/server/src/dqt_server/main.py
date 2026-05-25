@@ -56,6 +56,11 @@ async def _setup_db() -> None:
         for stmt in [
             "ALTER TABLE sources ADD COLUMN IF NOT EXISTS password VARCHAR",
             "ALTER TABLE sources ADD COLUMN IF NOT EXISTS secure BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE column_checks ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS source_id VARCHAR",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS column_name VARCHAR",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS warn_threshold DOUBLE PRECISION",
+            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS fail_threshold DOUBLE PRECISION",
         ]:
             try:
                 await conn.execute(text(stmt))

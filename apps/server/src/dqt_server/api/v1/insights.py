@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
+import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
@@ -13,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.db.engine import get_db
-from dqt_server.models.core import MetricDefinition
+from dqt_server.models.core import MetricCausalEdge, MetricDefinition
 
 from dqt.metrics import Metric, MetricKind, MetricRegistry
 
@@ -23,12 +25,12 @@ _pinned: set[str] = set()
 _registry: MetricRegistry | None = None
 
 
-def _run_causality_in_background() -> None:
-    """Lazy-import causal modules and trigger discovery. Safe to call after all modules load."""
+async def _run_causality_in_background() -> None:
+    """Async background task: runs PCMCI+ and persists edges to metric_causal_edges."""
     try:
-        from dqt_server.api.v1.causal_compute import _run_discovery
+        from dqt_server.api.v1.causal_compute import _run_discovery_async
         from dqt_server.api.v1.causal_review import _store as _review_store
-        _run_discovery(_review_store)
+        await _run_discovery_async(_review_store)
     except Exception:
         pass  # Never crash a metric mutation because causality failed
 
@@ -84,6 +86,8 @@ async def _load_registry_from_db(db: AsyncSession) -> MetricRegistry:
             description=r.description,
             owners=r.owners or [],
             tags=r.tags or [],
+            warn_threshold=r.warn_threshold,
+            fail_threshold=r.fail_threshold,
         )
         for r in rows
     ]
@@ -166,6 +170,8 @@ class MetricBatchItem(PydanticBaseModel):
     description: str = ""
     owners: list[str] = []
     tags: list[str] = []
+    source_id: str | None = None
+    column_name: str | None = None
 
 
 class MetricBatchBody(PydanticBaseModel):
@@ -189,6 +195,8 @@ async def create_metrics_batch(body: MetricBatchBody, background_tasks: Backgrou
                 description=item.description,
                 owners=item.owners,
                 tags=item.tags,
+                source_id=item.source_id,
+                column_name=item.column_name,
                 created_at=datetime.now(timezone.utc),
             ))
             created += 1
@@ -198,6 +206,252 @@ async def create_metrics_batch(body: MetricBatchBody, background_tasks: Backgrou
     if created > 0:
         background_tasks.add_task(_run_causality_in_background)
     return {"created": created}
+
+
+def _infer_kind(col_name: str) -> str:
+    n = col_name.lower().split(".")[-1]  # use just the column part if fqn passed
+    if any(n.startswith(p) for p in ("n_", "count_", "num_")) or any(n.endswith(s) for s in ("_count", "_n", "_number")):
+        return "count"
+    if any(n.startswith(p) for p in ("sum_", "total_")) or any(n.endswith(s) for s in ("_sum", "_total")):
+        return "sum"
+    return "ratio"
+
+
+class MetricPatch(PydanticBaseModel):
+    kind: str | None = None
+    description: str | None = None
+    owners: list[str] | None = None
+    tags: list[str] | None = None
+    warn_threshold: float | None = None
+    fail_threshold: float | None = None
+
+
+@router.patch("/metrics/{fqn:path}", status_code=200)
+async def patch_metric(fqn: str, body: MetricPatch, db: AsyncSession = Depends(get_db)) -> dict:
+    m = await db.get(MetricDefinition, fqn)
+    if m is None:
+        raise HTTPException(404, detail=f"Metric '{fqn}' not found")
+    if body.kind is not None:
+        m.kind = body.kind
+    if body.description is not None:
+        m.description = body.description
+    if body.owners is not None:
+        m.owners = body.owners
+    if body.tags is not None:
+        m.tags = body.tags
+    if body.warn_threshold is not None:
+        m.warn_threshold = body.warn_threshold
+    if body.fail_threshold is not None:
+        m.fail_threshold = body.fail_threshold
+    await db.commit()
+    global _registry
+    _registry = None
+    return {"fqn": fqn, "kind": m.kind}
+
+
+@router.post("/metrics/reinfer-kinds", status_code=200)
+async def reinfer_metric_kinds(db: AsyncSession = Depends(get_db)) -> dict:
+
+    result = await db.execute(select(MetricDefinition))
+    rows = list(result.scalars().all())
+    updated = 0
+    for m in rows:
+        inferred = _infer_kind(m.display_name or m.fqn)
+        if m.kind != inferred:
+            m.kind = inferred
+            updated += 1
+    if updated:
+        await db.commit()
+        global _registry
+        _registry = None
+    return {"updated": updated, "total": len(rows)}
+
+
+# ---------------------------------------------------------------------------
+# Metric suggestion pipeline (Stage 1 heuristic + Stage 2 LLM)
+# ---------------------------------------------------------------------------
+
+def _heuristic_classify(table: str, column: str, null_rate: float = 0.0) -> str:
+    """Classify a column into exactly one bucket. First match wins."""
+    t, n = table.lower(), column.lower()
+    if (any(t.startswith(p) for p in ("raw_", "staging_", "tmp_")) or
+            t.endswith("_archive") or null_rate > 0.5):
+        return "reject"
+    if any(n.endswith(s) for s in ("_id", "_key", "_uuid", "_sk", "_code")):
+        return "key"
+    if any(n.endswith(s) for s in ("_at", "_ts", "_date", "_time")):
+        return "timestamp"
+    if re.search(r"(^created_at$|^updated_at$|^loaded_at$|_by$|^etl_)", n):
+        return "audit"
+    if any(n.startswith(p) for p in ("is_", "has_", "flag_")):
+        return "boolean_flag"
+    if (any(t.startswith(p) for p in ("fact_", "agg_", "mart_", "fct_")) or
+            any(n.endswith(s) for s in (
+                "_amount", "_amt", "_revenue", "_cost", "_price",
+                "_qty", "_quantity", "_count", "_duration", "_score",
+                "_rate", "_value", "_total", "_balance", "_gmv", "_arr", "_mrr",
+            ))):
+        return "measure_candidate"
+    return "dimension"
+
+
+def _infer_additivity(column: str) -> str:
+    n = column.lower()
+    if any(n.endswith(s) for s in ("_balance", "_inventory", "_stock", "_outstanding")):
+        return "semi"
+    if any(n.endswith(s) for s in ("_rate", "_score", "_ratio", "_pct", "_percent", "_fraction")):
+        return "non"
+    return "full"
+
+
+def _infer_grain(table: str) -> str:
+    t = table.lower()
+    for prefix in ("fact_", "fct_", "agg_", "mart_"):
+        if t.startswith(prefix):
+            return t[len(prefix):].rstrip("s")
+    return "record"
+
+
+def _llm_suggest_metrics_sync(
+    candidates: list[dict],
+    dimensions: list[dict],
+    timestamps: list[dict],
+    api_key: str,
+) -> dict:
+    """Stage 2: Claude call to propose business metrics. Returns the parsed JSON dict."""
+    import anthropic
+
+    system = (
+        "You are a senior analytics engineer. From the warehouse columns below, propose at most 7 tracked "
+        "business metrics. Rules:\n"
+        "- Each metric must map to a recurring decision, have a clear good direction, and be reproducible "
+        "from the listed columns alone.\n"
+        "- For ratios, specify numerator AND denominator columns separately. Never average an average.\n"
+        "- Pair high-leverage metrics with one guardrail where possible.\n"
+        "- Mark additivity: full / semi / non.\n"
+        "- Drop vanity candidates that drive no decision.\n"
+        "- Return STRICT JSON only, no prose."
+    )
+    user = (
+        f"Measure candidates: {_json.dumps(candidates)}\n"
+        f"Dimensions: {_json.dumps(dimensions)}\n"
+        f"Time columns: {_json.dumps(timestamps)}\n\n"
+        'Return:\n{"metrics": [{"name": "...", "definition": "one-line plain English", '
+        '"sql_expression": "...", "numerator_columns": ["dataset.col"], '
+        '"denominator_columns": ["dataset.col"], "grain": "order|customer|session|...", '
+        '"aggregation": "sum|count_distinct|ratio|...", "additivity": "full|semi|non", '
+        '"good_direction": "up|down|in_band", "suggested_owner_role": "...", '
+        '"guardrail_for": "metric_name or null", "cadence": "daily|weekly|monthly", '
+        '"confidence": 0.0, "reasoning": "one sentence"}], '
+        '"rejected_candidates": [{"column": "...", "reason": "..."}]}'
+    )
+
+    client = anthropic.Anthropic(api_key=api_key)
+    for attempt in range(2):
+        try:
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=2048,
+                temperature=0.2,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+            raw = msg.content[0].text.strip()
+            if raw.startswith("```"):
+                raw = "\n".join(ln for ln in raw.splitlines() if not ln.startswith("```")).strip()
+            return _json.loads(raw)
+        except Exception:
+            if attempt == 1:
+                raise
+    return {"metrics": [], "rejected_candidates": []}
+
+
+class MetricSuggestItem(PydanticBaseModel):
+    dataset: str
+    column: str
+    null_rate: float = 0.0
+    data_type: str = ""
+    description: str = ""
+
+
+class MetricSuggestBody(PydanticBaseModel):
+    columns: list[MetricSuggestItem]
+
+
+@router.post("/metrics/suggest")
+async def suggest_metrics(body: MetricSuggestBody) -> dict:
+    """Stage 1 heuristic classification + optional Stage 2 LLM enrichment."""
+    candidates: list[dict] = []
+    dimensions: list[dict] = []
+    timestamps: list[dict] = []
+    rejected: list[dict] = []
+
+    for col in body.columns:
+        bucket = _heuristic_classify(col.dataset, col.column, col.null_rate)
+        fqn = f"{col.dataset}.{col.column}"
+        entry: dict = {"fqn": fqn, "dataset": col.dataset, "column": col.column,
+                       "data_type": col.data_type, "description": col.description}
+        if bucket == "measure_candidate":
+            entry["additivity"] = _infer_additivity(col.column)
+            entry["grain_hint"] = _infer_grain(col.dataset)
+            candidates.append(entry)
+        elif bucket == "dimension":
+            dimensions.append(entry)
+        elif bucket == "timestamp":
+            timestamps.append(entry)
+        else:
+            rejected.append({"column": fqn, "reason": bucket.replace("_", " ")})
+
+    if not candidates:
+        return {"metrics": [], "rejected_candidates": rejected}
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if api_key:
+        loop = asyncio.get_event_loop()
+        try:
+            result = await loop.run_in_executor(
+                None, lambda: _llm_suggest_metrics_sync(candidates, dimensions, timestamps, api_key)
+            )
+            for m in result.get("metrics", []):
+                nc = (m.get("numerator_columns") or [""])[0]
+                parts = nc.split(".")
+                m["source_column"] = ".".join(parts[-2:]) if len(parts) >= 2 else nc
+                m["dataset"] = parts[-2] if len(parts) >= 2 else (candidates[0]["dataset"] if candidates else "")
+                m["display_name"] = m.get("name", "")
+                m["kind"] = _infer_kind(parts[-1] if parts else nc)
+            return {
+                "metrics": result.get("metrics", []),
+                "rejected_candidates": rejected + result.get("rejected_candidates", []),
+            }
+        except Exception:
+            pass  # fall through to heuristic output
+
+    # Heuristic-only fallback
+    heuristic: list[dict] = []
+    for c in candidates:
+        col_word = c["column"].replace("_", " ").title()
+        additivity = c["additivity"]
+        heuristic.append({
+            "name": col_word,
+            "definition": f"{additivity.title()} additive measure from {c['dataset']}",
+            "sql_expression": f"SUM({c['column']})" if additivity == "full" else c["column"],
+            "numerator_columns": [c["fqn"]],
+            "denominator_columns": [],
+            "grain": c["grain_hint"],
+            "aggregation": "sum" if additivity == "full" else "last_value",
+            "additivity": additivity,
+            "kind": _infer_kind(c["column"]),
+            "good_direction": "up",
+            "suggested_owner_role": "",
+            "guardrail_for": None,
+            "cadence": "daily",
+            "confidence": 0.60,
+            "reasoning": "Identified as measure candidate by column naming conventions",
+            "source_column": c["fqn"],
+            "dataset": c["dataset"],
+            "display_name": col_word,
+        })
+    return {"metrics": heuristic, "rejected_candidates": rejected}
 
 
 @router.delete("/metrics/{fqn:path}")
