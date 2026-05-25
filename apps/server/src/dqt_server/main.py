@@ -61,6 +61,7 @@ async def _setup_db() -> None:
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS column_name VARCHAR",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS warn_threshold DOUBLE PRECISION",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS fail_threshold DOUBLE PRECISION",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS oncall_eligible BOOLEAN NOT NULL DEFAULT FALSE",
         ]:
             try:
                 await conn.execute(text(stmt))
@@ -210,6 +211,7 @@ from dqt_server.api.v1.checks import router as checks_router
 from dqt_server.api.v1.detectors import router as detectors_router
 from dqt_server.api.v1.causal_compute import router as causal_compute_router
 from dqt_server.api.v1.schedules import router as schedules_router
+from dqt_server.api.v1.oncall import router as oncall_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -227,6 +229,7 @@ app.include_router(checks_router)
 app.include_router(detectors_router)
 app.include_router(causal_compute_router)
 app.include_router(schedules_router)
+app.include_router(oncall_router)
 
 
 @app.get("/health", tags=["ops"])

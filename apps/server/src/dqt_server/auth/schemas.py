@@ -11,12 +11,26 @@ class UserCreate(BaseModel):
     password: str
 
 
+class UserCreateAdmin(BaseModel):
+    email: EmailStr
+    password: str = ""
+    role: str = "viewer"
+    oncall_eligible: bool = False
+
+
+class UserPatch(BaseModel):
+    role: str | None = None
+    is_active: bool | None = None
+    oncall_eligible: bool | None = None
+
+
 class UserRead(BaseModel):
     id: uuid.UUID
     email: str
     role: str
     tenant_id: str
     is_active: bool
+    oncall_eligible: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

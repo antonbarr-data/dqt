@@ -1,5 +1,10 @@
 import { serverFetch } from "@/lib/server-api";
 
+interface OncallStatus {
+  current_oncall: { email: string } | null;
+  upcoming_oncall: { email: string } | null;
+}
+
 interface CheckItem {
   id: string;
   dataset_id: string;
@@ -48,8 +53,13 @@ function severityStyle(severity: string): { bg: string; color: string } {
 }
 
 export default async function TasksPage() {
-  const checks = await serverFetch<CheckItem[]>("/checks", 15) ?? [];
-  const alertChecks = checks.filter((c) => c.verdict === "fail" || c.verdict === "warn");
+  const [checks, oncall] = await Promise.all([
+    serverFetch<CheckItem[]>("/checks", 15) ?? [],
+    serverFetch<OncallStatus>("/oncall/status", 15),
+  ]);
+  const assignee =
+    oncall?.current_oncall?.email ?? oncall?.upcoming_oncall?.email ?? "on-call";
+  const alertChecks = (checks as CheckItem[]).filter((c) => c.verdict === "fail" || c.verdict === "warn");
 
   const checkTasks: Task[] = alertChecks.map((c) => ({
     id: `check-${c.id}`,
@@ -58,7 +68,7 @@ export default async function TasksPage() {
     subtitle: c.plain_english ?? (c.ran_at_ago ? `Last run ${c.ran_at_ago}` : "Not yet run"),
     severity: c.verdict,
     due: c.verdict === "fail" ? "now" : "4h",
-    assignee: "on-call",
+    assignee,
     done: false,
   }));
 

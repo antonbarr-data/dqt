@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Shield, UserCheck, UserX } from "lucide-react";
+import { Plus, Shield, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { authHeaders, isSysAdmin } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 
@@ -12,6 +12,7 @@ interface User {
   email: string;
   role: string;
   is_active: boolean;
+  oncall_eligible: boolean;
   created_at: string;
 }
 
@@ -29,11 +30,25 @@ const ROLE_COLOR: Record<string, string> = {
   viewer: "var(--fg-2)",
 };
 
+const ROLES = ["viewer", "editor", "admin", "sysadmin"];
+
+interface AddUserForm {
+  email: string;
+  password: string;
+  role: string;
+  oncall_eligible: boolean;
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState<AddUserForm>({ email: "", password: "", role: "viewer", oncall_eligible: false });
+  const [addError, setAddError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -53,53 +68,166 @@ export default function UsersPage() {
     }
   }
 
-  async function setRole(userId: string, role: string) {
-    setBusy(userId + role);
+  async function addUser() {
+    setAdding(true);
+    setAddError(null);
     try {
-      const res = await fetch(`${API}/api/v1/admin/users/${userId}/role`, {
+      const res = await fetch(`${API}/api/v1/admin/users`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail ?? "Failed to create user");
+      }
+      const created: User = await res.json();
+      setUsers((prev) => [...prev, created]);
+      setShowAdd(false);
+      setForm({ email: "", password: "", role: "viewer", oncall_eligible: false });
+    } catch (e: unknown) {
+      setAddError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function patchUser(userId: string, patch: Partial<Pick<User, "role" | "is_active" | "oncall_eligible">>) {
+    setBusy(userId + JSON.stringify(patch));
+    try {
+      const res = await fetch(`${API}/api/v1/admin/users/${userId}`, {
         method: "PATCH",
         headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify(patch),
       });
-      if (!res.ok) throw new Error("Failed to update role");
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role } : u));
+      if (!res.ok) throw new Error("Failed to update user");
+      const updated: User = await res.json();
+      setUsers((prev) => prev.map((u) => u.id === userId ? updated : u));
     } finally {
       setBusy(null);
     }
   }
 
-  async function toggleActive(userId: string, active: boolean) {
-    setBusy(userId + "active");
+  async function deleteUser(userId: string) {
+    setBusy(userId + "delete");
     try {
-      const res = await fetch(`${API}/api/v1/admin/users/${userId}/active?active=${active}`, {
-        method: "PATCH",
+      const res = await fetch(`${API}/api/v1/admin/users/${userId}`, {
+        method: "DELETE",
         headers: authHeaders(),
       });
-      if (!res.ok) throw new Error("Failed to update");
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_active: active } : u));
+      if (!res.ok) throw new Error("Failed to delete user");
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
     } finally {
       setBusy(null);
+      setConfirmDelete(null);
     }
   }
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl">
-      <div className="flex items-center gap-2">
-        <Shield size={14} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
-        <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>User Management</h1>
+    <div className="p-6 space-y-5 max-w-5xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield size={14} strokeWidth={1.6} style={{ color: "var(--accent)" }} />
+          <h1 className="t-h1" style={{ color: "var(--fg-0)" }}>User Management</h1>
+        </div>
+        <button
+          onClick={() => { setShowAdd(true); setAddError(null); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 t-small border border-line transition-colors hover:opacity-80"
+          style={{ color: "var(--accent)", borderColor: "var(--accent)" }}
+        >
+          <Plus size={12} strokeWidth={2} />
+          Add User
+        </button>
       </div>
+
       <p className="t-small" style={{ color: "var(--fg-2)" }}>
-        Manage user roles and access. Only Super Admins can promote other Super Admins.
+        Manage user roles, access, and on-call eligibility. Only Super Admins can promote other Super Admins.
       </p>
 
-      {loading && <p className="t-small" style={{ color: "var(--fg-2)" }}>Loading…</p>}
+      {/* Add User form */}
+      {showAdd && (
+        <div className="border border-line p-4 space-y-3" style={{ background: "var(--bg-1)" }}>
+          <div className="flex items-center justify-between">
+            <span className="t-small" style={{ color: "var(--fg-0)" }}>New user</span>
+            <button onClick={() => setShowAdd(false)} className="hover:opacity-70">
+              <X size={14} style={{ color: "var(--fg-3)" }} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="user@example.com"
+                className="w-full px-2 py-1.5 t-small border border-line font-mono"
+                style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
+              />
+            </div>
+            <div>
+              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Password <span style={{ color: "var(--fg-3)" }}>(optional — user can use Google OAuth)</span></label>
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Leave blank for OAuth-only"
+                className="w-full px-2 py-1.5 t-small border border-line font-mono"
+                style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <label className="t-micro block mb-1" style={{ color: "var(--fg-2)" }}>Role</label>
+              <select
+                value={form.role}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                className="px-2 py-1.5 t-small border border-line"
+                style={{ background: "var(--bg-0)", color: "var(--fg-0)", outline: "none" }}
+              >
+                {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer mt-4">
+              <input
+                type="checkbox"
+                checked={form.oncall_eligible}
+                onChange={(e) => setForm((f) => ({ ...f, oncall_eligible: e.target.checked }))}
+                className="w-3.5 h-3.5"
+              />
+              <span className="t-small" style={{ color: "var(--fg-1)" }}>On-call eligible</span>
+            </label>
+          </div>
+          {addError && <p className="t-micro" style={{ color: "var(--fail)" }}>{addError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={addUser}
+              disabled={adding || !form.email}
+              className="px-3 py-1.5 t-small border border-line transition-colors hover:opacity-80 disabled:opacity-40"
+              style={{ color: "var(--accent)", borderColor: "var(--accent)" }}
+            >
+              {adding ? "Creating..." : "Create User"}
+            </button>
+            <button
+              onClick={() => setShowAdd(false)}
+              className="px-3 py-1.5 t-small border border-line transition-colors hover:opacity-80"
+              style={{ color: "var(--fg-2)" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading && <p className="t-small" style={{ color: "var(--fg-2)" }}>Loading...</p>}
       {error && <p className="t-small" style={{ color: "var(--fail)" }}>{error}</p>}
 
       {!loading && !error && (
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line" style={{ background: "var(--bg-1)" }}>
-              {["Email", "Role", "Status", "Joined", "Actions"].map((h) => (
+              {["Email", "Role", "On-call", "Status", "Joined", "Actions"].map((h) => (
                 <th key={h} className="px-3 py-2 text-left t-micro" style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   {h}
                 </th>
@@ -113,9 +241,49 @@ export default function UsersPage() {
                   <span className="t-small font-mono" style={{ color: "var(--fg-0)" }}>{u.email}</span>
                 </td>
                 <td className="px-3 py-2.5">
-                  <span className="t-micro px-2 py-0.5 border" style={{ color: ROLE_COLOR[u.role] ?? "var(--fg-2)", borderColor: ROLE_COLOR[u.role] ?? "var(--line)" }}>
-                    {ROLE_LABELS[u.role] ?? u.role}
-                  </span>
+                  <select
+                    value={u.role}
+                    onChange={(e) => patchUser(u.id, { role: e.target.value })}
+                    disabled={u.role === "sysadmin"}
+                    className="t-micro px-2 py-0.5 border"
+                    style={{
+                      color: ROLE_COLOR[u.role] ?? "var(--fg-2)",
+                      borderColor: ROLE_COLOR[u.role] ?? "var(--line)",
+                      background: "transparent",
+                      outline: "none",
+                      cursor: u.role === "sysadmin" ? "default" : "pointer",
+                    }}
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r} value={r} style={{ background: "var(--bg-1)", color: "var(--fg-0)" }}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-3 py-2.5">
+                  <button
+                    onClick={() => patchUser(u.id, { oncall_eligible: !u.oncall_eligible })}
+                    disabled={busy !== null}
+                    className="flex items-center gap-1.5 t-micro px-2 py-0.5 border transition-colors hover:opacity-80 disabled:opacity-40"
+                    style={{
+                      color: u.oncall_eligible ? "var(--pass)" : "var(--fg-3)",
+                      borderColor: u.oncall_eligible ? "var(--pass)" : "var(--line)",
+                    }}
+                    title={u.oncall_eligible ? "Remove from on-call rotation" : "Add to on-call rotation"}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: u.oncall_eligible ? "var(--pass)" : "var(--fg-3)",
+                        flexShrink: 0,
+                        display: "inline-block",
+                      }}
+                    />
+                    {u.oncall_eligible ? "Eligible" : "Not eligible"}
+                  </button>
                 </td>
                 <td className="px-3 py-2.5 t-small" style={{ color: u.is_active ? "var(--pass)" : "var(--fg-3)" }}>
                   {u.is_active ? "Active" : "Inactive"}
@@ -127,8 +295,8 @@ export default function UsersPage() {
                   <div className="flex items-center gap-2">
                     {u.role !== "sysadmin" && (
                       <button
-                        onClick={() => setRole(u.id, "sysadmin")}
-                        disabled={busy === u.id + "sysadmin"}
+                        onClick={() => patchUser(u.id, { role: "sysadmin" })}
+                        disabled={busy !== null}
                         className="flex items-center gap-1 px-2 py-1 t-micro border border-line transition-colors hover:opacity-80 disabled:opacity-40"
                         style={{ color: "var(--accent)" }}
                         title="Promote to Super Admin"
@@ -139,8 +307,8 @@ export default function UsersPage() {
                     )}
                     {u.is_active ? (
                       <button
-                        onClick={() => toggleActive(u.id, false)}
-                        disabled={busy === u.id + "active"}
+                        onClick={() => patchUser(u.id, { is_active: false })}
+                        disabled={busy !== null}
                         className="flex items-center gap-1 px-2 py-1 t-micro border border-line transition-colors hover:opacity-80 disabled:opacity-40"
                         style={{ color: "var(--fail)" }}
                         title="Deactivate"
@@ -150,14 +318,44 @@ export default function UsersPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => toggleActive(u.id, true)}
-                        disabled={busy === u.id + "active"}
+                        onClick={() => patchUser(u.id, { is_active: true })}
+                        disabled={busy !== null}
                         className="flex items-center gap-1 px-2 py-1 t-micro border border-line transition-colors hover:opacity-80 disabled:opacity-40"
                         style={{ color: "var(--pass)" }}
                         title="Reactivate"
                       >
                         <UserCheck size={10} strokeWidth={2} />
                         Reactivate
+                      </button>
+                    )}
+                    {confirmDelete === u.id ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => deleteUser(u.id)}
+                          disabled={busy === u.id + "delete"}
+                          className="px-2 py-1 t-micro border transition-colors hover:opacity-80 disabled:opacity-40"
+                          style={{ color: "var(--fail)", borderColor: "var(--fail)" }}
+                        >
+                          {busy === u.id + "delete" ? "Deleting..." : "Confirm"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(null)}
+                          className="px-2 py-1 t-micro border border-line transition-colors hover:opacity-80"
+                          style={{ color: "var(--fg-3)" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDelete(u.id)}
+                        disabled={busy !== null || u.role === "sysadmin"}
+                        className="flex items-center gap-1 px-2 py-1 t-micro border border-line transition-colors hover:opacity-80 disabled:opacity-40"
+                        style={{ color: "var(--fg-3)" }}
+                        title={u.role === "sysadmin" ? "Cannot delete Super Admin" : "Delete user"}
+                      >
+                        <Trash2 size={10} strokeWidth={2} />
+                        Delete
                       </button>
                     )}
                   </div>

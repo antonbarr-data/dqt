@@ -175,6 +175,15 @@ class CheckSchedule(Base):
     )
 
 
+class OncallShift(Base):
+    """One row per user in the on-call rotation; days_of_week is comma-separated 0-6 (Mon=0)."""
+    __tablename__ = "oncall_shifts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    days_of_week: Mapped[str] = mapped_column(String, nullable=False, default="")
+
+
 class LineageEdgeRecord(Base):
     __tablename__ = "lineage_edges"
 
@@ -189,3 +198,4 @@ class LineageEdgeRecord(Base):
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+

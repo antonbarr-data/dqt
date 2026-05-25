@@ -5,15 +5,16 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt_server.auth import google as google_oauth
 from dqt_server.auth import service
 from dqt_server.auth.dependencies import get_current_user, require_sysadmin
 from dqt_server.auth.models import ROLE_SYSADMIN, User
-from dqt_server.auth.schemas import Token, UserCreate, UserPromote, UserRead
+from dqt_server.auth.schemas import Token, UserCreate, UserCreateAdmin, UserPatch, UserPromote, UserRead
 from dqt_server.db.engine import get_db
+from dqt_server.models.core import OncallShift
 
 router = APIRouter(tags=["auth"])
 
@@ -138,3 +139,78 @@ async def set_active(
     await db.commit()
     await db.refresh(user)
     return user
+
+
+@router.post("/api/v1/admin/users", response_model=UserRead, status_code=201)
+async def create_user(
+    data: UserCreateAdmin,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_sysadmin),
+) -> User:
+    from dqt_server.api.v1.oncall import redistribute_oncall_days
+    result = await db.execute(select(User).where(User.email == data.email))
+    if result.scalar_one_or_none() is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Email already registered")
+    hashed = service.hash_password(data.password) if data.password else None
+    user = User(
+        email=data.email,
+        hashed_password=hashed,
+        role=data.role,
+        oncall_eligible=data.oncall_eligible,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    if data.oncall_eligible:
+        await redistribute_oncall_days(db)
+    return user
+
+
+@router.patch("/api/v1/admin/users/{user_id}", response_model=UserRead)
+async def patch_user(
+    user_id: uuid.UUID,
+    body: UserPatch,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_sysadmin),
+) -> User:
+    from dqt_server.api.v1.oncall import redistribute_oncall_days
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    oncall_changed = False
+    if body.role is not None:
+        user.role = body.role
+    if body.is_active is not None:
+        if user.email == service.SEEDED_SYSADMIN_EMAIL and not body.is_active:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot deactivate the root Super Admin")
+        user.is_active = body.is_active
+    if body.oncall_eligible is not None and body.oncall_eligible != user.oncall_eligible:
+        user.oncall_eligible = body.oncall_eligible
+        oncall_changed = True
+    await db.commit()
+    await db.refresh(user)
+    if oncall_changed:
+        await redistribute_oncall_days(db)
+    return user
+
+
+@router.delete("/api/v1/admin/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_sysadmin),
+) -> None:
+    from dqt_server.api.v1.oncall import redistribute_oncall_days
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    if user.email == service.SEEDED_SYSADMIN_EMAIL:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Cannot delete the root Super Admin")
+    was_eligible = user.oncall_eligible
+    await db.execute(sa_delete(OncallShift).where(OncallShift.user_id == str(user_id)))
+    await db.delete(user)
+    await db.commit()
+    if was_eligible:
+        await redistribute_oncall_days(db)
