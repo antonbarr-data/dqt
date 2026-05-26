@@ -20,6 +20,8 @@ _log = get_logger(__name__)
 
 
 class BigQueryAdapter:
+    sql_dialect = "bigquery"
+
     def __init__(self, project: str, max_bytes_billed: int = 50 * 1024**3, **client_kwargs: Any) -> None:
         try:
             from google.cloud import bigquery
@@ -125,9 +127,10 @@ class BigQueryAdapter:
         return sorted(t.table_id for t in self._bq.list_tables(schema))
 
     def describe_columns(self, schema: str, table: str) -> list[ColumnMeta]:
+        project = self._project or self._bq.project or ""
         sql = (
             f"SELECT column_name, data_type, is_nullable, ordinal_position "
-            f"FROM `{self._project}.{schema}.INFORMATION_SCHEMA.COLUMNS` "
+            f"FROM `{project}.{schema}.INFORMATION_SCHEMA.COLUMNS` "
             f"WHERE table_name = '{table}' "
             f"ORDER BY ordinal_position"
         )
@@ -142,13 +145,16 @@ class BigQueryAdapter:
             for _, row in df.iterrows()
         ]
 
-    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
-        sql = f"SELECT * FROM `{self._project}.{schema}.{table}` ORDER BY RAND() LIMIT {n}"
+    def sample(self, schema: str, table: str, n: int = 100_000, where: str | None = None) -> pd.DataFrame:
+        project = self._project or self._bq.project or ""
+        where_clause = f" WHERE {where}" if where else ""
+        sql = f"SELECT * FROM `{project}.{schema}.{table}`{where_clause} ORDER BY RAND() LIMIT {n}"
         return self._run_query(sql)
 
     def aggregate(self, schema: str, table: str, exprs: list[AggExpr]) -> dict[str, Any]:
+        project = self._project or self._bq.project or ""
         cols = ", ".join(f"{e.sql} AS {e.name}" for e in exprs)
-        sql = f"SELECT {cols} FROM `{self._project}.{schema}.{table}`"
+        sql = f"SELECT {cols} FROM `{project}.{schema}.{table}`"
         df = self._run_query(sql)
         if df.empty:
             return {e.name: None for e in exprs}

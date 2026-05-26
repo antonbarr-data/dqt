@@ -24,7 +24,7 @@ class ReferentialIntegrityDetector(BaseAggregateDetector):
         self._parent_table = parent_table
         self._parent_col = parent_col
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr(
                 name="orphan_count",

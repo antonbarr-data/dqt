@@ -18,7 +18,7 @@ class NullFractionDetector(BaseAggregateDetector):
     def __init__(self) -> None:
         self._col: str | None = None
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         self._col = col
         return [
             AggExpr("null_count", f"SUM(CASE WHEN {col} IS NULL THEN 1 ELSE 0 END)"),

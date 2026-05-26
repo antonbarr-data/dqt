@@ -1,6 +1,8 @@
 # Tracks the fraction of outliers from an upstream detector over time.
 # Learns the expected range from history and alerts when the current fraction deviates.
 # No external reference — range methods are standard: IQR (Tukey 1977), percentile, z-score.
+# When called on raw warehouse column data (no pre-computed outlier_fraction), computes IQR
+# outlier fraction directly and compares reference vs current windows.
 from __future__ import annotations
 
 import numpy as np
@@ -10,77 +12,105 @@ from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState
 from dqt.algorithms._registry import registry
 
 
+def _iqr_outlier_fraction(values: np.ndarray, k: float = 1.5) -> float:
+    """Fraction of values outside IQR fences [Q1 - k*IQR, Q3 + k*IQR]."""
+    q1 = float(np.percentile(values, 25))
+    q3 = float(np.percentile(values, 75))
+    iqr = q3 - q1
+    return float(np.mean((values < q1 - k * iqr) | (values > q3 + k * iqr)))
+
+
 @registry.register
 class OutlierFractionRangeDetector(BaseDetector):
-    """Meta-detector: alerts when the outlier fraction from an upstream detector drifts outside its historical range."""
+    """Alerts when the outlier fraction deviates from the baseline.
+    Accepts either a pre-computed 'outlier_fraction' series (meta-detector mode)
+    or raw numeric column data (single-window mode, computes IQR fraction inline).
+    """
     slug = "outlier_fraction_drift"
     group = "outliers_uni"
     kind = "sample"
 
-    def fit(self, reference: pd.DataFrame, **params) -> DetectorState:
-        """
-        reference: DataFrame with a single column "outlier_fraction" (floats in [0, 1]).
-        params:
-            method: "iqr" | "percentile" | "zscore"  (default: "iqr")
-            k: float — IQR multiplier or z-score threshold (default: 1.5)
-            lower_pct: float — lower percentile for method="percentile" (default: 5.0)
-            upper_pct: float — upper percentile for method="percentile" (default: 95.0)
-        """
-        method: str = params.get("method", "iqr")
-        k: float = float(params.get("k", 1.5))
-        lower_pct: float = float(params.get("lower_pct", 5.0))
-        upper_pct: float = float(params.get("upper_pct", 95.0))
+    def __init__(
+        self,
+        method: str = "iqr",
+        k: float = 1.5,
+        lower_pct: float = 5.0,
+        upper_pct: float = 95.0,
+    ) -> None:
+        if method not in ("iqr", "percentile", "zscore"):
+            raise ValueError(f"Unknown method '{method}'. Use 'iqr', 'percentile', or 'zscore'.")
+        self._method = method
+        self._k = float(k)
+        self._lower_pct = float(lower_pct)
+        self._upper_pct = float(upper_pct)
 
+    def fit(self, reference: pd.DataFrame) -> DetectorState:
+        if "outlier_fraction" not in reference.columns:
+            # Raw column data mode: compute IQR fraction from the reference window
+            values = reference.iloc[:, 0].dropna().to_numpy(dtype=float)
+            if len(values) < 10:
+                raise ValueError("outlier_fraction_drift requires at least 10 values in the reference window")
+            frac = _iqr_outlier_fraction(values, self._k)
+            # Allow up to 2x the baseline fraction before flagging (min 5% tolerance)
+            upper = min(1.0, max(frac * 2.0, frac + 0.05))
+            return {
+                "mean": frac, "std": 0.0,
+                "lower": 0.0, "upper": upper,
+                "method": "iqr", "k": self._k,
+                "n_history": 1, "raw_mode": True,
+                "reference_fraction": frac,
+            }
+
+        # Meta-detector mode: reference has a pre-computed 'outlier_fraction' column
         values = reference["outlier_fraction"].dropna().to_numpy(dtype=float)
         if len(values) < 3:
-            raise ValueError("OutlierFractionRangeDetector requires at least 3 history points.")
+            raise ValueError("outlier_fraction_drift requires at least 3 history points.")
 
         mean = float(np.mean(values))
         std = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
 
-        if method == "iqr":
+        if self._method == "iqr":
             q1 = float(np.percentile(values, 25))
             q3 = float(np.percentile(values, 75))
             iqr = q3 - q1
-            lower = q1 - k * iqr
-            upper = q3 + k * iqr
-        elif method == "percentile":
-            lower = float(np.percentile(values, lower_pct))
-            upper = float(np.percentile(values, upper_pct))
-        elif method == "zscore":
-            lower = mean - k * std
-            upper = mean + k * std
-        else:
-            raise ValueError(f"Unknown method '{method}'. Use 'iqr', 'percentile', or 'zscore'.")
-
-        lower = max(0.0, lower)
-        upper = min(1.0, upper)
+            lower = q1 - self._k * iqr
+            upper = q3 + self._k * iqr
+        elif self._method == "percentile":
+            lower = float(np.percentile(values, self._lower_pct))
+            upper = float(np.percentile(values, self._upper_pct))
+        else:  # zscore
+            lower = mean - self._k * std
+            upper = mean + self._k * std
 
         return {
             "mean": mean,
             "std": std,
-            "lower": lower,
-            "upper": upper,
-            "method": method,
-            "k": k,
+            "lower": max(0.0, lower),
+            "upper": min(1.0, upper),
+            "method": self._method,
+            "k": self._k,
             "n_history": len(values),
         }
 
-    def score(self, current: pd.DataFrame, state: DetectorState, **params) -> DetectorResult:
-        """
-        current: DataFrame with a single column "outlier_fraction".
-        Returns score = deviation from range / range width (0.0 if within range).
-        """
-        non_null = current["outlier_fraction"].dropna()
-        if len(non_null) == 0:
-            raise ValueError("OutlierFractionRangeDetector: current data has no non-NaN outlier_fraction values")
-        current_fraction = float(non_null.iloc[0])
+    def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
+        if "outlier_fraction" not in current.columns:
+            # Raw column data mode
+            values = current.iloc[:, 0].dropna().to_numpy(dtype=float)
+            if len(values) == 0:
+                from dqt.algorithms._base import Verdict
+                return DetectorResult(score=0.0, verdict=Verdict.pass_,
+                                      plain_english="No data to score.", details={})
+            current_fraction = _iqr_outlier_fraction(values, state.get("k", self._k))
+        else:
+            non_null = current["outlier_fraction"].dropna()
+            if len(non_null) == 0:
+                raise ValueError("outlier_fraction_drift: current data has no non-NaN outlier_fraction values")
+            current_fraction = float(non_null.iloc[0])
         lower: float = state["lower"]
         upper: float = state["upper"]
         range_width = upper - lower
 
         if range_width < 1e-6:
-            # Range collapsed — history is essentially constant
             score = 0.0 if abs(current_fraction - upper) < 1e-6 else 1.0
         else:
             if lower <= current_fraction <= upper:
@@ -89,7 +119,7 @@ class OutlierFractionRangeDetector(BaseDetector):
                 score = (lower - current_fraction) / range_width
             else:
                 score = (current_fraction - upper) / range_width
-            score = min(score, 1.0)  # cap to STAT_SCALE max
+            score = min(score, 1.0)
 
         verdict = self._verdict(score)
 

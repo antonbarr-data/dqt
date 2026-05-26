@@ -18,7 +18,7 @@ class SqlAssertionDetector(BaseAggregateDetector):
     def __init__(self, condition: str) -> None:
         self._condition = condition
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr("violation_count", f"SUM(CASE WHEN NOT ({self._condition}) THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),

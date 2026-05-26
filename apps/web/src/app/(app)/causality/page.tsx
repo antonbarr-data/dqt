@@ -12,6 +12,8 @@ interface ReviewEdge {
   status: string;
   reviewer: string;
   notes: string;
+  shap_attribution: number;
+  lag: number;
 }
 
 interface Stats {
@@ -180,7 +182,7 @@ export default function CausalityPage() {
             <table className="w-full" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr className="border-b border-line">
-                  {["Cause", "Effect", "p-value", "Strength", "Status", ""].map((h, i) => (
+                  {["Cause", "Effect", "Lag", "p-value", "SHAP", "Strength", "Status", ""].map((h, i) => (
                     <th
                       key={i}
                       className="px-4 py-2 t-micro text-left"
@@ -206,7 +208,15 @@ export default function CausalityPage() {
                       <span className="t-small font-mono" style={{ color: "var(--fg-0)" }}>{edge.effect}</span>
                     </td>
                     <td className="px-4 py-2.5">
+                      <span className="t-small font-mono" style={{ color: "var(--fg-3)" }}>t-{edge.lag ?? 1}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
                       <span className="t-small font-mono" style={{ color: "var(--fg-1)" }}>{edge.p_value.toFixed(4)}</span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="t-small font-mono" style={{ color: (edge.shap_attribution ?? 0) > 0.01 ? "var(--pass)" : "var(--fg-3)" }}>
+                        {(edge.shap_attribution ?? 0) > 0 ? edge.shap_attribution.toFixed(4) : "--"}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="t-small" style={{ color: STRENGTH_COLOR[edge.evidence_strength] ?? "var(--fg-2)" }}>
@@ -252,15 +262,25 @@ export default function CausalityPage() {
               <span className="t-micro block mb-0.5" style={{ color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Effect</span>
               <span className="t-small font-mono" style={{ color: "var(--fg-0)" }}>{selectedEdge.effect}</span>
             </div>
-            <div className="flex gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="t-micro block mb-0.5" style={{ color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>p-value</span>
+                <span className="t-micro block mb-0.5" style={{ color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>p-value (BH)</span>
                 <span className="t-small font-mono" style={{ color: "var(--fg-1)" }}>{selectedEdge.p_value.toFixed(4)}</span>
+              </div>
+              <div>
+                <span className="t-micro block mb-0.5" style={{ color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Optimal lag</span>
+                <span className="t-small font-mono" style={{ color: "var(--fg-1)" }}>t-{selectedEdge.lag ?? 1}</span>
               </div>
               <div>
                 <span className="t-micro block mb-0.5" style={{ color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Strength</span>
                 <span className="t-small" style={{ color: STRENGTH_COLOR[selectedEdge.evidence_strength] ?? "var(--fg-2)" }}>
                   {selectedEdge.evidence_strength}
+                </span>
+              </div>
+              <div>
+                <span className="t-micro block mb-0.5" style={{ color: "var(--fg-3)", textTransform: "uppercase", letterSpacing: "0.08em" }}>SHAP attr.</span>
+                <span className="t-small font-mono" style={{ color: (selectedEdge.shap_attribution ?? 0) > 0.01 ? "var(--pass)" : "var(--fg-3)" }}>
+                  {(selectedEdge.shap_attribution ?? 0) > 0 ? selectedEdge.shap_attribution.toFixed(4) : "--"}
                 </span>
               </div>
             </div>

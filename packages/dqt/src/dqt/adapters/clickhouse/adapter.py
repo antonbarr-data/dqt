@@ -22,6 +22,8 @@ _SYSTEM_DBS = frozenset({"system", "information_schema", "INFORMATION_SCHEMA"})
 
 
 class ClickHouseAdapter:
+    sql_dialect = "clickhouse"
+
     def __init__(self, **client_kwargs: Any) -> None:
         try:
             import clickhouse_connect
@@ -96,16 +98,15 @@ class ClickHouseAdapter:
     def _step_clock_skew(self) -> HealthCheckStep:
         t0 = time.perf_counter()
         try:
-            db_now_str = self._client.command("SELECT now()")
-            # clickhouse-connect may return a datetime object or a string depending on version
+            # toTimeZone converts to UTC regardless of server timezone
+            db_now_str = self._client.command("SELECT toTimeZone(now(), 'UTC')")
             if isinstance(db_now_str, datetime.datetime):
                 db_now = db_now_str
             else:
                 db_now = datetime.datetime.fromisoformat(str(db_now_str))
             local_now = datetime.datetime.now(datetime.timezone.utc)
-            if db_now.tzinfo is None:
-                db_now = db_now.replace(tzinfo=datetime.timezone.utc)
-            skew_s = abs((db_now - local_now).total_seconds())
+            db_utc = db_now.replace(tzinfo=datetime.timezone.utc)
+            skew_s = abs((db_utc - local_now).total_seconds())
             status = "pass" if skew_s < 60 else "fail"
             return HealthCheckStep("clock_skew", status, (time.perf_counter() - t0) * 1000, f"skew={skew_s:.1f}s")
         except Exception as exc:
@@ -139,12 +140,13 @@ class ClickHouseAdapter:
             for row in result.result_rows
         ]
 
-    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
+    def sample(self, schema: str, table: str, n: int = 100_000, where: str | None = None) -> pd.DataFrame:
         # ClickHouse rand() is fast — ORDER BY rand() on large tables can be expensive.
         # For production use, SAMPLE clause is preferable, but requires MergeTree engine.
         # We use ORDER BY rand() LIMIT n for correctness across all table engines.
+        where_clause = f" WHERE {where}" if where else ""
         result = self._client.query(
-            f"SELECT * FROM `{schema}`.`{table}` ORDER BY rand() LIMIT {n}"
+            f"SELECT * FROM `{schema}`.`{table}`{where_clause} ORDER BY rand() LIMIT {n}"
         )
         return pd.DataFrame(result.result_rows, columns=result.column_names)
 

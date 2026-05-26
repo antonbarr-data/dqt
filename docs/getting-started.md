@@ -1,6 +1,6 @@
 # Getting started with dqt
 
-dqt is a Python library that watches your data for statistical drift, outliers, schema changes, and — uniquely — surfaces *why* metrics moved by running causal discovery across your time series. This guide takes you from zero to your first working check in about five minutes, then walks through the dashboard, profiling, and causality features.
+dqt is a Python library that questions your data: it detects statistical drift, outliers, and schema changes — and uniquely surfaces *why* metrics moved by running causal discovery across your time series. This guide takes you from zero to your first working check in about five minutes, then walks through the dashboard, profiling, and causality features.
 
 ---
 

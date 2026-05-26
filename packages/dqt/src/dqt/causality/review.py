@@ -15,6 +15,8 @@ class CausalReviewEdge:
     reviewer: str = ""
     notes: str = ""
     weight_delta: float = 0.0       # +0.2 on accept, applied by causal queries
+    shap_attribution: float = 0.0   # mean |SHAP| for cause feature in lagged linear model
+    lag: int = 1                    # optimal lag found by PCMCI+
 
 
 class ReviewStore:

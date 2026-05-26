@@ -23,6 +23,8 @@ _log = get_logger(__name__)
 
 
 class DatabricksAdapter:
+    sql_dialect = "databricks"
+
     def __init__(
         self,
         server_hostname: str,
@@ -82,7 +84,7 @@ class DatabricksAdapter:
         steps.append(self._step_info_schema())
         steps.append(self._step_sample_select())
         steps.append(self._step_latency())
-        steps.append(self._step_clock_skew())
+        steps.append(HealthCheckStep("clock_skew", "skip", 0.0, "managed service"))
         return HealthCheckResult(steps=steps)
 
     def _step_tcp(self) -> HealthCheckStep:
@@ -136,25 +138,6 @@ class DatabricksAdapter:
         except Exception as exc:
             return HealthCheckStep("latency_probe", "fail", 0.0, str(exc))
 
-    def _step_clock_skew(self) -> HealthCheckStep:
-        t0 = time.perf_counter()
-        try:
-            with self._connect() as conn:
-                row = self._exec(conn, "SELECT current_timestamp()", fetch_all=False)
-            db_now = row[0] if row else None
-            local_now = datetime.datetime.now(datetime.timezone.utc)
-            if isinstance(db_now, str):
-                db_now = datetime.datetime.fromisoformat(db_now)
-            if db_now is not None and db_now.tzinfo is None:
-                db_now = db_now.replace(tzinfo=datetime.timezone.utc)
-            if db_now is None:
-                return HealthCheckStep("clock_skew", "fail", 0.0, "no timestamp returned")
-            skew_s = abs((db_now - local_now).total_seconds())
-            status = "pass" if skew_s < 60 else "fail"
-            return HealthCheckStep("clock_skew", status, (time.perf_counter() - t0) * 1000, f"skew={skew_s:.1f}s")
-        except Exception as exc:
-            return HealthCheckStep("clock_skew", "fail", 0.0, str(exc))
-
     def list_schemas(self) -> list[str]:
         with self._connect() as conn:
             rows = self._exec(conn, "SHOW SCHEMAS")
@@ -177,10 +160,15 @@ class DatabricksAdapter:
             if row[0] and not row[0].startswith("#")  # skip partition headers
         ]
 
-    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
-        # TABLESAMPLE (n ROWS) uses Delta's efficient sampling — avoids a full sort.
+    def sample(self, schema: str, table: str, n: int = 100_000, where: str | None = None) -> pd.DataFrame:
+        if where:
+            # TABLESAMPLE can't be combined with WHERE; fall back to ORDER BY rand() LIMIT.
+            sql = f"SELECT * FROM `{schema}`.`{table}` WHERE {where} ORDER BY rand() LIMIT {n}"
+        else:
+            # TABLESAMPLE (n ROWS) uses Delta's efficient sampling — avoids a full sort.
+            sql = f"SELECT * FROM `{schema}`.`{table}` TABLESAMPLE ({n} ROWS)"
         with self._connect() as conn:
-            df = self._exec_df(conn, f"SELECT * FROM `{schema}`.`{table}` TABLESAMPLE ({n} ROWS)")
+            df = self._exec_df(conn, sql)
         return df
 
     def aggregate(self, schema: str, table: str, exprs: list[AggExpr]) -> dict[str, Any]:

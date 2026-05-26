@@ -4,15 +4,6 @@ from dqt_server.main import app
 client = TestClient(app)
 
 
-def test_trigger_threshold_dry_run():
-    resp = client.post("/api/v1/trigger", json={"mode": "threshold", "dry_run": True})
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["mode"] == "threshold"
-    assert data["dry_run"] is True
-    assert "triggered" in data
-    assert "skipped" in data
-
 
 def test_trigger_daily_dry_run_returns_digest():
     resp = client.post("/api/v1/trigger", json={"mode": "daily", "dry_run": True})

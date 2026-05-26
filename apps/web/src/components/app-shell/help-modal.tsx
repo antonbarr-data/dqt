@@ -15,7 +15,7 @@ const SHORTCUTS = [
 const NAV = [
   { key: "Overview", href: "/overview" },
   { key: "Ask", href: "/ask" },
-  { key: "Subscriptions", href: "/subscriptions" },
+
   { key: "Datasets", href: "/datasets" },
   { key: "Lineage", href: "/lineage" },
   { key: "Metrics", href: "/metrics" },

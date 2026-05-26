@@ -68,12 +68,13 @@ async def _setup_db() -> None:
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS good_direction VARCHAR",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS refresh_cadence VARCHAR",
             "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS lineage JSONB",
-            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS expr_type VARCHAR",
-            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS expr_sql TEXT",
-            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS numerator_sql TEXT",
-            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS denominator_sql TEXT",
-            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS filter_sql TEXT",
-            "ALTER TABLE metric_definitions ADD COLUMN IF NOT EXISTS time_column VARCHAR",
+            "ALTER TABLE metric_definitions DROP COLUMN IF EXISTS expr_type",
+            "ALTER TABLE metric_definitions DROP COLUMN IF EXISTS expr_sql",
+            "ALTER TABLE metric_definitions DROP COLUMN IF EXISTS numerator_sql",
+            "ALTER TABLE metric_definitions DROP COLUMN IF EXISTS denominator_sql",
+            "ALTER TABLE metric_definitions DROP COLUMN IF EXISTS filter_sql",
+            "ALTER TABLE metric_definitions DROP COLUMN IF EXISTS time_column",
+            "DROP TABLE IF EXISTS metric_runs",
         ]:
             try:
                 await conn.execute(text(stmt))
@@ -215,7 +216,6 @@ from dqt_server.api.v1.search import router as search_router
 from dqt_server.api.v1.insights import router as insights_router
 from dqt_server.api.v1.feed import router as feed_router
 from dqt_server.api.v1.ask import router as ask_router
-from dqt_server.api.v1.subscriptions import router as subscriptions_router
 from dqt_server.api.v1.trigger import router as trigger_router
 from dqt_server.api.v1.lineage import router as lineage_router
 from dqt_server.api.v1.causal_review import router as causal_review_router
@@ -233,7 +233,6 @@ app.include_router(search_router)   # BEFORE insights -- /metrics/search before 
 app.include_router(insights_router)
 app.include_router(feed_router)
 app.include_router(ask_router)
-app.include_router(subscriptions_router)
 app.include_router(trigger_router)
 app.include_router(lineage_router)
 app.include_router(causal_review_router)

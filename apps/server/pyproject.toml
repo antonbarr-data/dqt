@@ -26,6 +26,8 @@ dependencies = [
     "pyyaml>=6.0",
     "google-cloud-bigquery>=3.0",
     "db-dtypes>=1.0",
+    "tigramite>=0.7",
+    "shap>=0.45",
     "dqtlib>=0.9.1",
 ]
 

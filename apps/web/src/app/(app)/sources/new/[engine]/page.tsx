@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Wizard } from "@/components/connections/wizard";
+import { EngineIcon } from "@/components/connections/engine-icon";
 
-const ENGINE_META: Record<string, { name: string; abbr: string; color: string; desc: string }> = {
-  postgres:   { name: "PostgreSQL",  abbr: "PG", color: "#336791", desc: "Operational + analytical Postgres clusters" },
-  mysql:      { name: "MySQL",       abbr: "MY", color: "#E48E00", desc: "MySQL 5.7+ / 8.x" },
-  clickhouse: { name: "ClickHouse",  abbr: "CH", color: "#FBBC05", desc: "ClickHouse Cloud or self-hosted" },
-  bigquery:   { name: "BigQuery",    abbr: "BQ", color: "#4285F4", desc: "Google Cloud BigQuery" },
-  snowflake:  { name: "Snowflake",   abbr: "SF", color: "#29B5E8", desc: "Snowflake with a dedicated read-only role" },
+const ENGINE_META: Record<string, { name: string; desc: string }> = {
+  postgres:   { name: "PostgreSQL",  desc: "Operational + analytical Postgres clusters" },
+  mysql:      { name: "MySQL",       desc: "MySQL 5.7+ / 8.x" },
+  clickhouse: { name: "ClickHouse",  desc: "ClickHouse Cloud or self-hosted" },
+  bigquery:   { name: "BigQuery",    desc: "Google Cloud BigQuery" },
+  snowflake:  { name: "Snowflake",   desc: "Snowflake with a dedicated read-only role" },
 };
 
 interface Props {
@@ -14,12 +15,7 @@ interface Props {
 }
 
 export default function NewSourcePage({ params }: Props) {
-  const meta = ENGINE_META[params.engine] ?? {
-    name: params.engine,
-    abbr: params.engine.slice(0, 2).toUpperCase(),
-    color: "var(--accent)",
-    desc: "",
-  };
+  const meta = ENGINE_META[params.engine] ?? { name: params.engine, desc: "" };
 
   return (
     <div className="min-h-full" style={{ background: "var(--bg-0)" }}>
@@ -39,21 +35,7 @@ export default function NewSourcePage({ params }: Props) {
 
         {/* Header */}
         <div className="flex items-center gap-4 mb-10">
-          <div
-            className="flex items-center justify-center flex-shrink-0"
-            style={{
-              width: 44,
-              height: 44,
-              background: meta.color,
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: "var(--font-jetbrains-mono)",
-              letterSpacing: "0.03em",
-            }}
-          >
-            {meta.abbr}
-          </div>
+          <EngineIcon engine={params.engine} size={44} />
           <div>
             <p
               className="t-micro font-medium uppercase"

@@ -8,20 +8,53 @@ from dqt.algorithms._registry import registry
 from dqt.algorithms.basic._helpers import fraction_result
 
 
+def _cast_to_str(col: str, dialect: str) -> str:
+    if dialect == "clickhouse":
+        return f"toString({col})"
+    if dialect == "bigquery":
+        return f"CAST({col} AS STRING)"
+    return f"CAST({col} AS TEXT)"
+
+
+def _regex_not_match(col_expr: str, pattern: str, dialect: str) -> str:
+    escaped = pattern.replace("'", "''")
+    if dialect == "bigquery":
+        return f"NOT REGEXP_CONTAINS({col_expr}, r'{escaped}')"
+    if dialect == "clickhouse":
+        return f"NOT match({col_expr}, '{escaped}')"
+    return f"NOT ({col_expr} ~ '{escaped}')"
+
+
 @registry.register
 class ValueInRangeDetector(BaseAggregateDetector):
     """Fraction of values outside [min_val, max_val]."""
     slug = "value_in_range"
     group = "basic"
 
-    def __init__(self, min_val: float = float("-inf"), max_val: float = float("inf")) -> None:
-        self._min, self._max = min_val, max_val
+    def __init__(self, min_value: float = float("-inf"), max_value: float = float("inf")) -> None:
+        try:
+            self._min = float(min_value)
+            self._max = float(max_value)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"min_value and max_value must be numeric, got min={min_value!r}, max={max_value!r}"
+            ) from exc
         self._col: str | None = None
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         self._col = col
+        # Build conditions only for finite bounds — inf/-inf are not valid SQL literals.
+        conditions = []
+        if self._min != float("-inf"):
+            conditions.append(f"{col} < {self._min}")
+        if self._max != float("inf"):
+            conditions.append(f"{col} > {self._max}")
+        if not conditions:
+            violation_sql = "0"
+        else:
+            violation_sql = f"SUM(CASE WHEN {' OR '.join(conditions)} THEN 1 ELSE 0 END)"
         return [
-            AggExpr("violation_count", f"SUM(CASE WHEN {col} < {self._min} OR {col} > {self._max} THEN 1 ELSE 0 END)"),
+            AggExpr("violation_count", violation_sql),
             AggExpr("total_count", "COUNT(*)"),
         ]
 
@@ -29,9 +62,16 @@ class ValueInRangeDetector(BaseAggregateDetector):
         return {}
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
-        result = fraction_result(current, "value_in_range_violation", f"range [{self._min}, {self._max}]")
+        bounds = f"[{self._min if self._min != float('-inf') else '-∞'}, {self._max if self._max != float('inf') else '+∞'}]"
+        result = fraction_result(current, "value_in_range_violation", f"range {bounds}")
         if self._col and result.score > 0:
-            result.failing_filter_sql = f"({self._col} < {self._min} OR {self._col} > {self._max})"
+            parts = []
+            if self._min != float("-inf"):
+                parts.append(f"{self._col} < {self._min}")
+            if self._max != float("inf"):
+                parts.append(f"{self._col} > {self._max}")
+            if parts:
+                result.failing_filter_sql = f"({' OR '.join(parts)})"
         return result
 
 
@@ -46,11 +86,18 @@ class SetMembershipDetector(BaseAggregateDetector):
             raise ValueError("allowed_values must be non-empty")
         self._allowed = set(allowed_values)
 
+    def _quote(self, v: object) -> str:
+        if isinstance(v, bool):
+            return "TRUE" if v else "FALSE"
+        if isinstance(v, (int, float)):
+            return str(v)
+        return f"'{v}'"
+
     def _in_clause(self) -> str:
-        quoted = ", ".join(f"'{v}'" for v in sorted(self._allowed))
+        quoted = ", ".join(self._quote(v) for v in self._allowed)
         return f"({quoted})"
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr("violation_count", f"SUM(CASE WHEN {col} NOT IN {self._in_clause()} THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
@@ -78,7 +125,7 @@ class SetExclusionDetector(BaseAggregateDetector):
         quoted = ", ".join(f"'{v}'" for v in sorted(self._forbidden))
         return f"({quoted})"
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr("violation_count", f"SUM(CASE WHEN {col} IN {self._in_clause()} THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
@@ -100,10 +147,11 @@ class RegexMatchDetector(BaseAggregateDetector):
     def __init__(self, pattern: str = ".*") -> None:
         self._pattern = pattern
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
-        escaped = self._pattern.replace("'", "''")
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        col_expr = _cast_to_str(col, dialect)
+        not_match = _regex_not_match(col_expr, self._pattern, dialect)
         return [
-            AggExpr("violation_count", f"SUM(CASE WHEN {col}::text !~ '{escaped}' THEN 1 ELSE 0 END)"),
+            AggExpr("violation_count", f"SUM(CASE WHEN {not_match} THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
         ]
 
@@ -123,10 +171,11 @@ class StringLengthRangeDetector(BaseAggregateDetector):
     def __init__(self, min_len: int = 0, max_len: int = 255) -> None:
         self._min, self._max = min_len, max_len
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        col_expr = _cast_to_str(col, dialect)
         return [
             AggExpr("violation_count",
-                    f"SUM(CASE WHEN LENGTH({col}::text) < {self._min} OR LENGTH({col}::text) > {self._max} THEN 1 ELSE 0 END)"),
+                    f"SUM(CASE WHEN LENGTH({col_expr}) < {self._min} OR LENGTH({col_expr}) > {self._max} THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
         ]
 
@@ -164,11 +213,12 @@ class DateFormatDetector(BaseAggregateDetector):
             pattern = pattern.replace(re.escape(token), rx)
         return f"^{pattern}$"
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
-        escaped_regex = self._regex.replace("'", "''").replace("\\", "\\\\")
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        col_expr = _cast_to_str(col, dialect)
+        not_match = _regex_not_match(col_expr, self._regex, dialect)
         return [
             AggExpr("violation_count",
-                    f"SUM(CASE WHEN {col} IS NOT NULL AND {col}::text !~ '{escaped_regex}' THEN 1 ELSE 0 END)"),
+                    f"SUM(CASE WHEN {col} IS NOT NULL AND {not_match} THEN 1 ELSE 0 END)"),
             AggExpr("total_count", "COUNT(*)"),
         ]
 

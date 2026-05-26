@@ -3,7 +3,6 @@ import { serverFetch } from "@/lib/server-api";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { InsightClient } from "./insight-client";
-import { SubscribeButton } from "@/components/subscriptions/subscribe-button";
 import { MetricProfilePanel } from "./metric-profile-panel";
 import { SeasonalityChart } from "./seasonality-chart";
 
@@ -22,17 +21,7 @@ interface MetricDetail {
   current_verdict: string | null;
   last_run: string | null;
   pinned: boolean;
-  grain: string | null;
-  additivity: string | null;
-  good_direction: string | null;
-  refresh_cadence: string | null;
   lineage: { label: string; kind?: string }[];
-  source_id: string | null;
-  expr_type: string | null;
-  expr_sql: string | null;
-  numerator_sql: string | null;
-  denominator_sql: string | null;
-  filter_sql: string | null;
 }
 
 interface MetricProfile {
@@ -114,30 +103,21 @@ export default async function MetricInsightPage({
           </div>
           <p className="t-micro font-mono mb-2" style={{ color: "var(--fg-3)" }}>{metric.fqn}</p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {metric.owners.map((o) => (
-            <span key={o} className="t-micro px-2 py-0.5 border border-line"
-                  style={{ color: "var(--fg-2)" }}>{o}</span>
-          ))}
-          <SubscribeButton metricFqn={decodedFqn} />
-        </div>
+        {metric.owners.length > 0 && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {metric.owners.map((o) => (
+              <span key={o} className="t-micro px-2 py-0.5 border border-line"
+                    style={{ color: "var(--fg-2)" }}>{o}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Profile panel: definition, grain, additivity, direction, cadence, lineage — editable */}
       <MetricProfilePanel
         fqn={decodedFqn}
         description={metric.description}
-        grain={metric.grain}
-        additivity={metric.additivity}
-        good_direction={metric.good_direction}
-        refresh_cadence={metric.refresh_cadence}
         lineage={metric.lineage}
-        source_id={metric.source_id}
-        expr_type={metric.expr_type}
-        expr_sql={metric.expr_sql}
-        numerator_sql={metric.numerator_sql}
-        denominator_sql={metric.denominator_sql}
-        filter_sql={metric.filter_sql}
       />
 
       {/* Meta line */}

@@ -15,7 +15,7 @@ class ValidityDetector(BaseAggregateDetector):
     def __init__(self, sql_predicate: str = "TRUE") -> None:
         self._predicate = sql_predicate
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr(
                 name="invalid_count",

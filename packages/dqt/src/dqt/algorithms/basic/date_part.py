@@ -18,22 +18,22 @@ class DatePartCompletenessDetector(BaseAggregateDetector):
     slug = "date_part_missing_fraction"
     group = "basic"
 
-    def __init__(self, col: str = "created_at", granularity: str = "day", lookback_days: int = 30) -> None:
+    def __init__(self, granularity: str = "day", lookback_days: int = 30) -> None:
         if granularity not in _GRANULARITIES:
             raise ValueError(f"granularity must be one of {set(_GRANULARITIES)}, got '{granularity}'")
-        self._col = col
         self._granularity = granularity
         self._lookback_days = lookback_days
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
-        trunc = _GRANULARITIES[self._granularity]
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        # CAST(col AS DATE) is portable across PostgreSQL, BigQuery, Snowflake.
+        # GREATEST avoids negative values when more dates exist than the lookback period.
+        # CASE WHEN instead of FILTER(WHERE...) for cross-database compatibility.
         return [
             AggExpr("missing_buckets", (
-                f"({self._lookback_days}) - "
-                f"COUNT(DISTINCT DATE_TRUNC('{trunc}', {col}::timestamp)) "
-                f"FILTER (WHERE {col} >= CURRENT_DATE - INTERVAL '{self._lookback_days} days')"
+                f"GREATEST(0, {self._lookback_days} - "
+                f"COUNT(DISTINCT CAST({col} AS DATE)))"
             )),
-            AggExpr("total_buckets", f"CAST({self._lookback_days} AS INTEGER)"),
+            AggExpr("total_buckets", str(self._lookback_days)),
         ]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

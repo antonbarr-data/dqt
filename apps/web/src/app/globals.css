@@ -79,3 +79,12 @@
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--line-2); }
+
+/* Number input spinners — always visible, themed */
+input[type="number"] { color-scheme: dark; }
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+  background-color: var(--bg-2);
+  cursor: pointer;
+}

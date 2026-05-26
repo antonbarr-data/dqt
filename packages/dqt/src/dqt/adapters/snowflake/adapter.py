@@ -25,6 +25,8 @@ _SYSTEM_SCHEMAS = frozenset({"INFORMATION_SCHEMA"})
 
 
 class SnowflakeAdapter:
+    sql_dialect = "snowflake"
+
     def __init__(self, **conn_kwargs: Any) -> None:
         try:
             import snowflake.connector  # noqa: F401
@@ -55,7 +57,7 @@ class SnowflakeAdapter:
         steps.append(self._step_info_schema())
         steps.append(self._step_sample_select())
         steps.append(self._step_latency())
-        steps.append(self._step_clock_skew())
+        steps.append(HealthCheckStep("clock_skew", "skip", 0.0, "managed service"))
         return HealthCheckResult(steps=steps)
 
     def _step_tcp(self) -> HealthCheckStep:
@@ -116,24 +118,6 @@ class SnowflakeAdapter:
         except Exception as exc:
             return HealthCheckStep("latency_probe", "fail", 0.0, str(exc))
 
-    def _step_clock_skew(self) -> HealthCheckStep:
-        t0 = time.perf_counter()
-        try:
-            with self._connect() as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT CURRENT_TIMESTAMP()")
-                db_now = cur.fetchone()[0]
-            local_now = datetime.datetime.now(datetime.timezone.utc)
-            if isinstance(db_now, str):
-                db_now = datetime.datetime.fromisoformat(db_now)
-            if db_now.tzinfo is None:
-                db_now = db_now.replace(tzinfo=datetime.timezone.utc)
-            skew_s = abs((db_now - local_now).total_seconds())
-            status = "pass" if skew_s < 60 else "fail"
-            return HealthCheckStep("clock_skew", status, (time.perf_counter() - t0) * 1000, f"skew={skew_s:.1f}s")
-        except Exception as exc:
-            return HealthCheckStep("clock_skew", "fail", 0.0, str(exc))
-
     def list_schemas(self) -> list[str]:
         with self._connect() as conn:
             cur = conn.cursor()
@@ -168,12 +152,15 @@ class SnowflakeAdapter:
                 for row in cur.fetchall()
             ]
 
-    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
-        # SAMPLE ({n} ROWS) is Snowflake's efficient reservoir-sampler — uses block-level sampling,
-        # much cheaper than ORDER BY RANDOM() on large tables.
+    def sample(self, schema: str, table: str, n: int = 100_000, where: str | None = None) -> pd.DataFrame:
         with self._connect() as conn:
             cur = conn.cursor()
-            cur.execute(f'SELECT * FROM "{schema}"."{table}" SAMPLE ({n} ROWS)')
+            if where:
+                # SAMPLE can't be combined with WHERE; fall back to ORDER BY RANDOM() LIMIT.
+                cur.execute(f'SELECT * FROM "{schema}"."{table}" WHERE {where} ORDER BY RANDOM() LIMIT {n}')
+            else:
+                # SAMPLE ({n} ROWS) is Snowflake's efficient reservoir-sampler — uses block-level sampling.
+                cur.execute(f'SELECT * FROM "{schema}"."{table}" SAMPLE ({n} ROWS)')
             cols = [desc[0] for desc in cur.description]
             return pd.DataFrame(cur.fetchall(), columns=cols)
 

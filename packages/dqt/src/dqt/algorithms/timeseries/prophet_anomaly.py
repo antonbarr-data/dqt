@@ -1,6 +1,6 @@
-# packages/dqt/src/dqt/algorithms/timeseries/prophet_anomaly.py
-# Ref: Taylor & Letham (2018) Am. Statistician 72(1) — Forecasting at Scale
-# Requires optional dqt[forecast] extra: pip install 'dqt[forecast]'
+# Ref: Cleveland et al. (1990) JASA — Seasonal-Trend decomposition using Loess (STL)
+# STL-based replacement for Prophet backend (CmdStan not available on all platforms).
+# Same slug and interface as the original ProphetAnomalyDetector.
 from __future__ import annotations
 
 import numpy as np
@@ -8,71 +8,71 @@ import pandas as pd
 
 from dqt.algorithms._base import BaseDetector, DetectorResult, DetectorState, Verdict
 from dqt.algorithms._registry import registry
-
-_PROPHET_MISSING_MSG = (
-    "prophet is not installed. "
-    "Install the optional forecast extra: pip install 'dqt[forecast]' "
-    "or pip install prophet"
-)
-
-
-def _require_prophet():
-    try:
-        import prophet  # noqa: F401
-    except ImportError as exc:
-        raise ImportError(_PROPHET_MISSING_MSG) from exc
+from dqt.algorithms.timeseries.stl import _auto_period
 
 
 @registry.register
 class ProphetAnomalyDetector(BaseDetector):
-    """Prophet-based anomaly detector (requires dqt[forecast] extra).
-    Raises ImportError with install hint if prophet is not installed.
+    """STL-based anomaly detector with Prophet-compatible interface.
+    Fits STL on the reference window to learn noise statistics, then scores the current
+    window by checking what fraction of residuals exceed the prediction interval.
     """
     slug = "prophet_anomaly"
     group = "timeseries"
 
-    def __init__(self, interval_width: float = 0.95) -> None:
+    def __init__(self, interval_width: float = 0.95, period: int | None = None) -> None:
         self._interval_width = interval_width
+        self._period = period
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
-        _require_prophet()
-        from prophet import Prophet  # type: ignore[import]
+        from statsmodels.tsa.seasonal import STL
+        import scipy.stats
         values = reference.iloc[:, 0].dropna().to_numpy(dtype=float)
-        n = len(values)
-        ds = pd.date_range("2020-01-01", periods=n, freq="D")
-        train = pd.DataFrame({"ds": ds, "y": values})
-        model = Prophet(interval_width=self._interval_width, daily_seasonality=False)
-        model.fit(train, verbose=False)
-        return {"model": model, "n_train": n, "interval_width": self._interval_width}
+        period = self._period if self._period is not None else _auto_period(values)
+        min_len = 2 * period + 1
+        if len(values) < min_len:
+            raise ValueError(f"prophet_anomaly requires at least {min_len} observations for period={period}, got {len(values)}")
+        result = STL(values, period=period, robust=True).fit()
+        resid = result.resid
+        resid_std = float(np.std(resid, ddof=1))
+        z_threshold = float(scipy.stats.norm.ppf((1.0 + self._interval_width) / 2.0))
+        return {
+            "resid_mean": float(np.mean(resid)),
+            "resid_std": resid_std if resid_std > 0 else 1.0,
+            "period": period,
+            "interval_width": self._interval_width,
+            "z_threshold": z_threshold,
+            "n_train": len(values),
+        }
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
-        _require_prophet()
-        values = current.iloc[:, 0].to_numpy(dtype=float)
-        non_nan_mask = ~np.isnan(values)
-        n_scored = int(np.sum(non_nan_mask))
-        if n_scored == 0:
+        from statsmodels.tsa.seasonal import STL
+        values = current.iloc[:, 0].dropna().to_numpy(dtype=float)
+        n = len(values)
+        min_len = 2 * state["period"] + 1
+        if n < min_len:
             return DetectorResult(
                 score=0.0, verdict=Verdict.pass_,
-                plain_english="No data to score.",
-                details={"anomaly_fraction": 0.0, "n_anomalies": 0},
+                plain_english=f"Too few observations ({n}) for STL period {state['period']}; skipping anomaly check",
+                details={"n_scored": n, "period": state["period"]},
             )
-        model = state["model"]
-        n_train = state["n_train"]
-        n = len(values)
-        future_ds = pd.date_range("2020-01-01", periods=n_train + n, freq="D")[-n:]
-        future = pd.DataFrame({"ds": future_ds})
-        forecast = model.predict(future)
-        lower = forecast["yhat_lower"].to_numpy()
-        upper = forecast["yhat_upper"].to_numpy()
-        anomalies = non_nan_mask & ((values < lower) | (values > upper))
+        result = STL(values, period=state["period"], robust=True).fit()
+        resid = result.resid
+        z_scores = np.abs((resid - state["resid_mean"]) / state["resid_std"])
+        anomalies = z_scores > state["z_threshold"]
         n_anomalies = int(np.sum(anomalies))
-        frac = n_anomalies / n_scored
+        frac = n_anomalies / n
         return DetectorResult(
             score=frac,
             verdict=self._verdict(frac),
             plain_english=(
-                f"{n_anomalies} of {n_scored} values outside Prophet "
-                f"{state['interval_width']:.0%} uncertainty interval ({frac:.1%})"
+                f"{n_anomalies} of {n} values outside STL "
+                f"{state['interval_width']:.0%} prediction interval ({frac:.1%})"
             ),
-            details={"anomaly_fraction": frac, "n_anomalies": n_anomalies},
+            details={
+                "anomaly_fraction": frac,
+                "n_anomalies": n_anomalies,
+                "z_threshold": state["z_threshold"],
+                "period": state["period"],
+            },
         )

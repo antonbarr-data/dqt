@@ -1,47 +1,43 @@
 ---
 description: Project context, positioning, and high-level architecture. Read this first for any new task.
-alwaysApply: true
 ---
 
-# Project Overview
-
-## What is dqt
-Open-source data quality, observability, semantic, and causality library + service. Watches dbt-built warehouses (and any SQL warehouse) for statistical drift, anomalies, silent regressions, and explains *why* metrics moved.
-
-**Positioning**: pip-installable Python library at the core (MIT). `apps/server` (FastAPI) exposes it as a multi-tenant service. `apps/web` (Next.js) is the power-user UI. Library is usable standalone in notebooks, CI pipelines, and Airflow/Dagster/Prefect tasks without the server.
-
-**Scope vs. peers**: superset of Great Expectations (declarative checks), Soda (SodaCL rules), and Elementary (dbt artifact ingestion). dqt additionally ships a full statistical/ML detector library, a semantic layer, column-level lineage, causal-discovery DAGs, an HITL review loop, an AI agent for incident explanation, and an on-call/incident manager.
-
-## Key data model
-`Source` (warehouse connection) → `Dataset` (table/view) → `Column` → `Check` (statistical or rule) → `Run` (one execution) → `Incident` (when a Run breaches threshold).
-
-On top: `Metric` (semantic-layer definition) → `MetricDriverEdge` (causal edge in the driver-tree DAG) → `MetricRun` (snapshot of metric value over time).
-
-## Tech stack
-- **Python**: 3.12+, FastAPI, SQLAlchemy 2.x async, Alembic, Pydantic v2, arq, ibis-framework, sqlglot, DuckDB
-- **Databases**: Postgres + TimescaleDB (results store), pgvector (semantic embeddings), Redis (cache + arq broker)
-- **Frontend**: Next.js 14 App Router, Tailwind, shadcn/ui, lucide-react, zustand, React Query
-- **AI**: Anthropic Claude SDK
-
-## Monorepo layout
-```
-packages/dqt/       # pip-publishable library (MIT) — no FastAPI, no auth, no web
-packages/dqt-cli/   # dqt command-line tool
-packages/dqt-types/ # generated TS types (git-ignored, from `make types`)
-apps/server/        # FastAPI multi-tenant service
-apps/worker/        # arq worker for scheduled runs + agent loop
-apps/web/           # Next.js 14 frontend
-shared/config/      # JSON enums + constants (single source of truth)
-shared/schemas/     # JSON Schema files for declarative artifacts
-shared/generated/   # generated TS + Python (git-ignored)
-docs/               # documentation (algorithms/, architecture/, governance/)
-examples/           # runnable library examples
-run_local/          # Docker compose stack + start scripts
-```
-
-## Two database concepts (critical separation)
+## Hard boundary: metadata DB vs. monitored warehouses
+dqt uses two-database concept:
 1. **dqt metadata DB** — dqt's own control-plane Postgres. Stores tenants, users, source configs, datasets, checks, runs, incidents. dqt owns this entirely.
 2. **Monitored warehouses** — the user's actual data warehouses that dqt connects to read-only at runtime. Each is a `Source` record. dqt never writes to monitored warehouses.
+Never generate code that writes to a monitored warehouse. Every adapter is read-only by contract!
 
-## Brand
-`dqt` wordmark — lowercase, JetBrains Mono weight 300, `-0.05em` tracking. Zero border-radius everywhere. Sharp corners. Dense power-user UI. Dark default, light supported.
+# Project Overview
+- **Product**: `dqt` — open-source data quality, observability, semantic, and causality library + service. Watches dbt-built warehouses (and any SQL warehouse) for statistical drift, anomalies, silent regressions, and explains *why* metrics moved.
+- **Positioning**: pip-installable Python library at the core (open-source, MIT). `apps/server` (FastAPI) exposes it as a multi-tenant service. `apps/web` (Next.js) is the power-user UI. Library is usable standalone in notebooks, CI pipelines, and Airflow/Dagster/Prefect tasks without the server.
+- **Scope vs. peers**: superset of Great Expectations (declarative checks), Soda (SodaCL rules), and Elementary (dbt artifact ingestion). dqt additionally ships a full statistical/ML detector library, a semantic layer, column-level lineage, causal-discovery DAGs, an HITL review loop, an AI agent for incident explanation, and an on-call/incident manager. See .ai/rules/algorithms.mdc
+- **Tenants**: Multi-tenant SaaS deployment of the server. Library itself is single-tenant (one workspace per process). Library API is tenant-agnostic; server adds the tenant layer.
+- **Architecture**: uv-managed Python monorepo. `packages/dqt` is the library (zero web deps). `apps/server` is a FastAPI service that imports the library. `apps/web` is a Next.js 14 App Router frontend. Optional `apps/worker` runs scheduled checks via arq (Redis-backed task queue).
+- **Backend stack**: Python 3.12+, FastAPI, SQLAlchemy 2.x async, Alembic, Pydantic v2, arq, ibis-framework, sqlglot, DuckDB, Postgres + TimescaleDB, pgvector, Redis
+- **Frontend stack**: Next.js 14 App Router, Tailwind, shadcn/ui, lucide-react, zustand, React Query, Anthropic Claude SDK
+- **Third-party services**: Anthropic Claude API (agent + plain-English explanation), optional PagerDuty / Opsgenie / Slack / Microsoft Teams for on-call routing, optional Sentry for error tracking. dbt Cloud and Elementary artifact ingestion are first-class.
+
+## Key data model: 
+`Source` (warehouse connection) → 
+`Dataset` (table/view) → 
+`Column` → 
+`Check` (statistical or rule) → 
+`Run` (one execution) → 
+`Incident` (when a Run breaches threshold). 
+On top: `Metric` (semantic-layer definition) → `MetricDriverEdge` (causal edge in the driver-tree DAG) → `MetricRun` (snapshot of metric value over time).
+
+# Architecture
+
+## Monorepo layout
+- **Tooling**: `uv` workspace at the repo root manages all Python packages. `pnpm` workspace manages `apps/web` and `apps/web-shared`. Single `Makefile` orchestrates both.
+- **Packages**:
+  - `packages/dqt/` — the open-source library. Everything publishable to PyPI. **No FastAPI, no web concepts, no auth.** Pure Python.
+  - `packages/dqt-cli/` — `dqt` command-line tool (init, run, fit-baselines, explain). Wraps the library.
+  - `packages/dqt-types/` — generated TypeScript types from the library's Pydantic models. Git-ignored, regenerated by `make types`.
+- **Apps**:
+  - `apps/server/` — FastAPI service. Imports `dqt` library. Adds auth, multi-tenancy, REST/WebSocket APIs, scheduling.
+  - `apps/worker/` — arq worker for scheduled check runs and the AI agent loop.
+  - `apps/web/` — Next.js 14 App Router frontend. Imports `dqt-types` for API contracts.
+- **Open-source boundary**: `packages/*` is MIT-licensed and published to PyPI. `apps/*` is the reference deployment, also MIT, but not published.
+

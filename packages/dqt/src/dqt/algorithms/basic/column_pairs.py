@@ -20,25 +20,38 @@ class ColumnPairComparisonDetector(BaseAggregateDetector):
     slug = "column_pair_comparison"
     group = "basic"
 
-    def __init__(self, col_a: str = "a", col_b: str = "b", operator: str = ">") -> None:
-        if operator not in _ALLOWED_OPS:
-            raise ValueError(f"operator must be one of {_ALLOWED_OPS}")
-        self._col_a, self._col_b, self._op = col_a, col_b, operator
+    def __init__(
+        self,
+        col_a: str = "a",
+        col_b: str = "b",
+        operator: str = ">",
+        expression: str | None = None,
+    ) -> None:
+        if expression:
+            self._expression: str | None = expression
+            self._col_a = self._col_b = self._op = ""
+        else:
+            if operator not in _ALLOWED_OPS:
+                raise ValueError(f"operator must be one of {_ALLOWED_OPS}")
+            self._col_a, self._col_b, self._op = col_a, col_b, operator
+            self._expression = None
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def _condition(self) -> str:
+        return self._expression or f"{self._col_a} {self._op} {self._col_b}"
+
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        cond = self._condition()
         return [
             AggExpr("violation_count",
-                    f"SUM(CASE WHEN NOT ({self._col_a} {self._op} {self._col_b}) THEN 1 ELSE 0 END)"),
-            AggExpr("total_count",
-                    f"SUM(CASE WHEN {self._col_a} IS NOT NULL AND {self._col_b} IS NOT NULL THEN 1 ELSE 0 END)"),
+                    f"SUM(CASE WHEN NOT ({cond}) THEN 1 ELSE 0 END)"),
+            AggExpr("total_count", "COUNT(*)"),
         ]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         return {}
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
-        label = f"{self._col_a} {self._op} {self._col_b}"
-        return fraction_result(current, "column_pair_violation", label)
+        return fraction_result(current, "column_pair_violation", self._condition())
 
 
 @registry.register
@@ -55,8 +68,14 @@ class CompositeUniquenessDetector(BaseAggregateDetector):
             raise ValueError("key_columns must be non-empty")
         self._cols = list(key_columns)
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
-        concat_expr = " || '|' || ".join(f"COALESCE({c}::text, '__null__')" for c in self._cols)
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        if dialect == "clickhouse":
+            parts = [f"COALESCE(toString({c}), '__null__')" for c in self._cols]
+        elif dialect == "bigquery":
+            parts = [f"COALESCE(CAST({c} AS STRING), '__null__')" for c in self._cols]
+        else:
+            parts = [f"COALESCE(CAST({c} AS TEXT), '__null__')" for c in self._cols]
+        concat_expr = " || '|' || ".join(parts)
         return [
             AggExpr("total_count", "COUNT(*)"),
             AggExpr("distinct_count", f"COUNT(DISTINCT ({concat_expr}))"),

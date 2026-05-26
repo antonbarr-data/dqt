@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time as _t
 import uuid
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -230,6 +231,28 @@ async def get_source(source_id: str, db: AsyncSession = Depends(get_db)) -> dict
     return _source_dict(s)
 
 
+class UpdateSourceBody(BaseModel):
+    name: str | None = None
+    password: str | None = None
+
+
+@router.patch("/sources/{source_id}")
+async def update_source(
+    source_id: str,
+    body: UpdateSourceBody,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    s = await db.get(Source, source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{source_id}' not found")
+    if body.name is not None:
+        s.name = body.name
+    if body.password is not None:
+        s.password = body.password
+    await db.commit()
+    return _source_dict(s)
+
+
 @router.delete("/sources/{source_id}", status_code=204)
 async def delete_source(source_id: str, db: AsyncSession = Depends(get_db)) -> None:
     s = await db.get(Source, source_id)
@@ -302,12 +325,17 @@ async def update_source_tables(
         await db.delete(current_datasets[table_id])
 
     now = datetime.now(timezone.utc)
-    schema = _default_schema_for_source(s)
+    default_schema = _default_schema_for_source(s)
     for table_name in (new_tables - current_tables):
+        # BigQuery tables arrive as "dataset.table"; extract schema from the name.
+        if s.engine == "bigquery" and "." in table_name:
+            table_schema, _ = table_name.split(".", 1)
+        else:
+            table_schema = default_schema
         db.add(Dataset(
             id=table_name,
             source_id=source_id,
-            schema_name=schema,
+            schema_name=table_schema,
             status="unknown",
             check_count=0,
             created_at=now,
@@ -429,15 +457,86 @@ def _build_profile(col_name: str, col_type: str, table: str):
     )
 
 
-def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
-    """Suggest data quality checks for selected tables using heuristics + Claude AI."""
+def _suggest_table_sync(
+    source: "Source",
+    schema: str,
+    table: str,
+    api_key: str,
+    rules_content: str,
+) -> list[dict]:
+    """Suggest checks for a single table. Runs in a thread with its own adapter."""
     from dqt.checks.suggest import SuggestedCheck, suggest_checks_for_column
 
+    # BigQuery tables arrive as "dataset.table"; split to get actual schema + table.
+    actual_schema = schema
+    actual_table = table
+    if "." in table:
+        actual_schema, actual_table = table.split(".", 1)
+
+    try:
+        adapter = _make_adapter(source)
+        cols = adapter.describe_columns(actual_schema, actual_table)
+    except Exception as exc:
+        log.warning("suggest_describe_failed", table=table, error=str(exc))
+        return []
+
+    col_names = [c.name for c in cols]
+    col_types = [c.data_type for c in cols]
+
+    heuristic: dict[str, list[SuggestedCheck]] = {
+        c.name: suggest_checks_for_column(_build_profile(c.name, c.data_type, actual_table), use_llm=False)
+        for c in cols
+    }
+
+    llm: dict[str, list[dict]] = {}
+    if api_key and rules_content:
+        try:
+            _tllm = _t.time()
+            llm = _llm_suggest_batch(actual_table, col_names, col_types, rules_content, api_key)
+            log.info("suggest_llm_ok", table=table, columns=len(col_names), llm_s=round(_t.time()-_tllm,2))
+        except Exception as exc:
+            log.warning("suggest_llm_failed", table=table, error=str(exc))
+
     results: list[dict] = []
+    for col in cols:
+        all_suggestions: list[SuggestedCheck] = list(heuristic[col.name])
+        for llm_check in llm.get(col.name, []):
+            all_suggestions.append(SuggestedCheck(
+                detector_slug=llm_check["detector_slug"],
+                params=llm_check.get("params", {}),
+                rationale=llm_check.get("rationale", ""),
+                confidence=float(llm_check.get("confidence", 0.65)),
+            ))
+
+        seen: dict[str, SuggestedCheck] = {}
+        for s in sorted(all_suggestions, key=lambda x: x.confidence, reverse=True):
+            if s.detector_slug not in seen:
+                seen[s.detector_slug] = s
+
+        for sugg in seen.values():
+            tier = (
+                "essential" if sugg.confidence >= 0.80
+                else "recommended" if sugg.confidence >= 0.60
+                else "full_coverage"
+            )
+            results.append({
+                "table": table,
+                "column": col.name,
+                "detector_slug": sugg.detector_slug,
+                "params": sugg.params,
+                "rationale": sugg.rationale,
+                "confidence": round(sugg.confidence, 3),
+                "tier": tier,
+            })
+
+    return results
+
+
+def _resolve_suggest_context(source: Source) -> tuple[str, str, str]:
+    """Resolve (schema, api_key, rules_content) before per-table parallel work."""
     try:
         adapter = _make_adapter(source)
         schema = _default_schema_for_source(source)
-        # If schema is empty (e.g. BigQuery with no dataset configured), pick the first available.
         if not schema:
             try:
                 schemas = adapter.list_schemas()
@@ -447,71 +546,12 @@ def _suggest_checks_sync(source: Source, tables: list[str]) -> list[dict]:
                 pass
     except Exception as exc:
         log.warning("suggest_adapter_failed", source_id=source.id, error=str(exc))
-        return results
-
+        schema = ""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         log.warning("suggest_no_anthropic_key", note="falling back to heuristics only")
     rules_content = _load_column_concepts() if api_key else ""
-
-    for table in tables:
-        try:
-            cols = adapter.describe_columns(schema, table)
-        except Exception as exc:
-            log.warning("suggest_describe_failed", table=table, error=str(exc))
-            continue
-
-        col_names = [c.name for c in cols]
-        col_types = [c.data_type for c in cols]
-
-        # Heuristic suggestions (always run, no API needed)
-        heuristic: dict[str, list[SuggestedCheck]] = {
-            c.name: suggest_checks_for_column(_build_profile(c.name, c.data_type, table), use_llm=False)
-            for c in cols
-        }
-
-        # LLM suggestions: one call for the whole table
-        llm: dict[str, list[dict]] = {}
-        if api_key and rules_content:
-            try:
-                llm = _llm_suggest_batch(table, col_names, col_types, rules_content, api_key)
-                log.info("suggest_llm_ok", table=table, columns=len(col_names))
-            except Exception as exc:
-                log.warning("suggest_llm_failed", table=table, error=str(exc))
-
-        # Merge: heuristic baseline + LLM additions, dedup by slug (highest confidence wins)
-        for col in cols:
-            all_suggestions: list[SuggestedCheck] = list(heuristic[col.name])
-            for llm_check in llm.get(col.name, []):
-                all_suggestions.append(SuggestedCheck(
-                    detector_slug=llm_check["detector_slug"],
-                    params=llm_check.get("params", {}),
-                    rationale=llm_check.get("rationale", ""),
-                    confidence=float(llm_check.get("confidence", 0.65)),
-                ))
-
-            seen: dict[str, SuggestedCheck] = {}
-            for s in sorted(all_suggestions, key=lambda x: x.confidence, reverse=True):
-                if s.detector_slug not in seen:
-                    seen[s.detector_slug] = s
-
-            for sugg in seen.values():
-                tier = (
-                    "essential" if sugg.confidence >= 0.80
-                    else "recommended" if sugg.confidence >= 0.60
-                    else "full_coverage"
-                )
-                results.append({
-                    "table": table,
-                    "column": col.name,
-                    "detector_slug": sugg.detector_slug,
-                    "params": sugg.params,
-                    "rationale": sugg.rationale,
-                    "confidence": round(sugg.confidence, 3),
-                    "tier": tier,
-                })
-
-    return results
+    return schema, api_key, rules_content
 
 
 @router.post("/sources/{source_id}/suggest-checks")
@@ -523,8 +563,18 @@ async def suggest_checks_for_source(
     s = await db.get(Source, source_id)
     if s is None:
         raise HTTPException(404, detail=f"Source '{source_id}' not found")
+
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _suggest_checks_sync, s, body.tables)
+    schema, api_key, rules_content = await loop.run_in_executor(
+        None, _resolve_suggest_context, s
+    )
+
+    # Each table runs in its own executor slot — truly parallel via asyncio.gather.
+    results_nested = await asyncio.gather(*[
+        loop.run_in_executor(None, _suggest_table_sync, s, schema, t, api_key, rules_content)
+        for t in body.tables
+    ])
+    return [item for sublist in results_nested for item in sublist]
 
 
 # ------------------------------------------------------------------
@@ -631,31 +681,174 @@ async def list_checks(
     verdict: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
-    q = select(CheckRun).order_by(desc(CheckRun.ran_at))
+    from sqlalchemy import text as _text
+    params: dict = {}
+    sql = """
+        SELECT cc.id, cc.dataset_id, cc.column_name, cc.detector_slug, cc.params, cc.enabled,
+               cr.verdict, cr.score, cr.ran_at, cr.plain_english
+        FROM column_checks cc
+        LEFT JOIN LATERAL (
+            SELECT verdict, score, ran_at, plain_english FROM check_runs
+            WHERE dataset_id = cc.dataset_id
+              AND column_name = cc.column_name
+              AND detector_slug = cc.detector_slug
+            ORDER BY ran_at DESC LIMIT 1
+        ) cr ON true
+    """
     if dataset_id:
-        q = q.where(CheckRun.dataset_id == dataset_id)
-    if verdict:
-        q = q.where(CheckRun.verdict == verdict)
+        sql += " WHERE cc.dataset_id = :dataset_id"
+        params["dataset_id"] = dataset_id
+    sql += " ORDER BY cc.created_at DESC LIMIT 1000"
 
-    result = await db.execute(q.limit(1000))
-    runs = result.scalars().all()
+    rows = (await db.execute(_text(sql), params)).fetchall()
+    output = []
+    for r in rows:
+        row_verdict = r.verdict if r.verdict else "pending"
+        if verdict is not None and row_verdict != verdict:
+            continue
+        output.append({
+            "id": r.id,
+            "dataset_id": r.dataset_id,
+            "column": r.column_name,
+            "detector": r.detector_slug,
+            "params": r.params,
+            "enabled": r.enabled if r.enabled is not None else True,
+            "verdict": row_verdict,
+            "score": r.score,
+            "ran_at": r.ran_at.isoformat() if r.ran_at else None,
+            "ran_at_ago": _time_ago(r.ran_at) if r.ran_at else None,
+            "plain_english": r.plain_english if r.verdict else None,
+        })
+    return output
 
-    seen: set[tuple] = set()
-    deduped: list[CheckRun] = []
-    for r in runs:
-        key = (r.dataset_id, r.column_name, r.detector_slug)
-        if key not in seen:
-            seen.add(key)
-            deduped.append(r)
 
-    return [_run_dict(r) for r in deduped]
+@router.get("/checks/{check_id}/sql")
+async def get_check_sql(check_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Return the SQL that this specific check runs against the warehouse."""
+    from dqt.algorithms._registry import registry
+    from dqt.algorithms._base import BaseAggregateDetector
+    from dqt_server.models.core import ColumnCheck
+    check = await db.get(ColumnCheck, check_id)
+    if check is None:
+        raise HTTPException(404, detail=f"Check '{check_id}' not found")
+    slug = check.detector_slug
+    params = check.params or {}
+    col = check.column_name
+    dataset_id = check.dataset_id
+    try:
+        detector_cls = registry.get(slug)
+    except KeyError:
+        raise HTTPException(400, detail=f"Unknown detector: '{slug}'")
+    constructor_params = {k: v for k, v in params.items() if k not in {"warn_threshold", "fail_threshold"}}
+    try:
+        detector = detector_cls(**constructor_params)
+    except Exception:
+        # Windowed detectors (e.g. ks_drift): generate template SQL from stored params
+        if "date_col" in constructor_params:
+            from datetime import date as _date, timedelta
+            date_col = str(constructor_params.get("date_col") or "").strip() or "<date_column>"
+            ref_days = int(constructor_params.get("reference_days", 30))
+            curr_days = int(constructor_params.get("current_days", 7))
+            today = _date.today()
+            curr_start = today - timedelta(days=curr_days - 1)
+            ref_end = curr_start - timedelta(days=1)
+            ref_start = ref_end - timedelta(days=ref_days - 1)
+            sql = (
+                f"-- {slug} on {dataset_id}.{col}\n"
+                f"-- Reference window (control)\n"
+                f"SELECT {col}\nFROM {dataset_id}\nWHERE {date_col} >= '{ref_start}' AND {date_col} <= '{ref_end}';\n\n"
+                f"-- Current window (test)\n"
+                f"SELECT {col}\nFROM {dataset_id}\nWHERE {date_col} >= '{curr_start}' AND {date_col} <= '{today}';"
+            )
+            return {"sql": sql, "check_id": check_id}
+        raise HTTPException(400, detail=f"Cannot instantiate detector: {constructor_params}")
+    if isinstance(detector, BaseAggregateDetector):
+        try:
+            agg_exprs = detector.get_aggregations(col)
+        except Exception as exc:
+            raise HTTPException(500, detail=f"Cannot generate SQL: {exc}")
+        selects = ",\n       ".join(f"{expr.sql} AS {expr.name}" for expr in agg_exprs)
+        sql = f"-- {slug} on {dataset_id}.{col}\nSELECT {selects}\nFROM {dataset_id};"
+        return {"sql": sql, "check_id": check_id}
+
+    if hasattr(detector, "get_sample_filters"):
+        try:
+            ref_where, curr_where = detector.get_sample_filters()
+        except Exception as exc:
+            raise HTTPException(500, detail=f"Cannot generate SQL: {exc}")
+        sql = (
+            f"-- {slug} on {dataset_id}.{col}\n"
+            f"-- Reference window (control)\n"
+            f"SELECT {col}\nFROM {dataset_id}\nWHERE {ref_where};\n\n"
+            f"-- Current window (test)\n"
+            f"SELECT {col}\nFROM {dataset_id}\nWHERE {curr_where};"
+        )
+        return {"sql": sql, "check_id": check_id}
+
+    sql = (
+        f"-- {slug} on {dataset_id}.{col}\n"
+        f"-- Statistical sample (full-table pull; limit as needed)\n"
+        f"SELECT {col}\nFROM {dataset_id}\nLIMIT 1000;"
+    )
+    return {"sql": sql, "check_id": check_id}
 
 
-@router.post("/checks/refresh")
+@router.get("/checks/sql")
+async def get_checks_sql(db: AsyncSession = Depends(get_db)) -> dict:
+    """Return SQL for all checks that have run at least once (for pasting into a SQL client)."""
+    from dqt.algorithms._registry import registry
+    from dqt.algorithms._base import BaseAggregateDetector
+    from sqlalchemy import text as _text
+
+    rows = (await db.execute(_text("""
+        SELECT cc.dataset_id, cc.column_name, cc.detector_slug, cc.params
+        FROM column_checks cc
+        WHERE EXISTS (
+            SELECT 1 FROM check_runs cr
+            WHERE cr.dataset_id = cc.dataset_id
+              AND cr.column_name = cc.column_name
+              AND cr.detector_slug = cc.detector_slug
+        )
+        ORDER BY cc.dataset_id, cc.column_name, cc.detector_slug
+    """))).fetchall()
+
+    sqls: list[str] = []
+    for r in rows:
+        slug = r.detector_slug
+        params = r.params or {}
+        col = r.column_name
+        dataset_id = r.dataset_id
+        try:
+            detector_cls = registry.get(slug)
+            constructor_params = {k: v for k, v in params.items()
+                                  if k not in {"warn_threshold", "fail_threshold"}}
+            detector = detector_cls(**constructor_params)
+        except Exception:
+            continue
+        if not isinstance(detector, BaseAggregateDetector):
+            continue
+        try:
+            agg_exprs = detector.get_aggregations(col)
+        except Exception:
+            continue
+        selects = ",\n       ".join(f"{expr.sql} AS {expr.name}" for expr in agg_exprs)
+        sqls.append(f"-- {slug} on {dataset_id}.{col}\nSELECT {selects}\nFROM {dataset_id};")
+
+    return {"sql": "\n\n".join(sqls)}
+
+
+@router.post("/checks/refresh", status_code=202)
 async def refresh_checks() -> dict:
-    """Trigger a non-blocking refresh of all warehouse checks."""
+    """Fire-and-forget: start a full check refresh in the background."""
+    import asyncio
     asyncio.create_task(check_runner.refresh())
-    return {"status": "refresh_started"}
+    return {"status": "accepted"}
+
+
+@router.get("/checks/running")
+async def checks_running_status() -> dict:
+    """Return whether a full refresh is currently in progress."""
+    return {"running": check_runner._refreshing}
 
 
 # ------------------------------------------------------------------
@@ -675,6 +868,38 @@ async def list_incidents(
     )
     result = await db.execute(q)
     return [_incident_dict(i) for i in result.scalars().all()]
+
+
+@router.get("/datasets/{dataset_id}/columns")
+async def list_dataset_columns(
+    dataset_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """Return column metadata for a dataset, fetched live from the warehouse."""
+    d = await db.get(Dataset, dataset_id)
+    if d is None:
+        raise HTTPException(404, detail=f"Dataset '{dataset_id}' not found")
+    s = await db.get(Source, d.source_id)
+    if s is None:
+        raise HTTPException(404, detail=f"Source '{d.source_id}' not found")
+    loop = asyncio.get_event_loop()
+
+    def _fetch() -> list[dict]:
+        adapter = _make_adapter(s)
+        # For BQ, dataset_id is "schema.table"; split accordingly
+        if s.engine == "bigquery" and "." in dataset_id:
+            schema, table = dataset_id.split(".", 1)
+        else:
+            schema = _default_schema_for_source(s) or d.schema_name or "public"
+            table = dataset_id
+        try:
+            cols = adapter.describe_columns(schema, table)
+            return [{"name": c.name, "data_type": c.data_type, "nullable": c.nullable, "position": c.position} for c in cols]
+        except Exception as exc:
+            log.warning("dataset_columns_failed", dataset=dataset_id, error=str(exc))
+            return []
+
+    return await loop.run_in_executor(None, _fetch)
 
 
 @router.get("/datasets/{dataset_id}/columns/{column}/profile")

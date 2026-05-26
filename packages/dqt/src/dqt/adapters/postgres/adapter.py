@@ -21,6 +21,8 @@ _log = get_logger(__name__)
 
 
 class PostgresAdapter:
+    sql_dialect = "postgres"
+
     def __init__(self, conn_str: str) -> None:
         self._conn_str = conn_str
         self._engine = sa.create_engine(
@@ -99,11 +101,11 @@ class PostgresAdapter:
         t0 = time.perf_counter()
         try:
             with self._engine.connect() as conn:
-                db_now = conn.execute(sa.text("SELECT NOW()")).scalar()
+                # AT TIME ZONE 'UTC' returns a naive datetime guaranteed to be UTC
+                db_now = conn.execute(sa.text("SELECT NOW() AT TIME ZONE 'UTC'")).scalar()
             local_now = datetime.datetime.now(datetime.timezone.utc)
-            if db_now.tzinfo is None:
-                db_now = db_now.replace(tzinfo=datetime.timezone.utc)
-            skew_s = abs((db_now - local_now).total_seconds())
+            db_utc = db_now.replace(tzinfo=datetime.timezone.utc)
+            skew_s = abs((db_utc - local_now).total_seconds())
             status = "pass" if skew_s < 60 else "fail"
             return HealthCheckStep("clock_skew", status, (time.perf_counter() - t0) * 1000, f"skew={skew_s:.1f}s")
         except Exception as exc:
@@ -138,10 +140,10 @@ class PostgresAdapter:
             for r in rows
         ]
 
-    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
-        # Use ORDER BY random() to get a genuine random sample without TABLESAMPLE bias on small tables.
+    def sample(self, schema: str, table: str, n: int = 100_000, where: str | None = None) -> pd.DataFrame:
         # schema/table are double-quoted identifiers, not user values in SQL context.
-        query = sa.text(f'SELECT * FROM "{schema}"."{table}" ORDER BY random() LIMIT :n')
+        where_clause = f" WHERE {where}" if where else ""
+        query = sa.text(f'SELECT * FROM "{schema}"."{table}"{where_clause} ORDER BY random() LIMIT :n')
         with self._engine.connect() as conn:
             return pd.read_sql(query, conn, params={"n": n})
 

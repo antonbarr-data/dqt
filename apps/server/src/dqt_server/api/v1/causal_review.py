@@ -9,21 +9,6 @@ router = APIRouter(prefix="/api/v1/causal/review", tags=["causal-review"])
 _store = ReviewStore()
 
 
-def _seed() -> None:
-    demo_edges = [
-        CausalReviewEdge(id="marketing.clicks->revenue.gmv", cause="marketing.clicks", effect="revenue.gmv", p_value=0.008, evidence_strength="strong"),
-        CausalReviewEdge(id="ops.support_tickets->ops.fulfillment_rate", cause="ops.support_tickets", effect="ops.fulfillment_rate", p_value=0.023, evidence_strength="moderate"),
-        CausalReviewEdge(id="product.signups->revenue.gmv", cause="product.signups", effect="revenue.gmv", p_value=0.041, evidence_strength="moderate"),
-        CausalReviewEdge(id="marketing.impressions->product.signups", cause="marketing.impressions", effect="product.signups", p_value=0.067, evidence_strength="weak"),
-        CausalReviewEdge(id="ops.fulfillment_rate->revenue.net_revenue", cause="ops.fulfillment_rate", effect="revenue.net_revenue", p_value=0.003, evidence_strength="strong"),
-    ]
-    for e in demo_edges:
-        _store.add(e)
-
-
-_seed()
-
-
 class ReviewEdgeOut(BaseModel):
     id: str
     cause: str
@@ -33,6 +18,8 @@ class ReviewEdgeOut(BaseModel):
     status: str
     reviewer: str
     notes: str
+    shap_attribution: float = 0.0
+    lag: int = 1
 
 
 class ReviewDecisionIn(BaseModel):

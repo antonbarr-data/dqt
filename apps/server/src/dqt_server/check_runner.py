@@ -226,47 +226,185 @@ def _check_table_sync(adapter: Any, schema: str, table: str, source_id: str) -> 
 def _run_user_checks_sync(
     adapter: Any, schema: str, table: str, col_checks: list[dict]
 ) -> list[dict]:
-    """Run user-defined detectors on sampled column data."""
+    """Run user-defined detectors. Aggregate detectors push SQL to the warehouse;
+    sample-based detectors operate on a local sample."""
+    import pandas as pd
     from dqt.algorithms._registry import registry
+    from dqt.algorithms._base import BaseAggregateDetector
+
+    # Normalize: dataset_id encodes "schema.table"; split when schema is missing.
+    if not schema and "." in table:
+        schema, table = table.split(".", 1)
 
     results: list[dict] = []
-    try:
-        full_df = adapter.sample(schema, table, n=2000)
-    except Exception as exc:
-        log.error("sample_table_failed", table=table, error=str(exc))
-        return results
+    # Loaded lazily — only needed for sample-based detectors.
+    full_df: pd.DataFrame | None = None
+    sample_failed = False
 
     for cc in col_checks:
+        if not cc.get("enabled", True):
+            log.debug("check_skipped_disabled", column=cc.get("column_name"), slug=cc.get("detector_slug"))
+            continue
         column = cc["column_name"]
         slug = cc["detector_slug"]
         params = cc["params"] or {}
 
-        if column not in full_df.columns:
-            log.warning("column_not_found", table=table, column=column)
-            continue
-
-        detector_cls = registry.get(slug)
-        if detector_cls is None:
-            log.warning("unknown_detector", slug=slug)
-            continue
-
-        col_df = full_df[[column]].dropna()
-        if len(col_df) < 20:
-            continue
-
-        mid = len(col_df) // 2
-        ref_df = col_df.iloc[:mid]
-        cur_df = col_df.iloc[mid:]
-
         try:
-            detector = detector_cls(**params)
-            state = detector.fit(ref_df)
-            det_result = detector.score(cur_df, state)
-            verdict = (
-                det_result.verdict.value
-                if hasattr(det_result.verdict, "value")
-                else str(det_result.verdict)
-            )
+            detector_cls = registry.get(slug)
+        except KeyError:
+            log.warning("unknown_detector", slug=slug)
+            results.append({
+                "column": column, "detector_slug": slug,
+                "score": 0.0, "verdict": "error",
+                "plain_english": f"Unknown detector: '{slug}'",
+                "details": {"error": f"Detector slug '{slug}' is not registered"},
+            })
+            continue
+
+        # Strip verdict-threshold keys — they configure scoring, not the constructor.
+        constructor_params = {k: v for k, v in params.items() if k not in {"warn_threshold", "fail_threshold"}}
+        try:
+            detector = detector_cls(**constructor_params)
+        except Exception as exc:
+            log.error("user_detector_init_failed", slug=slug, column=column, error=str(exc))
+            results.append({
+                "column": column, "detector_slug": slug,
+                "score": 0.0, "verdict": "error",
+                "plain_english": f"Check misconfigured: {exc}",
+                "details": {"error": str(exc)},
+            })
+            continue
+
+        dialect = getattr(adapter, "sql_dialect", "ansi")
+        try:
+            if isinstance(detector, BaseAggregateDetector):
+                agg_exprs = detector.get_aggregations(column, dialect)
+                agg_result = adapter.aggregate(schema, table, agg_exprs)
+                det_result = detector.score(pd.DataFrame([agg_result]), {})
+            elif hasattr(detector, "get_sample_filters"):
+                # Time-windowed detector: fetch reference and current windows separately.
+                ref_where, curr_where = detector.get_sample_filters()
+                try:
+                    ref_df = adapter.sample(schema, table, n=1000, where=ref_where)
+                    curr_df = adapter.sample(schema, table, n=1000, where=curr_where)
+                except Exception as exc:
+                    log.error("windowed_sample_failed", table=table, column=column, error=str(exc))
+                    results.append({
+                        "column": column, "detector_slug": slug,
+                        "score": 0.0, "verdict": "error",
+                        "plain_english": f"Windowed sample failed: {exc}",
+                        "details": {"error": str(exc)},
+                    })
+                    continue
+                if column not in ref_df.columns or column not in curr_df.columns:
+                    log.warning("column_not_found_in_window", table=table, column=column,
+                                available=list(ref_df.columns))
+                    results.append({
+                        "column": column, "detector_slug": slug,
+                        "score": 0.0, "verdict": "error",
+                        "plain_english": f"Column '{column}' not found in windowed sample",
+                        "details": {"error": "column_not_in_sample",
+                                    "available_columns": list(ref_df.columns)},
+                    })
+                    continue
+                ref_col = ref_df[[column]].dropna()
+                curr_col = curr_df[[column]].dropna()
+                if len(ref_col) < 10 or len(curr_col) < 10:
+                    results.append({
+                        "column": column, "detector_slug": slug,
+                        "score": 0.0, "verdict": "error",
+                        "plain_english": f"Not enough data to run check (ref={len(ref_col)} rows, curr={len(curr_col)} rows, need ≥10 each)",
+                        "details": {"error": "insufficient_data", "ref_rows": len(ref_col), "curr_rows": len(curr_col)},
+                    })
+                    continue
+                state = detector.fit(ref_col)
+                det_result = detector.score(curr_col, state)
+            else:
+                # schema_change needs metadata, not row data
+                if slug == "schema_change":
+                    try:
+                        cols_meta = adapter.describe_columns(schema, table)
+                        schema_df = pd.DataFrame([
+                            {"col_name": c.name, "data_type": c.data_type} for c in cols_meta
+                        ])
+                    except Exception as exc:
+                        log.error("describe_columns_failed", table=table, error=str(exc))
+                        results.append({
+                            "column": column, "detector_slug": slug,
+                            "score": 0.0, "verdict": "error",
+                            "plain_english": f"Could not retrieve schema: {exc}",
+                            "details": {"error": str(exc)},
+                        })
+                        continue
+                    if len(schema_df) < 1:
+                        results.append({
+                            "column": column, "detector_slug": slug,
+                            "score": 0.0, "verdict": "error",
+                            "plain_english": "Schema has no columns",
+                            "details": {"error": "empty_schema"},
+                        })
+                        continue
+                    state = detector.fit(schema_df)
+                    det_result = detector.score(schema_df, state)
+                    verdict = det_result.verdict.value if hasattr(det_result.verdict, "value") else str(det_result.verdict)
+                    results.append({
+                        "column": column, "detector_slug": slug,
+                        "score": float(det_result.score), "verdict": verdict,
+                        "plain_english": det_result.plain_english, "details": det_result.details or {},
+                    })
+                    continue
+
+                if not sample_failed and full_df is None:
+                    try:
+                        full_df = adapter.sample(schema, table, n=2000)
+                    except Exception as exc:
+                        log.error("sample_table_failed", table=table, error=str(exc))
+                        sample_failed = True
+                if sample_failed:
+                    results.append({
+                        "column": column, "detector_slug": slug,
+                        "score": 0.0, "verdict": "error",
+                        "plain_english": "Could not sample table data",
+                        "details": {"error": "sample_failed"},
+                    })
+                    continue
+
+                # Table-level detectors use column "(table)" and need the full DataFrame
+                if column == "(table)":
+                    col_df = full_df  # type: ignore[assignment]
+                    if len(col_df) < 20:  # type: ignore[arg-type]
+                        results.append({
+                            "column": column, "detector_slug": slug,
+                            "score": 0.0, "verdict": "error",
+                            "plain_english": f"Not enough data ({len(col_df)} rows, need ≥20)",  # type: ignore[arg-type]
+                            "details": {"error": "insufficient_data", "row_count": len(col_df)},  # type: ignore[arg-type]
+                        })
+                        continue
+                else:
+                    if column not in full_df.columns:  # type: ignore[union-attr]
+                        log.warning("column_not_found", table=table, column=column)
+                        results.append({
+                            "column": column, "detector_slug": slug,
+                            "score": 0.0, "verdict": "error",
+                            "plain_english": f"Column '{column}' not found in table sample",
+                            "details": {"error": "column_not_in_sample"},
+                        })
+                        continue
+                    col_df = full_df[[column]].dropna()  # type: ignore[index]
+                    if len(col_df) < 20:
+                        results.append({
+                            "column": column, "detector_slug": slug,
+                            "score": 0.0, "verdict": "error",
+                            "plain_english": f"Not enough data to run check ({len(col_df)} non-null rows, need ≥20)",
+                            "details": {"error": "insufficient_data", "row_count": len(col_df)},
+                        })
+                        continue
+
+                mid = len(col_df) // 2
+                state = detector.fit(col_df.iloc[:mid])
+                det_result = detector.score(col_df.iloc[mid:], state)
+
+            verdict = det_result.verdict.value if hasattr(det_result.verdict, "value") else str(det_result.verdict)
             results.append({
                 "column": column,
                 "detector_slug": slug,
@@ -277,6 +415,12 @@ def _run_user_checks_sync(
             })
         except Exception as exc:
             log.error("user_detector_failed", slug=slug, column=column, error=str(exc))
+            results.append({
+                "column": column, "detector_slug": slug,
+                "score": 0.0, "verdict": "error",
+                "plain_english": f"Check failed: {exc}",
+                "details": {"error": str(exc)},
+            })
 
     return results
 
@@ -301,6 +445,56 @@ class CheckRunner:
         finally:
             self._refreshing = False
         log.info("refresh_done")
+
+    async def run_single(self, check_id: str) -> dict:
+        """Run one check by its column_checks.id and return the result dict."""
+        if AsyncSessionLocal is None:
+            return {"error": "no_db"}
+
+        loop = asyncio.get_event_loop()
+        now = datetime.now(timezone.utc)
+
+        async with AsyncSessionLocal() as db:
+            cc = await db.get(ColumnCheck, check_id)
+            if cc is None:
+                return {"error": "check_not_found"}
+            dataset = await db.get(Dataset, cc.dataset_id)
+            if dataset is None:
+                return {"error": "dataset_not_found"}
+            source = await db.get(Source, dataset.source_id)
+            if source is None:
+                return {"error": "source_not_found"}
+
+        try:
+            adapter = await loop.run_in_executor(None, _make_adapter, source)
+            # Prefer the dataset's own schema_name; fall back to source default.
+            schema = dataset.schema_name or _default_schema_for_source(source)
+        except Exception as exc:
+            log.error("run_single_adapter_failed", check_id=check_id, error=str(exc))
+            return {"error": str(exc)}
+
+        # dataset_id is "schema.table"; extract just the table name for the adapter call.
+        table_name = cc.dataset_id.rsplit(".", 1)[-1]
+        col_check = {
+            "column_name": cc.column_name,
+            "detector_slug": cc.detector_slug,
+            "params": cc.params,
+            "enabled": cc.enabled,
+        }
+        try:
+            results = await loop.run_in_executor(
+                None, _run_user_checks_sync, adapter, schema, table_name, [col_check]
+            )
+        except Exception as exc:
+            log.error("run_single_executor_failed", check_id=check_id, error=str(exc))
+            return {"error": f"executor_error: {exc}"}
+        if not results:
+            log.error("run_single_empty_results", check_id=check_id, schema=schema, table=table_name)
+            return {"error": "no_result"}
+
+        await self._persist_user_check_results(cc.dataset_id, results, now)
+        log.info("run_single_done", check_id=check_id, verdict=results[0]["verdict"])
+        return {"check_id": check_id, "ran_at": now.isoformat(), **results[0]}
 
     async def _do_refresh(self) -> None:
         if AsyncSessionLocal is None:
@@ -342,6 +536,7 @@ class CheckRunner:
                     "column_name": cc.column_name,
                     "detector_slug": cc.detector_slug,
                     "params": cc.params,
+                    "enabled": cc.enabled,
                 })
 
             try:
@@ -352,13 +547,15 @@ class CheckRunner:
                 continue
 
             all_ok = True
+            is_clickhouse = source.engine.lower() == "clickhouse"
             for table in watched:
-                result = await loop.run_in_executor(
-                    None, _check_table_sync, adapter, schema, table, source.id
-                )
-                if result.status == "fail":
-                    all_ok = False
-                await self._persist_table_result(result, now)
+                if is_clickhouse:
+                    result = await loop.run_in_executor(
+                        None, _check_table_sync, adapter, schema, table, source.id
+                    )
+                    if result.status == "fail":
+                        all_ok = False
+                    await self._persist_table_result(result, now)
 
                 user_checks = col_checks_by_dataset.get(table, [])
                 if user_checks:

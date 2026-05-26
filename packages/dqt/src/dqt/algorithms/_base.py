@@ -116,7 +116,7 @@ class BaseDetector:
 class BaseAggregateDetector(BaseDetector):
     kind: ClassVar[str] = "aggregate"
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         raise NotImplementedError
 
     def estimate_cost(self, row_count: int, sample_n: int = 100_000) -> CostEstimate:

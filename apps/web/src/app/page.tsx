@@ -9,7 +9,7 @@ import { DQT_VERSION } from "@/lib/version";
 const GITHUB_URL = "https://github.com/antonbarr-data/dqt";
 const REGISTRY_URL = "https://raw.githubusercontent.com/antonbarr-data/dqt/main/docs/registry.json";
 
-const LOGO_TOOLTIP = "質 (shitsu) — quality, substance, the inner nature of a thing. The kanji points to what something truly is, not how it appears. dqt is meant to work the same way: concerned with the truth of the data, not its surface. The mark is also a quiet acknowledgment of a tradition I have learned much from — one in which quality and craft are understood to be the same thing. — Anton Barr";
+const LOGO_TOOLTIP = "質 (shitsu) - quality, substance, the inner nature of a thing. The kanji points to what something truly is, not how it appears. dqt is meant to work the same way: concerned with the truth of the data, not its surface. The mark is also a quiet acknowledgment of a tradition I have learned much from - one in which quality is one of its most distinguishing characteristics, and craft and precision are understood to be the same thing. — Anton Barr";
 
 function LogoMark({ size = "nav" }: { size?: "nav" | "footer" }) {
   const [visible, setVisible] = useState(false);
@@ -126,15 +126,6 @@ const CAPABILITIES = [
   },
 ];
 
-const COMPARISON = [
-  { label: "Open source (MIT)", dqt: true, gx: true, soda: "partial", elementary: true, dataplex: false },
-  { label: "Statistical & ML detectors (MAD, KS, IF…)", dqt: true, gx: "limited", soda: "limited", elementary: "limited", dataplex: "partial" },
-  { label: "Column-level lineage", dqt: true, gx: false, soda: false, elementary: "partial", dataplex: true },
-  { label: "Causal discovery", dqt: true, gx: false, soda: false, elementary: false, dataplex: false },
-  { label: "AI-grounded incident explainer", dqt: true, gx: false, soda: false, elementary: "partial", dataplex: true },
-  { label: "pip install, runs offline", dqt: true, gx: true, soda: "partial", elementary: "partial", dataplex: false },
-  { label: "No vendor lock-in", dqt: true, gx: true, soda: "partial", elementary: "partial", dataplex: false },
-];
 
 const INTEGRATIONS = [
   { name: "dbt", note: "reads manifest.json and semantic_models.yml directly" },
@@ -158,12 +149,6 @@ result = Runner(MemoryStore()).run(check, adapter)
 print(result.plain_english)
 # → "0.82% of values are outliers — within the 1% warn threshold"`;
 
-function CellValue({ v }: { v: boolean | string }) {
-  if (v === true) return <span style={{ color: "var(--pass)", fontWeight: 600 }}>✓</span>;
-  if (v === false) return <span style={{ color: "var(--fg-3)" }}>—</span>;
-  if (v === "partial") return <span style={{ color: "var(--warn)" }}>partial</span>;
-  return <span style={{ color: "var(--fg-2)" }}>{v}</span>;
-}
 
 type TabKey = "python" | "yaml" | "cli";
 
@@ -177,7 +162,26 @@ export default function RootPage() {
   const [nAdapters, setNAdapters] = useState<number>(2);
 
   useEffect(() => {
-    if (getToken()) router.replace("/overview");
+    if (!getToken()) return;
+    // Redirect to top pinned item, or Sources if no pins
+    try {
+      const raw = localStorage.getItem("dqt-nav-pins");
+      const pins: string[] = raw ? JSON.parse(raw) : [];
+      const NAV_HREFS: Record<string, string> = {
+        Overview: "/overview", Ask: "/ask", Sources: "/sources",
+        Datasets: "/datasets", Checks: "/checks", Incidents: "/incidents",
+        Tasks: "/tasks", Metrics: "/metrics", Causality: "/causality",
+        Catalog: "/catalog", Policies: "/policies", Audit: "/audit",
+        "On-call": "/oncall", Users: "/settings/users",
+      };
+      if (pins.length > 0 && NAV_HREFS[pins[0]]) {
+        router.replace(NAV_HREFS[pins[0]] as never);
+      } else {
+        router.replace("/sources" as never);
+      }
+    } catch {
+      router.replace("/sources" as never);
+    }
   }, [router]);
 
   useEffect(() => {
@@ -238,7 +242,6 @@ export default function RootPage() {
           <a href="#why" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Code</a>
           <a href="#start" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Get started</a>
-          <a href="#compare" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>Compare</a>
           <a href="#about" className="t-small transition-opacity hover:opacity-70" style={{ color: "var(--fg-1)" }}>About</a>
         </div>
 
@@ -290,7 +293,6 @@ export default function RootPage() {
           <a href="#why" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Why dqt</a>
           <a href="#code" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Code</a>
           <a href="#start" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Get started</a>
-          <a href="#compare" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>Compare</a>
           <a href="#about" onClick={() => setMenuOpen(false)} className="px-6 py-4 t-small border-b border-line" style={{ color: "var(--fg-1)" }}>About</a>
           <div className="flex gap-2 px-6 py-4">
             <a
@@ -368,12 +370,11 @@ export default function RootPage() {
         </div>
 
         <h1 style={{ fontSize: "clamp(44px, 5.6vw, 78px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.05, color: "var(--fg-0)", maxWidth: 740 }}>
-          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool that tells you <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and surfaces the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
+          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Questioning</em> Tool that tells you the <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
-        <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 580, lineHeight: 1.7 }}>
-          Statistical drift detection, column-level lineage, and causal discovery for dbt, warehouses, and data lakes.
-          A <span style={{ color: "var(--fg-0)" }}>Python library</span>, <span style={{ color: "var(--fg-0)" }}>CLI</span>, and <span style={{ color: "var(--fg-0)" }}>Web app</span>. All MIT licensed. Not just the Python library, like the others.
+        <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 620, lineHeight: 1.7 }}>
+          Unifies your scattered data into <strong style={{ color: "#ffffff" }}>one source of truth</strong>. Upgrades your existing models, dashboards, and queries into a <strong style={{ color: "#ffffff" }}>causal semantic layer</strong> you didn&apos;t have to write. Picks up on <strong style={{ color: "#ffffff" }}>trends</strong> and surfaces <strong style={{ color: "#ffffff" }}>business insights</strong>, all wrapped in a quality harness that puts <strong style={{ color: "#ffffff" }}>guardrails on the AI</strong> so the reports it generates stay <strong style={{ color: "#ffffff" }}>on-spec</strong>.
         </p>
 
         <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: 12, color: "var(--fg-2)" }}>
@@ -464,7 +465,7 @@ export default function RootPage() {
       <section id="why" className="px-8 py-14 max-w-5xl mx-auto">
         <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>The hour after the alert</p>
         <h2 style={{ fontSize: "clamp(28px, 3.5vw, 44px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: 24 }}>
-          Most DQ tools tell you a row count dropped.<br />They don&apos;t tell you why.
+          Most monitoring tools tell you a row count dropped.<br />They don&apos;t tell you why.
         </h2>
         <div className="grid grid-cols-2 gap-10">
           <div className="space-y-4">
@@ -521,7 +522,7 @@ export default function RootPage() {
                   <p style={{ fontSize: 11, color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)", lineHeight: 1.8, paddingTop: 4 }}>{c.mono}</p>
                 )}
                 {c.highlight && (
-                  <p style={{ fontSize: 11, color: "var(--pass)", paddingTop: 4, fontWeight: 500 }}>The only DQ tool that ships causal discovery.</p>
+                  <p style={{ fontSize: 11, color: "var(--pass)", paddingTop: 4, fontWeight: 500 }}>The only data questioning tool that ships causal discovery.</p>
                 )}
               </div>
             ))}
@@ -584,7 +585,7 @@ export default function RootPage() {
             Use dqt with Claude Code.
           </h2>
           <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 32, maxWidth: 600 }}>
-            Three plugins turn Claude Code into a grounded data-quality engineer that knows your warehouse, knows the dqt API, and can run checks from natural language.
+            Three plugins turn Claude Code into a grounded data questioning engineer that knows your warehouse, knows the dqt API, and can run checks from natural language.
           </p>
 
           <div className="grid grid-cols-3 gap-0 border border-line">
@@ -896,52 +897,6 @@ dqt dashboard --port 8080
         </div>
       </section>
 
-      {/* ── comparison table ── */}
-      <section id="compare" className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
-        <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Where dqt sits.</p>
-        <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 8 }}>
-          Built on the shoulders of GE, Soda, and Elementary.<br />Different strengths, not a replacement.
-        </h2>
-        <p style={{ fontSize: 13, color: "var(--fg-1)", marginBottom: 6, lineHeight: 1.6 }}>
-          GE and Soda have larger communities and more declarative checks. dqt goes deeper on statistical detection, lineage, and causal hypothesis generation — the layer that answers <em>&ldquo;why did this break?&rdquo;</em> rather than <em>&ldquo;did this break?&rdquo;</em>
-        </p>
-        <p style={{ fontSize: 12, color: "var(--fg-2)", marginBottom: 24, lineHeight: 1.6 }}>
-          Causal edges are proposed by the algorithm and confirmed by a human before entering the production DAG. They are starting points for investigation, not assertions.
-        </p>
-
-        <div className="border border-line overflow-x-auto" style={{ background: "var(--bg-1)" }}>
-          <table className="w-full" style={{ borderCollapse: "collapse", minWidth: 640 }}>
-            <thead>
-              <tr style={{ background: "var(--bg-2)" }}>
-                <th className="px-4 py-3 text-left" style={{ fontSize: 10, color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase" }}>Capability</th>
-                {[
-                  { key: "dqt", label: "dqt", accent: true },
-                  { key: "gx", label: "Great Expectations", accent: false },
-                  { key: "soda", label: "Soda", accent: false },
-                  { key: "elementary", label: "Elementary", accent: false },
-                  { key: "dataplex", label: "Dataplex", accent: false },
-                ].map((c) => (
-                  <th key={c.key} className="px-4 py-3 text-center" style={{ fontSize: 11, color: c.accent ? "var(--accent)" : "var(--fg-2)", fontWeight: c.accent ? 700 : 400, letterSpacing: "0.06em" }}>
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {COMPARISON.map((row, i) => (
-                <tr key={row.label} className="border-t border-line" style={{ background: i % 2 === 0 ? "var(--bg-1)" : "var(--bg-0)" }}>
-                  <td className="px-4 py-2.5" style={{ fontSize: 13, color: "var(--fg-0)" }}>{row.label}</td>
-                  {[row.dqt, row.gx, row.soda, row.elementary, row.dataplex].map((v, j) => (
-                    <td key={j} className="px-4 py-2.5 text-center" style={{ fontSize: 13 }}>
-                      <CellValue v={v} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
 
       {/* ── integrations ── */}
       <section className="border-t border-line px-8 py-12" style={{ background: "var(--bg-1)" }}>
@@ -1011,7 +966,7 @@ dqt dashboard --port 8080
           <p style={{ fontSize: 13, color: "var(--fg-2)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>About the author</p>
           <p style={{ fontSize: 15, color: "var(--fg-1)", lineHeight: 1.75 }}>
             <a href="https://www.linkedin.com/in/antonbar/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }} className="hover:opacity-70">Anton Barr</a>
-            {" "}is an engineer and data geek with 25+ years building data systems. Getting things done since 1972 — and yes, still writing Python at unreasonable hours. A student of <span style={{ color: "var(--accent)" }}>質</span> (shitsu): quality, substance, the inner nature of a thing. <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)", fontWeight: 500, letterSpacing: "-0.05em" }}>dqt</span> is a personal project built by a practitioner who got tired of data quality tools that answer <em>what</em> but never <em>why</em>.
+            {" "}is an engineer and data geek with 25+ years building data systems. A student of <span style={{ color: "var(--accent)" }}>質</span> (shitsu): quality, substance, the inner nature of a thing. <span style={{ color: "var(--accent)", fontFamily: "var(--font-jetbrains-mono)", fontWeight: 500, letterSpacing: "-0.05em" }}>dqt</span> is a personal project built by a practitioner who believes craft and precision are the same thing - and got tired of tools that answer <em>what</em> but never <em>why</em>.
           </p>
         </div>
       </section>

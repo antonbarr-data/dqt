@@ -23,7 +23,7 @@ class StringCaseDetector(BaseAggregateDetector):
             raise ValueError(f"case must be one of {_ALLOWED_CASES}, got '{case}'")
         self._case = case
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         if self._case == "upper":
             cond = f"{col} <> UPPER({col})"
         elif self._case == "lower":

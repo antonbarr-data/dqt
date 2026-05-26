@@ -12,7 +12,7 @@ class UniquenessDetector(BaseAggregateDetector):
     slug = "uniqueness"
     group = "basic"
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr(name="distinct_count", sql=f"COUNT(DISTINCT {col})"),
             AggExpr(name="total_count", sql="COUNT(*)"),
@@ -28,11 +28,12 @@ class UniquenessDetector(BaseAggregateDetector):
         row = current.iloc[0]
         total = int(row["total_count"])
         rate = int(row["distinct_count"]) / total if total > 0 else 1.0
+        baseline = state.get("baseline_uniqueness", rate)
         return DetectorResult(
             score=rate,
             verdict=self._verdict(rate),
-            plain_english=f"Uniqueness is {rate:.1%} (baseline {state['baseline_uniqueness']:.1%})",
-            details={"uniqueness_rate": rate, "baseline": state["baseline_uniqueness"]},
+            plain_english=f"Uniqueness is {rate:.1%} (baseline {baseline:.1%})",
+            details={"uniqueness_rate": rate, "baseline": baseline},
         )
 
     def _verdict(self, score: float):

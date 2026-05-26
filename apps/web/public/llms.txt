@@ -1,6 +1,6 @@
 # dqt
 
-> Open-source data quality, lineage, semantic layer, and causal discovery library for Python. Watches dbt-built warehouses and any SQL warehouse for statistical drift, anomalies, and silent regressions — and explains *why* metrics moved.
+> A Data Questioning Tool that tells you the what and surfaces the why. Unifies your scattered data into one source of truth. Upgrades your existing models, dashboards, and queries into a causal semantic layer you didn't have to write. Picks up on trends and surfaces business insights, all wrapped in a quality harness that puts guardrails on the AI so the reports it generates stay on-spec.
 
 dqt is a pip-installable Python library (`pip install dqtlib`) that runs standalone in notebooks, CI pipelines, and orchestration tasks. No server required. The optional FastAPI service and Next.js dashboard add multi-tenancy and scheduling.
 
@@ -270,7 +270,7 @@ csv (path + table_name), parquet (path + table_name), duckdb (database), postgre
 
 Three plugins turn Claude Code into a grounded data-quality engineer for dqt:
 
-**1. Context7** (https://claude.com/plugins/context7) — connects Claude Code to dqt's live documentation and source. Claude always has the current API, all 38 detector slugs, and the exact YAML schema — not a training-data snapshot from months ago. Ask Claude Code to write checks, pick detectors, or debug failures and it grounds every answer in the actual dqt code.
+**1. Context7** (https://claude.com/plugins/context7) — connects Claude Code to dqt's live documentation and source. Claude always has the current API, all detector slugs, and the exact YAML schema — not a training-data snapshot from months ago. Ask Claude Code to write checks, pick detectors, or debug failures and it grounds every answer in the actual dqt code.
 
 **2. Superpowers** (https://claude.com/plugins/superpowers) — gives Claude Code structured agentic workflows for planning and executing multi-step tasks. Useful for building out a full check suite, generating a semantic layer from scratch, or TDD-ing a detector config.
 

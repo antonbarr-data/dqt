@@ -5,6 +5,9 @@ alwaysApply: false
 
 # UI Design Principles
 
+## Brand
+`dqt` wordmark — lowercase, JetBrains Mono weight 300, `-0.05em` tracking. Zero border-radius everywhere. Sharp corners. Dense power-user UI. Dark default, light supported.
+
 ## Density
 Power-user tool. Dense by default. Do not add whitespace for aesthetics. Every pixel should carry information or structure. Table rows are compact (32–36px height). Forms are tight but not cramped.
 

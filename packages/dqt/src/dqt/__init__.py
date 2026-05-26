@@ -1,5 +1,5 @@
 # packages/dqt/src/dqt/__init__.py
-"""dqt — open-source data quality, observability, and causality library."""
+"""dqt — open-source data questioning, observability, and causality library."""
 from __future__ import annotations
 
 __version__ = "1.3.1"

@@ -138,30 +138,11 @@ class MetricDefinition(Base):
     good_direction: Mapped[str | None] = mapped_column(String, nullable=True)
     refresh_cadence: Mapped[str | None] = mapped_column(String, nullable=True)
     lineage: Mapped[list | None] = mapped_column(JSONB, nullable=True)
-    expr_type: Mapped[str | None] = mapped_column(String, nullable=True)
-    expr_sql: Mapped[str | None] = mapped_column(Text, nullable=True)
-    numerator_sql: Mapped[str | None] = mapped_column(Text, nullable=True)
-    denominator_sql: Mapped[str | None] = mapped_column(Text, nullable=True)
-    filter_sql: Mapped[str | None] = mapped_column(Text, nullable=True)
-    time_column: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
 
-
-class MetricRun(Base):
-    """One row per metric evaluation result; enables historical value tracking."""
-    __tablename__ = "metric_runs"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    fqn: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    value: Mapped[float | None] = mapped_column(Float, nullable=True)
-    ran_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
-    )
 
 
 class MetricCausalEdge(Base):

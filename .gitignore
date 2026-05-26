@@ -135,3 +135,7 @@ data/daily_metrics_dirty.csv
 # examples/benchmarks/results_summary.md is generated but committed intentionally
 .playwright-mcp/
 **/application_default_credentials.json
+/examples/gigler/data-quality-tool-495816-2cba90d48880.json
+/examples/gigler/application_default_credentials.json
+.env.backup
+.claude/worktrees/

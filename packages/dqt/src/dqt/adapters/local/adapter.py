@@ -35,6 +35,7 @@ _HEALTH_STEPS = ("readable", "parseable", "columns", "sample_read", "row_count")
 
 class LocalFileAdapter:
     """Reads a local file and exposes it as a single-table WarehouseAdapter."""
+    sql_dialect = "duckdb"
 
     def __init__(self, path: str | pathlib.Path) -> None:
         self._path = pathlib.Path(path)
@@ -101,7 +102,7 @@ class LocalFileAdapter:
             for i, col in enumerate(df.columns)
         ]
 
-    def sample(self, schema: str, table: str, n: int = 100_000) -> pd.DataFrame:
+    def sample(self, schema: str, table: str, n: int = 100_000, where: str | None = None) -> pd.DataFrame:
         df = self._read()
         if len(df) <= n:
             return df.reset_index(drop=True)

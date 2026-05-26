@@ -13,7 +13,7 @@ class NumericMeanDetector(BaseAggregateDetector):
     slug = "numeric_mean"
     group = "basic"
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [
             AggExpr(name="mean", sql=f"AVG({col})"),
             AggExpr(name="stddev", sql=f"STDDEV({col})"),
@@ -29,12 +29,20 @@ class NumericMeanDetector(BaseAggregateDetector):
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
         row = current.iloc[0]
-        z = abs((float(row["mean"]) - state["ref_mean"]) / state["ref_stddev"])
+        current_mean = float(row["mean"])
+        if "ref_mean" not in state:
+            from dqt.algorithms._base import Verdict
+            return DetectorResult(
+                score=0.0, verdict=Verdict.pass_,
+                plain_english=f"Mean={current_mean:.3g} (no baseline yet — will compare on next run)",
+                details={"current_mean": current_mean},
+            )
+        z = abs((current_mean - state["ref_mean"]) / state["ref_stddev"])
         return DetectorResult(
             score=z,
             verdict=self._verdict(z),
             plain_english=f"Mean shifted {z:.2f}σ from baseline (baseline μ={state['ref_mean']:.3g})",
-            details={"current_mean": float(row["mean"]), "baseline_mean": state["ref_mean"], "z_score": z},
+            details={"current_mean": current_mean, "baseline_mean": state["ref_mean"], "z_score": z},
         )
 
     def _verdict(self, score: float):

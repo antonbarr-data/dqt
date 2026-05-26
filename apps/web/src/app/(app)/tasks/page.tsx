@@ -61,7 +61,7 @@ export default async function TasksPage() {
   const assignee = oncallPerson
     ? (oncallPerson.name ?? oncallPerson.email)
     : "on-call";
-  const alertChecks = (checks as CheckItem[]).filter((c) => c.verdict === "fail" || c.verdict === "warn");
+  const alertChecks = ((checks ?? []) as CheckItem[]).filter((c) => c.verdict === "fail" || c.verdict === "warn");
 
   const checkTasks: Task[] = alertChecks.map((c) => ({
     id: `check-${c.id}`,

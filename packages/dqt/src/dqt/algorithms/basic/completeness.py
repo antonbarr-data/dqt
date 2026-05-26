@@ -15,7 +15,7 @@ class CompletenessDetector(BaseAggregateDetector):
     def __init__(self) -> None:
         self._col: str | None = None
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         self._col = col
         return [
             AggExpr(name="null_count", sql=f"COUNT(*) - COUNT({col})"),
@@ -33,11 +33,13 @@ class CompletenessDetector(BaseAggregateDetector):
         total = int(row["total_count"])
         null_count = int(row["null_count"])
         rate = 1.0 - (null_count / total) if total > 0 else 1.0
+        baseline = state.get("baseline_completeness")
+        plain = f"Completeness is {rate:.1%}" + (f" (baseline {baseline:.1%})" if baseline is not None else "")
         return DetectorResult(
             score=rate,
             verdict=self._verdict(rate),
-            plain_english=f"Completeness is {rate:.1%} (baseline {state['baseline_completeness']:.1%})",
-            details={"completeness_rate": rate, "baseline": state["baseline_completeness"]},
+            plain_english=plain,
+            details={"completeness_rate": rate, "baseline": baseline},
             failing_filter_sql=f"{self._col} IS NULL" if self._col and null_count > 0 and rate < 1.0 else None,
         )
 

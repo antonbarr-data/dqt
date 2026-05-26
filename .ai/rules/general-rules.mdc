@@ -3,28 +3,86 @@ description: Core developer preferences, philosophy, and cross-cutting rules tha
 alwaysApply: true
 ---
 
-# General Rules
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-## Communication
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+## Other Rules
+
+### Communication
 - Be concise and direct. No padding, no summaries of what you just did.
 - Challenge requests when better approaches exist — especially statistical correctness. If a check will produce false positives at scale (e.g. raw Z-score on heavy-tailed data), say so and propose the right method.
 - If unsure, ask the user rather than guessing.
 - User is your helper — ask them to check the UI or console/backend logs when needed.
 
-## Code quality
+### Code quality
 - No workarounds or fallbacks. Everything through one preferred path. Same for algorithms — one canonical implementation per method, never two.
 - Avoid duplicate code — create common helper methods. Every detector returns the same `DetectorResult` shape; every adapter implements the same `WarehouseAdapter` protocol.
 - Split source files >1,000 lines.
 - No features, refactors, or abstractions beyond what the task requires. Three similar lines beats a premature abstraction.
 - No error handling, fallbacks, or validation for scenarios that can't happen. Trust internal code and framework guarantees. Only validate at system boundaries (user input, external APIs).
 
-## Comments
+### Comments
 - Default to no comments. Only add one when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific bug, surprising behaviour.
 - For statistical methods, link the canonical paper/reference at the top of the file in a single line — that's the spec, the code is the implementation.
 - Never write multi-paragraph docstrings or multi-line comment blocks.
 - Don't reference the current task, fix, or callers ("used by X", "added for Y flow") — those belong in the PR description and rot.
 
-## After changes
+### After changes
 - Offer to run unit tests, git commit, and push — but never commit without explicit permission.
 - Don't create dedicated documentation files for each fix/feature. Only create architecture docs for substantial issues, after checking with the user. Algorithm docs are the exception — every detector gets a one-paragraph entry in `docs/algorithms/`.
 - After writing any frontend code, run `pnpm build` and fix all errors and warnings before reporting done.

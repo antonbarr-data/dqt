@@ -24,7 +24,7 @@ class FreshnessDetector(BaseAggregateDetector):
         self._warn = warn_seconds
         self._fail = fail_seconds
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [AggExpr("latest_ts", f"MAX({col})")]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:

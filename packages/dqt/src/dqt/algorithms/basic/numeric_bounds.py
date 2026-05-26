@@ -7,6 +7,21 @@ from dqt.algorithms._base import BaseAggregateDetector, DetectorResult, Detector
 from dqt.algorithms._registry import registry
 
 
+def _percentile_agg(col: str, q: float, dialect: str) -> str:
+    """Returns a scalar aggregate SQL expression for the q-th quantile."""
+    if dialect == "bigquery":
+        offset = min(100, max(0, round(q * 100)))
+        return f"APPROX_QUANTILES({col}, 100)[OFFSET({offset})]"
+    if dialect == "clickhouse":
+        return f"quantileExact({q})({col})"
+    if dialect == "snowflake":
+        return f"PERCENTILE_CONT({q}) WITHIN GROUP (ORDER BY {col})"
+    if dialect == "databricks":
+        return f"PERCENTILE_CONT({q}) WITHIN GROUP (ORDER BY {col})"
+    # postgres / ansi
+    return f"PERCENTILE_CONT({q}) WITHIN GROUP (ORDER BY {col})"
+
+
 def _binary_result(value: float, min_val: float, max_val: float, label: str, slug: str) -> DetectorResult:
     in_range = min_val <= value <= max_val
     score = 0.0 if in_range else 1.0
@@ -30,7 +45,7 @@ class MaxInRangeDetector(BaseAggregateDetector):
     def __init__(self, min_val: float = 0.0, max_val: float = float("inf")) -> None:
         self._min, self._max = min_val, max_val
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [AggExpr(name="agg_value", sql=f"MAX({col})")]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
@@ -49,7 +64,7 @@ class MinInRangeDetector(BaseAggregateDetector):
     def __init__(self, min_val: float = 0.0, max_val: float = float("inf")) -> None:
         self._min, self._max = min_val, max_val
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [AggExpr(name="agg_value", sql=f"MIN({col})")]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
@@ -68,8 +83,8 @@ class MedianInRangeDetector(BaseAggregateDetector):
     def __init__(self, min_val: float = 0.0, max_val: float = float("inf")) -> None:
         self._min, self._max = min_val, max_val
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
-        return [AggExpr(name="agg_value", sql=f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {col})")]
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        return [AggExpr(name="agg_value", sql=_percentile_agg(col, 0.5, dialect))]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         return {}
@@ -87,7 +102,7 @@ class StdDevInRangeDetector(BaseAggregateDetector):
     def __init__(self, min_val: float = 0.0, max_val: float = float("inf")) -> None:
         self._min, self._max = min_val, max_val
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [AggExpr(name="agg_value", sql=f"STDDEV({col})")]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
@@ -106,7 +121,7 @@ class SumInRangeDetector(BaseAggregateDetector):
     def __init__(self, min_val: float = 0.0, max_val: float = float("inf")) -> None:
         self._min, self._max = min_val, max_val
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [AggExpr(name="agg_value", sql=f"SUM({col})")]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
@@ -125,7 +140,7 @@ class CardinalityInRangeDetector(BaseAggregateDetector):
     def __init__(self, min_val: int = 1, max_val: int = 2**31) -> None:
         self._min, self._max = float(min_val), float(max_val)
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         return [AggExpr(name="agg_value", sql=f"COUNT(DISTINCT {col})")]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
@@ -144,8 +159,8 @@ class QuantileInRangeDetector(BaseAggregateDetector):
     def __init__(self, quantile: float = 0.95, min_val: float = 0.0, max_val: float = float("inf")) -> None:
         self._q, self._min, self._max = quantile, min_val, max_val
 
-    def get_aggregations(self, col: str) -> list[AggExpr]:
-        return [AggExpr(name="agg_value", sql=f"PERCENTILE_CONT({self._q}) WITHIN GROUP (ORDER BY {col})")]
+    def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
+        return [AggExpr(name="agg_value", sql=_percentile_agg(col, self._q, dialect))]
 
     def fit(self, reference: pd.DataFrame) -> DetectorState:
         return {}
