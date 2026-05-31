@@ -27,32 +27,55 @@ def _regex_not_match(col_expr: str, pattern: str, dialect: str) -> str:
 
 @registry.register
 class ValueInRangeDetector(BaseAggregateDetector):
-    """Fraction of values outside [min_val, max_val]."""
+    """Fraction of values outside [min_val, max_val]. Supports numeric, date, and string columns."""
     slug = "value_in_range"
     group = "basic"
 
-    def __init__(self, min_value: float = float("-inf"), max_value: float = float("inf")) -> None:
-        try:
-            self._min = float(min_value)
-            self._max = float(max_value)
-        except (ValueError, TypeError) as exc:
-            raise ValueError(
-                f"min_value and max_value must be numeric, got min={min_value!r}, max={max_value!r}"
-            ) from exc
+    def __init__(
+        self,
+        min_value: float | str | None = None,
+        max_value: float | str | None = None,
+        value_type: str = "numeric",  # "numeric" | "date" | "string"
+    ) -> None:
+        self._value_type = value_type
         self._col: str | None = None
+        if value_type == "numeric":
+            def _f(v: float | str | None, default: float) -> float:
+                if v is None:
+                    return default
+                try:
+                    return float(v)
+                except (ValueError, TypeError) as exc:
+                    raise ValueError(f"min_value/max_value must be numeric, got {v!r}") from exc
+            self._min: float | str | None = _f(min_value, float("-inf"))
+            self._max: float | str | None = _f(max_value, float("inf"))
+        else:
+            self._min = str(min_value) if min_value is not None else None
+            self._max = str(max_value) if max_value is not None else None
+
+    def _quote_bound(self, val: str, dialect: str) -> str:
+        if self._value_type == "date" and dialect == "clickhouse":
+            return f"toDate('{val}')"
+        return f"'{val}'"
 
     def get_aggregations(self, col: str, dialect: str = "ansi") -> list[AggExpr]:
         self._col = col
-        # Build conditions only for finite bounds — inf/-inf are not valid SQL literals.
-        conditions = []
-        if self._min != float("-inf"):
-            conditions.append(f"{col} < {self._min}")
-        if self._max != float("inf"):
-            conditions.append(f"{col} > {self._max}")
-        if not conditions:
-            violation_sql = "0"
+        conditions: list[str] = []
+        if self._value_type == "numeric":
+            # inf/-inf are not valid SQL literals — omit unbounded sides.
+            if self._min != float("-inf"):
+                conditions.append(f"{col} < {self._min}")
+            if self._max != float("inf"):
+                conditions.append(f"{col} > {self._max}")
         else:
-            violation_sql = f"SUM(CASE WHEN {' OR '.join(conditions)} THEN 1 ELSE 0 END)"
+            if self._min is not None:
+                conditions.append(f"{col} < {self._quote_bound(str(self._min), dialect)}")
+            if self._max is not None:
+                conditions.append(f"{col} > {self._quote_bound(str(self._max), dialect)}")
+        violation_sql = (
+            f"SUM(CASE WHEN {' OR '.join(conditions)} THEN 1 ELSE 0 END)"
+            if conditions else "0"
+        )
         return [
             AggExpr("violation_count", violation_sql),
             AggExpr("total_count", "COUNT(*)"),
@@ -62,14 +85,25 @@ class ValueInRangeDetector(BaseAggregateDetector):
         return {}
 
     def score(self, current: pd.DataFrame, state: DetectorState) -> DetectorResult:
-        bounds = f"[{self._min if self._min != float('-inf') else '-∞'}, {self._max if self._max != float('inf') else '+∞'}]"
-        result = fraction_result(current, "value_in_range_violation", f"range {bounds}")
+        if self._value_type == "numeric":
+            lo = self._min if self._min != float("-inf") else "-∞"
+            hi = self._max if self._max != float("inf") else "+∞"
+        else:
+            lo = self._min if self._min is not None else "-∞"
+            hi = self._max if self._max is not None else "+∞"
+        result = fraction_result(current, "value_in_range_violation", f"range [{lo}, {hi}]")
         if self._col and result.score > 0:
-            parts = []
-            if self._min != float("-inf"):
-                parts.append(f"{self._col} < {self._min}")
-            if self._max != float("inf"):
-                parts.append(f"{self._col} > {self._max}")
+            parts: list[str] = []
+            if self._value_type == "numeric":
+                if self._min != float("-inf"):
+                    parts.append(f"{self._col} < {self._min}")
+                if self._max != float("inf"):
+                    parts.append(f"{self._col} > {self._max}")
+            else:
+                if self._min is not None:
+                    parts.append(f"{self._col} < '{self._min}'")
+                if self._max is not None:
+                    parts.append(f"{self._col} > '{self._max}'")
             if parts:
                 result.failing_filter_sql = f"({' OR '.join(parts)})"
         return result

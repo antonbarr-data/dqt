@@ -1,845 +1,487 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { ChevronRight, ChevronDown, Database, Table2, Plus, Columns, Trash2, Loader2 } from "lucide-react";
-import { SuggestPanel } from "@/components/checks/suggest-panel";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { Search, BarChart2, ListFilter, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface Source {
-  id: string;
-  name: string;
-  engine: string;
-  tables: number;
-  status: string;
-}
-
-interface Dataset {
-  id: string;
-  source: string;
-  schema: string;
-  row_count: number | null;
-  column_count: number | null;
-  check_count: number;
-  status: string;
-  last_run: string;
-}
-
-interface CheckResult {
-  id: number;
-  dataset_id: string;
-  column: string | null;
-  detector: string;
-  score: number | null;
-  verdict: string | null;
-  message: string | null;
-}
-
-interface DatasetDetail extends Dataset {
-  checks: CheckResult[];
-}
-
-interface ColumnCheck {
-  id: string;
+interface ColumnRow {
+  source_id: string;
+  source_name: string;
+  source_engine: string;
   dataset_id: string;
   column: string;
-  detector_slug: string;
-  params: Record<string, unknown>;
-  rationale: string;
+  check_counts: Record<string, number>;
+  verdict_counts: Record<string, number>;
+  total_checks: number;
+  is_metric: boolean;
+  worst_verdict: string | null;
+  dqt_score: number | null;
 }
+
+type FilterKey = "source" | "verdict" | "metric";
+
+interface FilterOption {
+  value: string;
+  label: string;
+  count: number;
+  color?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const VERDICT_COLOR: Record<string, string> = {
+  pass: "var(--pass)", warn: "var(--warn)", fail: "var(--fail)",
+  error: "var(--fail)", pending: "var(--fg-3)", unknown: "var(--fg-3)",
+};
+
+const ENGINE_ABBR: Record<string, string> = {
+  bigquery: "BQ", postgres: "PG", clickhouse: "CH", snowflake: "SF",
+  mysql: "MY", databricks: "DB",
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function statusColor(status: string | null | undefined): string {
-  if (status === "pass") return "var(--pass)";
-  if (status === "warn") return "var(--warn)";
-  if (status === "fail") return "var(--fail)";
-  return "var(--fg-3)";
-}
-
-function StatusDot({ status }: { status: string | null | undefined }) {
-  const color = statusColor(status);
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 8,
-        height: 8,
-        flexShrink: 0,
-        background: color,
-        boxShadow: `0 0 0 2px ${color}30`,
-      }}
-    />
-  );
-}
-
-function SkeletonBar({ width = "100%", height = 14 }: { width?: string; height?: number }) {
-  return (
-    <div
-      style={{
-        width,
-        height,
-        background: "var(--bg-3)",
-        opacity: 0.6,
-        borderRadius: 0,
-      }}
-    />
-  );
-}
-
-// Group datasets by schema within a source
-function groupBySchema(datasets: Dataset[]): Record<string, Dataset[]> {
-  const groups: Record<string, Dataset[]> = {};
-  for (const ds of datasets) {
-    const key = ds.schema || "(default)";
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(ds);
-  }
-  return groups;
-}
-
-// Aggregate columns from detail checks (deduplicate by column name)
-function extractColumns(checks: CheckResult[]): Array<{ name: string; verdict: string | null; checkCount: number }> {
-  const map = new Map<string, { verdict: string | null; checkCount: number }>();
-  for (const c of checks) {
-    const col = c.column ?? "(table)";
-    const existing = map.get(col);
-    if (!existing) {
-      map.set(col, { verdict: c.verdict, checkCount: 1 });
-    } else {
-      existing.checkCount += 1;
-      // Escalate verdict
-      if (c.verdict === "fail" || existing.verdict !== "fail") {
-        if (c.verdict === "fail") existing.verdict = "fail";
-        else if (c.verdict === "warn" && existing.verdict !== "fail") existing.verdict = "warn";
-      }
-    }
-  }
-  return Array.from(map.entries()).map(([name, meta]) => ({ name, ...meta }));
-}
-
 // ---------------------------------------------------------------------------
-// Column expanded row
+// FilterDropdown
 // ---------------------------------------------------------------------------
 
-function ColumnExpanded({
-  datasetId,
-  column,
-  onColumnDeleted,
+function FilterDropdown({
+  options, selected, onChange, onClose, anchorEl,
 }: {
-  datasetId: string;
-  column: string;
-  onColumnDeleted?: () => void;
+  options: FilterOption[];
+  selected: Set<string>;
+  onChange: (s: Set<string>) => void;
+  onClose: () => void;
+  anchorEl: HTMLElement | null;
 }) {
-  const [checks, setChecks] = useState<ColumnCheck[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [slug, setSlug] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-  const [deletingColumn, setDeletingColumn] = useState(false);
-  const [confirmDeleteCol, setConfirmDeleteCol] = useState(false);
-
-  const loadChecks = useCallback(() => {
-    setLoading(true);
-    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}/checks`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: ColumnCheck[]) => setChecks(data))
-      .catch(() => setChecks([]))
-      .finally(() => setLoading(false));
-  }, [datasetId, column]);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const [search, setSearch] = useState("");
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
-    loadChecks();
-  }, [loadChecks]);
+    if (!anchorEl) return;
+    const rect = anchorEl.getBoundingClientRect();
+    setPos({ top: rect.bottom + 2, left: rect.left });
+  }, [anchorEl]);
 
-  function handleDeleteColumn() {
-    setDeletingColumn(true);
-    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}`, { method: "DELETE" })
-      .then(() => { onColumnDeleted?.(); })
-      .catch(() => setDeletingColumn(false))
-      .finally(() => { setDeletingColumn(false); setConfirmDeleteCol(false); });
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      if (
+        dropRef.current && !dropRef.current.contains(e.target as Node) &&
+        anchorEl && !anchorEl.contains(e.target as Node)
+      ) onClose();
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose, anchorEl]);
+
+  const visibleOpts = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+  const allChecked = visibleOpts.length > 0 && visibleOpts.every(o => selected.has(o.value));
+  const someChecked = visibleOpts.some(o => selected.has(o.value));
+
+  function toggleAll() {
+    const next = new Set(selected);
+    if (allChecked) visibleOpts.forEach(o => next.delete(o.value));
+    else visibleOpts.forEach(o => next.add(o.value));
+    onChange(next);
   }
 
-  function handleAdd() {
-    if (!slug.trim()) return;
-    setAdding(true);
-    setAddError(null);
-    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}/checks`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ detector_slug: slug.trim(), params: {}, rationale: "" }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then(() => {
-        setSlug("");
-        loadChecks();
-      })
-      .catch((e: Error) => setAddError(e.message))
-      .finally(() => setAdding(false));
+  function toggle(value: string) {
+    const next = new Set(selected);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    onChange(next);
   }
 
-  return (
+  if (!pos) return null;
+
+  const baseInput: React.CSSProperties = {
+    background: "var(--bg-2)", color: "var(--fg-0)",
+    border: "1px solid var(--line)", outline: "none",
+    fontSize: 11, padding: "3px 7px", width: "100%", fontFamily: "inherit",
+  };
+
+  return createPortal(
     <div
+      ref={dropRef}
       style={{
-        background: "var(--bg-2)",
-        borderTop: "1px solid var(--line)",
-        padding: "12px 16px 0",
+        position: "fixed", top: pos.top, left: pos.left,
+        zIndex: 1000, width: 220,
+        background: "var(--bg-1)", border: "1px solid var(--line)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
       }}
     >
-      {/* Existing checks */}
-      <div className="mb-3">
-        <p className="t-micro mb-2" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          Checks
-        </p>
-        {loading ? (
-          <SkeletonBar width="60%" height={12} />
-        ) : checks.length === 0 ? (
-          <p className="t-micro" style={{ color: "var(--fg-3)" }}>No checks yet.</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {checks.map((c) => (
-              <span
-                key={c.id}
-                className="t-micro px-2 py-0.5 border"
-                style={{
-                  borderColor: "var(--line-3)",
-                  color: "var(--fg-1)",
-                  fontFamily: "var(--font-jetbrains-mono)",
-                  background: "var(--bg-3)",
-                }}
-              >
-                {c.detector_slug}
-              </span>
-            ))}
-          </div>
-        )}
+      <div className="p-2 border-b border-line">
+        <input autoFocus type="text" placeholder="Search..." value={search}
+          onChange={e => setSearch(e.target.value)} style={baseInput} />
       </div>
-
-      {/* Add check form */}
-      <div className="flex items-center gap-2 mb-3">
-        <input
-          type="text"
-          value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          placeholder="detector_slug"
-          className="t-small flex-1 px-2 py-1 border"
-          style={{
-            background: "var(--bg-1)",
-            borderColor: "var(--line)",
-            color: "var(--fg-0)",
-            fontFamily: "var(--font-jetbrains-mono)",
-            outline: "none",
-            minWidth: 0,
-          }}
-        />
-        <button
-          onClick={handleAdd}
-          disabled={adding || !slug.trim()}
-          className="t-micro px-3 py-1 border flex items-center gap-1"
-          style={{
-            borderColor: slug.trim() ? "var(--accent)" : "var(--line)",
-            color: slug.trim() ? "var(--accent)" : "var(--fg-3)",
-            background: "transparent",
-            cursor: adding || !slug.trim() ? "default" : "pointer",
-            flexShrink: 0,
-          }}
-        >
-          <Plus size={11} strokeWidth={1.6} />
-          {adding ? "Adding..." : "Add"}
-        </button>
-      </div>
-      {addError && (
-        <p className="t-micro mb-2" style={{ color: "var(--fail)" }}>
-          {addError}
-        </p>
-      )}
-
-      {/* AI suggestions */}
-      <div>
-        <p className="t-micro mb-1" style={{ color: "var(--fg-3)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          AI Suggestions
-        </p>
-        <SuggestPanel datasetId={datasetId} column={column} />
-      </div>
-
-      {/* Delete column */}
-      <div className="py-3 flex items-center justify-end gap-2">
-        {confirmDeleteCol ? (
-          <>
-            <button
-              onClick={handleDeleteColumn}
-              disabled={deletingColumn}
-              className="flex items-center gap-1 px-2 py-0.5 t-micro border transition-colors"
-              style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
-            >
-              {deletingColumn ? <Loader2 size={10} strokeWidth={2} className="animate-spin" /> : "remove column"}
-            </button>
-            <button
-              onClick={() => setConfirmDeleteCol(false)}
-              className="t-micro px-1 hover:opacity-60"
-              style={{ color: "var(--fg-3)" }}
-            >
-              ✕
-            </button>
-          </>
-        ) : (
+      <div className="flex items-center justify-between px-2 py-1.5 border-b border-line" style={{ background: "var(--bg-0)" }}>
+        <label className="flex items-center gap-2 cursor-pointer t-micro" style={{ color: "var(--fg-1)" }}>
+          <input
+            type="checkbox" checked={allChecked}
+            ref={el => { if (el) el.indeterminate = someChecked && !allChecked; }}
+            onChange={toggleAll}
+            style={{ accentColor: "var(--accent)", width: 12, height: 12 }}
+          />
+          Select all ({visibleOpts.length})
+        </label>
+        {selected.size > 0 && (
           <button
-            onClick={() => setConfirmDeleteCol(true)}
-            className="t-micro flex items-center gap-1 hover:opacity-70 transition-opacity"
-            style={{ color: "var(--fg-3)" }}
+            onClick={() => { onChange(new Set()); onClose(); }}
+            className="t-micro hover:underline"
+            style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
           >
-            <Trash2 size={10} strokeWidth={1.6} />
-            remove from monitoring
+            Clear
           </button>
         )}
       </div>
+      <div style={{ maxHeight: 240, overflowY: "auto" }}>
+        {visibleOpts.length === 0 ? (
+          <p className="px-3 py-2 t-micro" style={{ color: "var(--fg-3)" }}>No matches</p>
+        ) : (
+          visibleOpts.map(o => (
+            <label
+              key={o.value}
+              className="flex items-center gap-2 px-2 py-1.5 cursor-pointer"
+              style={{ color: "var(--fg-0)" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-2)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "")}
+            >
+              <input
+                type="checkbox" checked={selected.has(o.value)}
+                onChange={() => toggle(o.value)}
+                style={{ accentColor: "var(--accent)", width: 12, height: 12, flexShrink: 0 }}
+              />
+              {o.color && <span style={{ width: 6, height: 6, background: o.color, flexShrink: 0, display: "inline-block" }} />}
+              <span className="t-small truncate flex-1">{o.label}</span>
+              <span className="t-micro font-mono flex-shrink-0" style={{ color: "var(--fg-3)" }}>{o.count}</span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FilterHeader
+// ---------------------------------------------------------------------------
+
+function FilterHeader({
+  label, filterKey, options, selected, openFilter, onOpen, onClose, onChange, headerRef,
+}: {
+  label: string;
+  filterKey: FilterKey;
+  options: FilterOption[];
+  selected: Set<string>;
+  openFilter: FilterKey | null;
+  onOpen: (key: FilterKey) => void;
+  onClose: () => void;
+  onChange: (key: FilterKey, s: Set<string>) => void;
+  headerRef: (el: HTMLTableCellElement | null) => void;
+}) {
+  const cellRef = useRef<HTMLTableCellElement | null>(null);
+  const isOpen = openFilter === filterKey;
+  const isActive = selected.size > 0;
+
+  return (
+    <th
+      ref={el => { cellRef.current = el; headerRef(el); }}
+      className="px-3 py-2 text-left t-micro select-none"
+      style={{ fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}
+    >
+      <button
+        onClick={() => isOpen ? onClose() : onOpen(filterKey)}
+        className="flex items-center gap-1.5"
+        style={{
+          color: isActive ? "var(--accent)" : isOpen ? "var(--fg-0)" : "var(--fg-2)",
+          background: "transparent", border: "none", padding: 0, cursor: "pointer",
+          letterSpacing: "0.08em", textTransform: "uppercase",
+          fontSize: "inherit", fontFamily: "inherit", fontWeight: "inherit",
+        }}
+      >
+        {label}
+        <ListFilter size={10} strokeWidth={1.6} style={{ opacity: isActive || isOpen ? 1 : 0.4 }} />
+        {isActive && (
+          <span className="font-mono" style={{ fontSize: 9, background: "var(--accent)", color: "var(--bg-0)", padding: "0 3px", lineHeight: "14px", display: "inline-block" }}>
+            {selected.size}
+          </span>
+        )}
+      </button>
+      {isOpen && (
+        <FilterDropdown
+          options={options}
+          selected={selected}
+          onChange={s => onChange(filterKey, s)}
+          onClose={onClose}
+          anchorEl={cellRef.current}
+        />
+      )}
+    </th>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CheckSummary
+// ---------------------------------------------------------------------------
+
+function CheckSummary({ total, verdictCounts }: { total: number; verdictCounts: Record<string, number> }) {
+  if (total === 0) return <span className="t-micro" style={{ color: "var(--fg-3)" }}>--</span>;
+
+  const fail  = (verdictCounts.fail  ?? 0) + (verdictCounts.error ?? 0);
+  const warn  = verdictCounts.warn   ?? 0;
+  const pass  = verdictCounts.pass   ?? 0;
+  const pend  = verdictCounts.pending ?? 0;
+
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="t-micro font-mono" style={{ color: "var(--fg-2)" }}>{total}</span>
+      <div className="flex items-center gap-2">
+        {fail > 0 && <span className="t-micro font-mono" style={{ color: "var(--fail)" }}>{fail} fail</span>}
+        {warn > 0 && <span className="t-micro font-mono" style={{ color: "var(--warn)" }}>{warn} warn</span>}
+        {pass > 0 && <span className="t-micro font-mono" style={{ color: "var(--pass)" }}>{pass} pass</span>}
+        {pend > 0 && fail === 0 && warn === 0 && (
+          <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>{pend} pending</span>
+        )}
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Page
+// Main page
 // ---------------------------------------------------------------------------
+
+const EMPTY_SET = new Set<string>();
 
 export default function DatasetsPage() {
-  const [sources, setSources] = useState<Source[]>([]);
-  const [sourcesLoading, setSourcesLoading] = useState(true);
-  const [sourcesError, setSourcesError] = useState<string | null>(null);
+  const router = useRouter();
+  const [rows, setRows] = useState<ColumnRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  const [datasets, setDatasets] = useState<Dataset[]>([]);
-  const [datasetsLoading, setDatasetsLoading] = useState(true);
-  const [datasetsError, setDatasetsError] = useState<string | null>(null);
+  const [filterSets, setFilterSets] = useState<Record<FilterKey, Set<string>>>({
+    source: EMPTY_SET,
+    verdict: EMPTY_SET,
+    metric: EMPTY_SET,
+  });
+  const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const headerEls = useRef<Partial<Record<FilterKey, HTMLTableCellElement | null>>>({});
 
-  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  const [expandedSchemas, setExpandedSchemas] = useState<Set<string>>(new Set());
-
-  const [datasetDetail, setDatasetDetail] = useState<DatasetDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [confirmDeleteDataset, setConfirmDeleteDataset] = useState<string | null>(null);
-  const [deletingDataset, setDeletingDataset] = useState(false);
-
-  // Load sources
   useEffect(() => {
-    setSourcesLoading(true);
-    setSourcesError(null);
-    fetch("/api/v1/sources")
-      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
-      .then((data: Source[]) => {
-        setSources(data);
-        if (data.length > 0) setSelectedSourceId(data[0].id);
-      })
-      .catch((e: unknown) => setSourcesError(String(e)))
-      .finally(() => setSourcesLoading(false));
+    fetch("/api/v1/columns")
+      .then(r => r.ok ? r.json() : [])
+      .then((data: ColumnRow[]) => { setRows(data); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
 
-  // Load datasets
-  useEffect(() => {
-    setDatasetsLoading(true);
-    setDatasetsError(null);
-    fetch("/api/v1/datasets")
-      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
-      .then((data: Dataset[]) => setDatasets(data))
-      .catch((e: unknown) => setDatasetsError(String(e)))
-      .finally(() => setDatasetsLoading(false));
-  }, []);
+  const filterOptions = useMemo((): Record<FilterKey, FilterOption[]> => {
+    const count = (arr: string[]) =>
+      arr.reduce<Record<string, number>>((acc, v) => { acc[v] = (acc[v] ?? 0) + 1; return acc; }, {});
 
-  // Load dataset detail when selected
-  useEffect(() => {
-    if (!selectedDatasetId) {
-      setDatasetDetail(null);
-      return;
-    }
-    setDetailLoading(true);
-    setDetailError(null);
-    fetch(`/api/v1/datasets/${encodeURIComponent(selectedDatasetId)}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`)))
-      .then((data: DatasetDetail) => setDatasetDetail(data))
-      .catch((e: unknown) => setDetailError(String(e)))
-      .finally(() => setDetailLoading(false));
-  }, [selectedDatasetId]);
+    const sourceCounts  = count(rows.map(r => r.source_name));
+    const verdictCounts = count(rows.map(r => r.worst_verdict ?? "pending"));
+    const metricCounts  = count(rows.map(r => r.is_metric ? "yes" : "no"));
 
-  function handleDeleteDataset(datasetId: string) {
-    setDeletingDataset(true);
-    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}`, { method: "DELETE" })
-      .then(() => {
-        setDatasets((prev) => prev.filter((d) => d.id !== datasetId));
-        if (selectedDatasetId === datasetId) {
-          setSelectedDatasetId(null);
-          setDatasetDetail(null);
-        }
-      })
-      .catch(() => {})
-      .finally(() => { setDeletingDataset(false); setConfirmDeleteDataset(null); });
-  }
+    return {
+      source: Object.entries(sourceCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([v, n]) => ({ value: v, label: v, count: n })),
+      verdict: (["fail", "error", "warn", "pass", "pending"] as const)
+        .map(v => ({ value: v, label: v, count: verdictCounts[v] ?? 0, color: VERDICT_COLOR[v] }))
+        .filter(o => o.count > 0),
+      metric: [
+        { value: "yes", label: "Yes", count: metricCounts.yes ?? 0 },
+        { value: "no",  label: "No",  count: metricCounts.no  ?? 0 },
+      ].filter(o => o.count > 0),
+    };
+  }, [rows]);
 
-  function handleColumnDeleted(col: string) {
-    setDatasetDetail((prev) => {
-      if (!prev) return prev;
-      return { ...prev, checks: prev.checks.filter((c) => c.column !== col) };
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter(r => {
+      if (filterSets.source.size > 0 && !filterSets.source.has(r.source_name)) return false;
+      if (filterSets.verdict.size > 0 && !filterSets.verdict.has(r.worst_verdict ?? "pending")) return false;
+      if (filterSets.metric.size > 0 && !filterSets.metric.has(r.is_metric ? "yes" : "no")) return false;
+      if (!q) return true;
+      return (
+        r.source_name.toLowerCase().includes(q) ||
+        r.dataset_id.toLowerCase().includes(q) ||
+        r.column.toLowerCase().includes(q)
+      );
     });
+  }, [rows, search, filterSets]);
+
+  function updateFilter(key: FilterKey, s: Set<string>) {
+    setFilterSets(prev => ({ ...prev, [key]: s }));
   }
 
-  // When source selection changes, clear dataset selection
-  function handleSelectSource(id: string) {
-    setSelectedSourceId(id);
-    setSelectedDatasetId(null);
-    setDatasetDetail(null);
-  }
+  const filterHeaderProps = (key: FilterKey) => ({
+    filterKey: key,
+    options: filterOptions[key],
+    selected: filterSets[key],
+    openFilter,
+    onOpen: (k: FilterKey) => setOpenFilter(k),
+    onClose: () => setOpenFilter(null),
+    onChange: updateFilter,
+    headerRef: (el: HTMLTableCellElement | null) => { headerEls.current[key] = el; },
+  });
 
-  // Toggle schema group expand
-  function toggleSchema(key: string) {
-    setExpandedSchemas((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  // Datasets filtered to selected source
-  const filteredDatasets = selectedSourceId
-    ? datasets.filter((d) => d.source === selectedSourceId)
-    : datasets;
-
-  const schemaGroups = groupBySchema(filteredDatasets);
-
-  // Auto-expand all schemas when source changes
-  useEffect(() => {
-    setExpandedSchemas(new Set(Object.keys(groupBySchema(filteredDatasets))));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSourceId, datasetsLoading]);
+  const hasActiveFilters = Object.values(filterSets).some(s => s.size > 0);
 
   return (
-    <div
-      className="flex h-full overflow-hidden fade-in"
-      style={{ background: "var(--bg-0)" }}
-    >
-      {/* ----------------------------------------------------------------- */}
-      {/* Left rail — sources (220px)                                        */}
-      {/* ----------------------------------------------------------------- */}
+    <div className="flex flex-col h-full min-h-0">
+      {/* Toolbar */}
       <div
-        style={{
-          width: 220,
-          flexShrink: 0,
-          borderRight: "1px solid var(--line)",
-          background: "var(--bg-1)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
+        className="flex items-center gap-3 px-4 py-2.5 border-b border-line"
+        style={{ background: "var(--bg-1)", flexShrink: 0 }}
       >
-        <div
-          className="px-3 py-3 border-b"
-          style={{ borderColor: "var(--line)", flexShrink: 0 }}
-        >
-          <p
-            className="t-micro"
+        <div style={{ position: "relative", width: 280 }}>
+          <Search size={13} strokeWidth={1.5} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--fg-3)", pointerEvents: "none" }} />
+          <input
+            type="text"
+            placeholder="Search source, table, column..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             style={{
-              color: "var(--fg-3)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
+              background: "var(--bg-2)", color: "var(--fg-0)", border: "1px solid var(--line)",
+              outline: "none", fontSize: 12, padding: "6px 10px 6px 30px",
+              fontFamily: "inherit", width: "100%",
             }}
-          >
-            Sources
-          </p>
+          />
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {sourcesLoading && (
-            <div className="flex flex-col gap-2 p-3">
-              {[1, 2, 3].map((i) => (
-                <SkeletonBar key={i} width="80%" height={13} />
-              ))}
-            </div>
-          )}
-          {sourcesError && (
-            <p className="t-micro px-3 py-3" style={{ color: "var(--fail)" }}>
-              {sourcesError}
+
+        {hasActiveFilters && (
+          <button
+            onClick={() => setFilterSets({ source: new Set(), verdict: new Set(), metric: new Set() })}
+            className="t-micro px-2 py-1 border border-line flex items-center gap-1.5"
+            style={{ color: "var(--fg-3)", background: "transparent", cursor: "pointer" }}
+          >
+            <X size={10} strokeWidth={1.6} />
+            Clear filters
+          </button>
+        )}
+
+        <div className="flex-1" />
+
+        <span className="t-micro font-mono" style={{ color: "var(--fg-3)" }}>
+          {loading ? "..." : `${filtered.length} columns`}
+        </span>
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <span className="t-small" style={{ color: "var(--fg-3)" }}>Loading...</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <BarChart2 size={24} strokeWidth={1.2} style={{ color: "var(--fg-3)" }} />
+            <p className="t-small" style={{ color: "var(--fg-3)" }}>
+              {rows.length === 0
+                ? "No monitored columns yet. Add checks to columns to see them here."
+                : "No columns match the current filter."}
             </p>
-          )}
-          {!sourcesLoading && !sourcesError && sources.length === 0 && (
-            <p className="t-small px-3 py-4 text-center" style={{ color: "var(--fg-3)" }}>
-              No sources.
-            </p>
-          )}
-          {!sourcesLoading &&
-            !sourcesError &&
-            sources.map((src) => {
-              const isSelected = selectedSourceId === src.id;
-              return (
-                <button
-                  key={src.id}
-                  onClick={() => handleSelectSource(src.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors"
-                  style={{
-                    background: isSelected ? "var(--accent-bg)" : "transparent",
-                    borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
-                    cursor: "pointer",
-                  }}
+          </div>
+        ) : (
+          <table className="w-full" style={{ borderCollapse: "collapse" }}>
+            <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
+              <tr style={{ background: "var(--bg-1)", borderBottom: "1px solid var(--line)" }}>
+                <FilterHeader label="Source" {...filterHeaderProps("source")} />
+                <th className="px-3 py-2 text-left t-micro" style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  dataset.table.column
+                </th>
+                <FilterHeader label="Checks" {...filterHeaderProps("verdict")} />
+                <th className="px-3 py-2 text-left t-micro" style={{ color: "var(--fg-2)", fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", width: 80 }}>
+                  DQT Score
+                </th>
+                <FilterHeader label="Metric" {...filterHeaderProps("metric")} />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(row => (
+                <tr
+                  key={`${row.dataset_id}.${row.column}`}
+                  onClick={() => router.push(`/datasets/${encodeURIComponent(row.dataset_id)}/${encodeURIComponent(row.column)}`)}
+                  className="border-b border-line cursor-pointer"
+                  style={{ background: "var(--bg-0)" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-2)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "var(--bg-0)")}
                 >
-                  <Database
-                    size={13}
-                    strokeWidth={1.6}
-                    style={{ color: isSelected ? "var(--accent)" : "var(--fg-3)", flexShrink: 0 }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className="t-small truncate"
-                      style={{
-                        color: isSelected ? "var(--fg-0)" : "var(--fg-1)",
-                        fontFamily: "var(--font-jetbrains-mono)",
-                      }}
-                    >
-                      {src.name}
-                    </p>
-                    <p className="t-micro" style={{ color: "var(--fg-3)" }}>
-                      {src.engine} · {src.tables ?? 0} tables
-                    </p>
-                  </div>
-                  <StatusDot status={src.status} />
-                </button>
-              );
-            })}
-        </div>
-      </div>
+                  {/* Source */}
+                  <td className="px-3 py-2.5" style={{ width: 200 }}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="t-micro font-mono flex-shrink-0"
+                        style={{ padding: "1px 4px", background: "var(--bg-3)", color: "var(--fg-2)", border: "1px solid var(--line)", fontSize: 10 }}
+                      >
+                        {ENGINE_ABBR[row.source_engine.toLowerCase()] ?? row.source_engine.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="t-small truncate" style={{ color: "var(--fg-1)" }} title={row.source_name}>
+                        {row.source_name}
+                      </span>
+                    </div>
+                  </td>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* Middle rail — schema/table tree (280px)                            */}
-      {/* ----------------------------------------------------------------- */}
-      <div
-        style={{
-          width: 280,
-          flexShrink: 0,
-          borderRight: "1px solid var(--line)",
-          background: "var(--bg-1)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          className="px-3 py-3 border-b flex items-center justify-between"
-          style={{ borderColor: "var(--line)", flexShrink: 0 }}
-        >
-          <p
-            className="t-micro"
-            style={{
-              color: "var(--fg-3)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-            }}
-          >
-            Tables
-          </p>
-          {!datasetsLoading && (
-            <span className="t-micro" style={{ color: "var(--fg-3)" }}>
-              {filteredDatasets.length}
-            </span>
-          )}
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {datasetsLoading && (
-            <div className="flex flex-col gap-2 p-3">
-              {[1, 2, 3, 4].map((i) => (
-                <SkeletonBar key={i} width={`${60 + i * 8}%`} height={12} />
-              ))}
-            </div>
-          )}
-          {datasetsError && (
-            <p className="t-micro px-3 py-3" style={{ color: "var(--fail)" }}>
-              {datasetsError}
-            </p>
-          )}
-          {!datasetsLoading && !datasetsError && filteredDatasets.length === 0 && (
-            <p className="t-small px-3 py-4 text-center" style={{ color: "var(--fg-3)" }}>
-              {selectedSourceId ? "No datasets for this source." : "Select a source."}
-            </p>
-          )}
-          {!datasetsLoading &&
-            !datasetsError &&
-            Object.entries(schemaGroups).map(([schema, schemaDatassets]) => {
-              const isOpen = expandedSchemas.has(schema);
-              return (
-                <div key={schema}>
-                  {/* Schema header */}
-                  <button
-                    onClick={() => toggleSchema(schema)}
-                    className="w-full flex items-center gap-1.5 px-3 py-2 text-left border-b transition-colors"
-                    style={{
-                      borderColor: "var(--line)",
-                      background: "var(--bg-2)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {isOpen ? (
-                      <ChevronDown size={12} strokeWidth={1.6} style={{ color: "var(--fg-3)" }} />
+                  {/* Path — dataset.table.column dot notation */}
+                  <td className="px-3 py-2.5 min-w-0">
+                    <span className="font-mono" style={{ fontSize: 12 }} title={`${row.dataset_id}.${row.column}`}>
+                      <span style={{ color: "var(--fg-3)" }}>{row.dataset_id}</span>
+                      <span style={{ color: "var(--fg-3)" }}>.</span>
+                      <span style={{ color: "var(--accent)" }}>{row.column}</span>
+                    </span>
+                  </td>
+
+                  {/* Checks summary */}
+                  <td className="px-3 py-2.5" style={{ width: 300 }}>
+                    <CheckSummary total={row.total_checks} verdictCounts={row.verdict_counts} />
+                  </td>
+
+                  {/* DQT Score */}
+                  <td className="px-3 py-2.5" style={{ width: 80 }}>
+                    {row.dqt_score !== null && row.dqt_score !== undefined ? (
+                      <span
+                        className="t-small font-mono"
+                        style={{
+                          color: row.dqt_score >= 80 ? "var(--pass)" : row.dqt_score >= 50 ? "var(--warn)" : "var(--fail)",
+                          fontFamily: "var(--font-jetbrains-mono)",
+                        }}
+                      >
+                        {row.dqt_score}
+                      </span>
                     ) : (
-                      <ChevronRight size={12} strokeWidth={1.6} style={{ color: "var(--fg-3)" }} />
+                      <span className="t-micro" style={{ color: "var(--fg-3)" }}>--</span>
                     )}
-                    <span
-                      className="t-micro flex-1 truncate"
-                      style={{
-                        color: "var(--fg-2)",
-                        fontFamily: "var(--font-jetbrains-mono)",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      {schema}
+                  </td>
+
+                  {/* Metric */}
+                  <td className="px-3 py-2.5" style={{ width: 80 }}>
+                    <span className="t-small font-mono" style={{ color: row.is_metric ? "var(--accent)" : "var(--fg-3)" }}>
+                      {row.is_metric ? "Yes" : "No"}
                     </span>
-                    <span className="t-micro" style={{ color: "var(--fg-3)" }}>
-                      {schemaDatassets.length}
-                    </span>
-                  </button>
-
-                  {/* Dataset rows */}
-                  {isOpen &&
-                    schemaDatassets.map((ds) => {
-                      const isSelected = selectedDatasetId === ds.id;
-                      return (
-                        <div
-                          key={ds.id}
-                          className="flex items-center border-b"
-                          style={{
-                            borderColor: "var(--line)",
-                            background: isSelected ? "var(--accent-bg)" : "transparent",
-                            borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
-                          }}
-                        >
-                          <button
-                            onClick={() => setSelectedDatasetId(ds.id)}
-                            className="flex-1 flex items-center gap-2 pl-6 pr-2 py-2 text-left transition-colors"
-                            style={{ cursor: "pointer", minWidth: 0 }}
-                          >
-                            <Table2
-                              size={12}
-                              strokeWidth={1.6}
-                              style={{
-                                color: isSelected ? "var(--accent)" : "var(--fg-3)",
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span
-                              className="t-small flex-1 truncate"
-                              style={{
-                                color: isSelected ? "var(--fg-0)" : "var(--fg-1)",
-                                fontFamily: "var(--font-jetbrains-mono)",
-                              }}
-                            >
-                              {ds.id}
-                            </span>
-                            <StatusDot status={ds.status} />
-                            <span className="t-micro" style={{ color: "var(--fg-3)" }}>
-                              {ds.column_count ?? "--"}
-                            </span>
-                          </button>
-                          <div className="px-1 flex items-center" onClick={(e) => e.stopPropagation()}>
-                            {confirmDeleteDataset === ds.id ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleDeleteDataset(ds.id)}
-                                  disabled={deletingDataset}
-                                  className="t-micro px-1.5 py-0.5 border transition-colors"
-                                  style={{ borderColor: "var(--fail)", color: "var(--fail)", background: "rgba(224,123,110,0.08)" }}
-                                >
-                                  {deletingDataset ? <Loader2 size={9} strokeWidth={2} className="animate-spin" /> : "del"}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDeleteDataset(null)}
-                                  className="t-micro hover:opacity-60"
-                                  style={{ color: "var(--fg-3)" }}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmDeleteDataset(ds.id)}
-                                className="w-5 h-5 flex items-center justify-center border border-transparent hover:border-line transition-colors"
-                                style={{ color: "var(--fg-3)" }}
-                                title="Remove dataset"
-                              >
-                                <Trash2 size={10} strokeWidth={1.6} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              );
-            })}
-        </div>
-      </div>
-
-      {/* ----------------------------------------------------------------- */}
-      {/* Main panel — column list                                           */}
-      {/* ----------------------------------------------------------------- */}
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <div
-          className="flex items-center gap-2 px-4 py-3 border-b"
-          style={{
-            borderColor: "var(--line)",
-            background: "var(--bg-1)",
-            flexShrink: 0,
-          }}
-        >
-          {datasetDetail ? (
-            <>
-              <Columns
-                size={14}
-                strokeWidth={1.6}
-                style={{ color: "var(--fg-3)" }}
-              />
-              <span
-                className="t-small"
-                style={{
-                  color: "var(--fg-0)",
-                  fontFamily: "var(--font-jetbrains-mono)",
-                }}
-              >
-                {datasetDetail.id}
-              </span>
-              <span className="t-micro" style={{ color: "var(--fg-3)" }}>
-                {extractColumns(datasetDetail.checks).length} columns
-              </span>
-            </>
-          ) : (
-            <span className="t-small" style={{ color: "var(--fg-3)" }}>
-              Select a dataset
-            </span>
-          )}
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto" style={{ background: "var(--bg-0)" }}>
-          {detailLoading && (
-            <div className="flex flex-col gap-2 p-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <SkeletonBar key={i} width={`${50 + i * 7}%`} height={14} />
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
-          {detailError && (
-            <div className="flex items-center justify-center h-32">
-              <p className="t-small" style={{ color: "var(--fail)" }}>
-                {detailError}
-              </p>
-            </div>
-          )}
-          {!selectedDatasetId && !detailLoading && (
-            <div className="flex items-center justify-center h-32">
-              <p className="t-small" style={{ color: "var(--fg-3)" }}>
-                Select a dataset to browse columns
-              </p>
-            </div>
-          )}
-          {!detailLoading && !detailError && datasetDetail && (
-            <ColumnList dataset={datasetDetail} onColumnDeleted={handleColumnDeleted} />
-          )}
-        </div>
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Column list component (separated to isolate expanded state)
-// ---------------------------------------------------------------------------
-
-function ColumnList({ dataset, onColumnDeleted }: { dataset: DatasetDetail; onColumnDeleted?: (col: string) => void }) {
-  const [expandedCol, setExpandedCol] = useState<string | null>(null);
-  const columns = extractColumns(dataset.checks);
-
-  return (
-    <>
-      {columns.length === 0 ? (
-        <div className="flex items-center justify-center h-32">
-          <p className="t-small" style={{ color: "var(--fg-3)" }}>
-            No columns found.
-          </p>
-        </div>
-      ) : (
-        columns.map((col) => {
-          const isExpanded = expandedCol === col.name;
-          return (
-            <div key={col.name} style={{ borderBottom: "1px solid var(--line)" }}>
-              <button
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left"
-                style={{
-                  background: isExpanded ? "var(--bg-2)" : "transparent",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isExpanded)
-                    (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-1)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!isExpanded)
-                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                }}
-                onClick={() => setExpandedCol(isExpanded ? null : col.name)}
-              >
-                {isExpanded ? (
-                  <ChevronDown
-                    size={13}
-                    strokeWidth={1.6}
-                    style={{ color: "var(--fg-3)", flexShrink: 0 }}
-                  />
-                ) : (
-                  <ChevronRight
-                    size={13}
-                    strokeWidth={1.6}
-                    style={{ color: "var(--fg-3)", flexShrink: 0 }}
-                  />
-                )}
-                <StatusDot status={col.verdict ?? undefined} />
-                <span
-                  className="t-small flex-1 min-w-0 truncate"
-                  style={{
-                    color: "var(--fg-0)",
-                    fontFamily: "var(--font-jetbrains-mono)",
-                  }}
-                >
-                  {col.name}
-                </span>
-                {col.checkCount > 0 && (
-                  <span
-                    className="t-micro px-1.5"
-                    style={{
-                      background: "var(--bg-3)",
-                      color: "var(--fg-3)",
-                      fontFamily: "var(--font-jetbrains-mono)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {col.checkCount}
-                  </span>
-                )}
-              </button>
-              {isExpanded && (
-                <ColumnExpanded
-                  datasetId={dataset.id}
-                  column={col.name}
-                  onColumnDeleted={() => {
-                    setExpandedCol(null);
-                    onColumnDeleted?.(col.name);
-                  }}
-                />
-              )}
-            </div>
-          );
-        })
-      )}
-    </>
   );
 }

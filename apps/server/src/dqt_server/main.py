@@ -224,6 +224,7 @@ from dqt_server.api.v1.detectors import router as detectors_router
 from dqt_server.api.v1.causal_compute import router as causal_compute_router
 from dqt_server.api.v1.schedules import router as schedules_router
 from dqt_server.api.v1.oncall import router as oncall_router
+from dqt_server.api.v1.column_profile import router as column_profile_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -241,6 +242,7 @@ app.include_router(detectors_router)
 app.include_router(causal_compute_router)
 app.include_router(schedules_router)
 app.include_router(oncall_router)
+app.include_router(column_profile_router)
 
 
 @app.get("/health", tags=["ops"])

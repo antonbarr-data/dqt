@@ -113,16 +113,28 @@ export default function DatasetDetailPage() {
     );
   }
 
-  // Build a map from column name → best check result
+  // Build maps from column name → worst check result + verdict-based DQT score (min across checks) + check count
   const checksByColumn = new Map<string, CheckResult>();
+  const dqtScoreByColumn = new Map<string, number>();
+  const checkCountByColumn = new Map<string, number>();
+  const verdictScore = (v: string | null) => v === "pass" ? 100 : v === "warn" ? 50 : v === "fail" || v === "error" ? 0 : null;
   for (const chk of dataset.checks) {
     if (!chk.column) continue;
     const existing = checksByColumn.get(chk.column);
-    // Prefer fail > warn > pass > unknown
     const rank = (v: string | null) => v === "fail" ? 3 : v === "warn" ? 2 : v === "pass" ? 1 : 0;
     if (!existing || rank(chk.verdict) > rank(existing.verdict)) {
       checksByColumn.set(chk.column, chk);
     }
+    // DQT score = min verdict-based score across all checks for this column
+    const vs = verdictScore(chk.verdict);
+    if (vs !== null) {
+      const prev = dqtScoreByColumn.get(chk.column);
+      if (prev === undefined || vs < prev) {
+        dqtScoreByColumn.set(chk.column, vs);
+      }
+    }
+    // Count distinct checks per column
+    checkCountByColumn.set(chk.column, (checkCountByColumn.get(chk.column) ?? 0) + 1);
   }
 
   const failCount = dataset.checks.filter(c => c.verdict === "fail").length;
@@ -232,7 +244,7 @@ export default function DatasetDetailPage() {
         <table className="w-full" style={{ borderCollapse: "collapse" }}>
           <thead>
             <tr className="border-b border-line">
-              {["Column", "Type", "Nullable", "Verdict", "Last checked"].map((h) => (
+              {["Column", "Type", "Nullable", "Checks", "DQT Score", "Verdict", "Last checked"].map((h) => (
                 <th
                   key={h}
                   className="px-3 py-2 text-left t-micro"
@@ -246,19 +258,19 @@ export default function DatasetDetailPage() {
           <tbody>
             {loadingColumns && columns.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center">
+                <td colSpan={7} className="px-3 py-6 text-center">
                   <Loader2 size={14} className="animate-spin inline" style={{ color: "var(--fg-3)" }} />
                 </td>
               </tr>
             ) : filteredColumns.length === 0 && columns.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-4 t-small text-center" style={{ color: "var(--fg-3)" }}>
+                <td colSpan={7} className="px-3 py-4 t-small text-center" style={{ color: "var(--fg-3)" }}>
                   No columns found.
                 </td>
               </tr>
             ) : filteredColumns.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3 py-4 t-small text-center" style={{ color: "var(--fg-3)" }}>
+                <td colSpan={7} className="px-3 py-4 t-small text-center" style={{ color: "var(--fg-3)" }}>
                   No {filter} columns.
                 </td>
               </tr>
@@ -266,6 +278,7 @@ export default function DatasetDetailPage() {
               filteredColumns.map((col) => {
                 const chk = checksByColumn.get(col.name);
                 const verdict = (chk?.verdict ?? "unknown") as Verdict;
+                const scoreInt = dqtScoreByColumn.get(col.name) ?? null;
                 const colHref = `/datasets/${encodeURIComponent(id)}/${encodeURIComponent(col.name)}`;
                 return (
                   <tr
@@ -283,6 +296,24 @@ export default function DatasetDetailPage() {
                     </td>
                     <td className="px-3 py-2 t-small font-mono" style={{ color: col.nullable ? "var(--fg-3)" : "var(--fg-1)" }}>
                       {col.nullable ? "yes" : "no"}
+                    </td>
+                    <td className="px-3 py-2 t-small font-mono" style={{ color: "var(--fg-2)" }}>
+                      {checkCountByColumn.get(col.name) ?? <span style={{ color: "var(--fg-3)" }}>--</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      {scoreInt !== null ? (
+                        <span
+                          className="t-small font-mono"
+                          style={{
+                            color: scoreInt >= 80 ? "var(--pass)" : scoreInt >= 50 ? "var(--warn)" : "var(--fail)",
+                            fontFamily: "var(--font-jetbrains-mono)",
+                          }}
+                        >
+                          {scoreInt}
+                        </span>
+                      ) : (
+                        <span className="t-micro" style={{ color: "var(--fg-3)" }}>--</span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       {chk ? <VerdictBadge verdict={verdict} /> : (

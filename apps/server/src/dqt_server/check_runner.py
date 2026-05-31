@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from dqt_server.db.engine import AsyncSessionLocal
@@ -562,7 +562,23 @@ class CheckRunner:
                     user_results = await loop.run_in_executor(
                         None, _run_user_checks_sync, adapter, schema, table, user_checks
                     )
-                    await self._persist_user_check_results(table, user_results, now)
+                    # Fetch row count for non-ClickHouse sources (ClickHouse gets it via _persist_table_result)
+                    row_count: int | None = None
+                    if not is_clickhouse:
+                        try:
+                            from dqt.adapters._protocol import AggExpr
+                            # Same normalisation as _run_user_checks_sync
+                            _schema, _table = schema, table
+                            if not _schema and "." in _table:
+                                _schema, _table = _table.split(".", 1)
+                            count_result = await loop.run_in_executor(
+                                None, adapter.aggregate, _schema, _table,
+                                [AggExpr("COUNT(*)", "__total")]
+                            )
+                            row_count = int(count_result.get("__total") or 0)
+                        except Exception as exc:
+                            log.warning("row_count_failed", table=table, error=str(exc))
+                    await self._persist_user_check_results(table, user_results, now, row_count=row_count)
 
             async with AsyncSessionLocal() as db:
                 src = await db.get(Source, source.id)
@@ -658,10 +674,11 @@ class CheckRunner:
             await db.commit()
 
     async def _persist_user_check_results(
-        self, table: str, results: list[dict], now: datetime
+        self, table: str, results: list[dict], now: datetime, row_count: int | None = None
     ) -> None:
         if not results or AsyncSessionLocal is None:
             return
+        from sqlalchemy import func as _func
         async with AsyncSessionLocal() as db:
             for r in results:
                 db.add(CheckRun(
@@ -674,6 +691,20 @@ class CheckRunner:
                     details=r["details"],
                     ran_at=now,
                 ))
+            # Keep Dataset metadata in sync
+            count_q = await db.execute(
+                select(_func.count(ColumnCheck.id)).where(
+                    ColumnCheck.dataset_id == table,
+                    ColumnCheck.enabled.is_(True),
+                )
+            )
+            check_count = count_q.scalar() or len(results)
+            update_vals: dict = {"last_run_at": now, "check_count": check_count}
+            if row_count is not None:
+                update_vals["row_count"] = row_count
+            await db.execute(
+                sa_update(Dataset).where(Dataset.id == table).values(**update_vals)
+            )
             await db.commit()
 
     # ------------------------------------------------------------------

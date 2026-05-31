@@ -154,3 +154,7 @@ class PostgresAdapter:
         with self._engine.connect() as conn:
             row = conn.execute(query).fetchone()
         return dict(zip([e.name for e in exprs], row))
+
+    def profile_column(self, schema: str, table: str, column: str) -> "ColumnProfileResult":
+        from dqt.adapters._pandas_profile import pandas_profile_column
+        return pandas_profile_column(self, schema, table, column, _log)

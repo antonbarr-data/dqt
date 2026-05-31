@@ -13,7 +13,7 @@ def agg(out_of_rule: int, total: int) -> pd.DataFrame:
 @pytest.fixture()
 def range_det():
     from dqt.algorithms.basic.value_checks import ValueInRangeDetector
-    return ValueInRangeDetector(min_val=0.0, max_val=100.0)
+    return ValueInRangeDetector(min_value=0.0, max_value=100.0)
 
 def test_value_in_range_pass(range_det):
     df = agg(0, 1000)
@@ -121,12 +121,51 @@ def test_date_format_fail():
 def test_value_checks_stability(violations, total):
     from dqt.algorithms.basic.value_checks import ValueInRangeDetector
     violations = min(violations, total)
-    det = ValueInRangeDetector(min_val=0.0, max_val=100.0)
+    det = ValueInRangeDetector(min_value=0.0, max_value=100.0)
     df = pd.DataFrame([{"violation_count": violations, "total_count": total}])
     state = det.fit(df)
     result = det.score(df, state)
     assert 0.0 <= result.score <= 1.0
     assert not math.isnan(result.score)
+
+def test_value_in_range_date_sql():
+    from dqt.algorithms.basic.value_checks import ValueInRangeDetector
+    det = ValueInRangeDetector(min_value="2024-01-01", max_value="2025-12-31", value_type="date")
+    exprs = det.get_aggregations("event_date")
+    sql = " ".join(e.sql for e in exprs)
+    assert "'2024-01-01'" in sql and "'2025-12-31'" in sql
+    # Numeric literals must not appear
+    assert "2024.0" not in sql
+
+def test_value_in_range_date_clickhouse_sql():
+    from dqt.algorithms.basic.value_checks import ValueInRangeDetector
+    det = ValueInRangeDetector(min_value="2024-01-01", max_value="2025-12-31", value_type="date")
+    exprs = det.get_aggregations("event_date", dialect="clickhouse")
+    sql = " ".join(e.sql for e in exprs)
+    assert "toDate('2024-01-01')" in sql
+
+def test_value_in_range_string_sql():
+    from dqt.algorithms.basic.value_checks import ValueInRangeDetector
+    det = ValueInRangeDetector(min_value="apple", max_value="mango", value_type="string")
+    exprs = det.get_aggregations("fruit")
+    sql = " ".join(e.sql for e in exprs)
+    assert "'apple'" in sql and "'mango'" in sql
+
+def test_value_in_range_unbounded_date():
+    from dqt.algorithms.basic.value_checks import ValueInRangeDetector
+    det = ValueInRangeDetector(max_value="2025-12-31", value_type="date")
+    exprs = det.get_aggregations("event_date")
+    sql = exprs[0].sql
+    assert "2025-12-31" in sql
+    assert "<" not in sql  # no lower bound
+
+def test_value_in_range_numeric_backward_compat():
+    from dqt.algorithms.basic.value_checks import ValueInRangeDetector
+    # Old-style: no value_type, float bounds
+    det = ValueInRangeDetector(min_value=0.0, max_value=100.0)
+    exprs = det.get_aggregations("price")
+    sql = " ".join(e.sql for e in exprs)
+    assert "0.0" in sql and "100.0" in sql
 
 def test_value_checks_stat_scale_verdicts():
     from dqt.algorithms._base import compute_verdict

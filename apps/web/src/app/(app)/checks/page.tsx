@@ -65,7 +65,7 @@ const DETECTOR_GROUP: Record<string, string> = {
   set_exclusion: "validity", regex_match: "validity", value_in_range: "validity",
   string_length_range: "validity", date_format: "validity", string_case: "validity",
   sql_assertion: "validity", date_part_missing: "validity", monotonicity: "validity",
-  referential_integrity_rate: "validity", column_pair: "validity",
+  referential_integrity_rate: "validity", referential_integrity: "validity", column_pair: "validity",
   composite_uniqueness: "validity", max_in_range: "validity", min_in_range: "validity",
   median_in_range: "validity", stddev_in_range: "validity", sum_in_range: "validity",
   cardinality_in_range: "validity", quantile_in_range: "validity",
@@ -713,7 +713,7 @@ function coerceParamValue(raw: string): unknown {
 interface ParamDef {
   name: string;
   label: string;
-  type: "text" | "number" | "integer" | "column";
+  type: "text" | "number" | "integer" | "column" | "date";
   required?: boolean;
   default?: string | number | null;
   placeholder?: string;
@@ -782,6 +782,10 @@ const DETECTOR_PARAMS: Record<string, ParamDef[]> = {
     { name: "direction", label: "Direction", type: "text", default: "increasing", selectOptions: [{ value: "increasing", label: "Increasing" }, { value: "decreasing", label: "Decreasing" }] },
   ],
   referential_integrity_rate: [
+    { name: "parent_table", label: "Parent table", type: "text", required: true, placeholder: "schema.table_name" },
+    { name: "parent_col", label: "Parent column", type: "text", default: "id", placeholder: "id" },
+  ],
+  referential_integrity: [
     { name: "parent_table", label: "Parent table", type: "text", required: true, placeholder: "schema.table_name" },
     { name: "parent_col", label: "Parent column", type: "text", default: "id", placeholder: "id" },
   ],
@@ -960,6 +964,7 @@ const SCALE_DEFAULTS: Record<string, { warn: number; fail: number }> = {
   monotonicity:                  { warn: 0.5,   fail: 0.5  },
   date_part_missing:             { warn: 0.01,  fail: 0.05 },
   referential_integrity_rate:    { warn: 0.99,  fail: 0.95 },
+  referential_integrity:         { warn: 0.99,  fail: 0.95 },
   freshness_seconds_behind:      { warn: 3600,  fail: 86400 },
   ks_pvalue:                     { warn: 0.95,  fail: 0.99 },
   ks_drift:                      { warn: 0.95,  fail: 0.99 },
@@ -1014,6 +1019,15 @@ function coerceSchemaValue(val: string, p: ParamDef): unknown {
   return val;
 }
 
+type ValueType = "numeric" | "date" | "string";
+
+function normalizeValueType(dbType: string): ValueType {
+  const t = dbType.toLowerCase();
+  if (/int|float|decimal|numeric|double|real|number/.test(t)) return "numeric";
+  if (/date|time|timestamp|datetime/.test(t)) return "date";
+  return "string";
+}
+
 const DATE_COL_KEYWORDS = /date|created|updated|timestamp|time|dt|at$/i;
 
 function sortDateColumnsFirst(cols: string[]): string[] {
@@ -1026,7 +1040,7 @@ function sortDateColumnsFirst(cols: string[]): string[] {
 }
 
 function ParamSchemaEditor({
-  slug, values, onChange, inputCls, inputStyle, labelCls, labelStyle, columns,
+  slug, values, onChange, inputCls, inputStyle, labelCls, labelStyle, columns, columnValueType, validationErrors,
 }: {
   slug: string;
   values: Record<string, string>;
@@ -1036,9 +1050,19 @@ function ParamSchemaEditor({
   labelCls: string;
   labelStyle: React.CSSProperties;
   columns?: string[];
+  columnValueType?: ValueType;
+  validationErrors?: Set<string>;
 }) {
   const schema = DETECTOR_PARAMS[slug];
   const sortedColumns = useMemo(() => columns ? sortDateColumnsFirst(columns) : [], [columns]);
+
+  function effectiveParamType(p: ParamDef): ParamDef["type"] {
+    if (slug === "value_in_range" && (p.name === "min_value" || p.name === "max_value")) {
+      if (columnValueType === "date") return "date";
+      if (columnValueType === "string") return "text";
+    }
+    return p.type;
+  }
 
   const warnVal = values.warn_threshold ?? "";
   const failVal = values.fail_threshold ?? "";
@@ -1046,53 +1070,60 @@ function ParamSchemaEditor({
   return (
     <div className="space-y-3">
       {/* Detector-specific params */}
-      {schema && schema.map(p => (
-        <label key={p.name} className="block space-y-1">
-          <span className={labelCls} style={labelStyle}>
-            {p.label}
-            {p.required && <span style={{ color: "var(--fail)", marginLeft: 3 }}>*</span>}
-          </span>
-          {p.type === "column" ? (
-            sortedColumns.length > 0 ? (
-              <select
-                value={values[p.name] ?? ""}
-                onChange={e => onChange(p.name, e.target.value)}
-                className={inputCls}
-                style={inputStyle}
-              >
-                <option value="">-- select column --</option>
-                {sortedColumns.map(c => <option key={c} value={c}>{c}</option>)}
+      {schema && schema.map(p => {
+        const isInvalid = validationErrors?.has(p.name);
+        const errorBorderStyle = isInvalid ? { borderColor: "var(--fail)" } : {};
+        return (
+          <label key={p.name} className="block space-y-1">
+            <span className={labelCls} style={labelStyle}>
+              {p.label}
+              {p.required && <span style={{ color: "var(--fail)", marginLeft: 3 }}>*</span>}
+            </span>
+            {p.type === "column" ? (
+              sortedColumns.length > 0 ? (
+                <select
+                  value={values[p.name] ?? ""}
+                  onChange={e => onChange(p.name, e.target.value)}
+                  className={inputCls}
+                  style={{ ...inputStyle, ...errorBorderStyle }}
+                >
+                  <option value="">-- select column --</option>
+                  {sortedColumns.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  className={inputCls}
+                  style={{ ...inputStyle, ...errorBorderStyle }}
+                  value={values[p.name] ?? ""}
+                  onChange={e => onChange(p.name, e.target.value)}
+                  placeholder={p.placeholder ?? ""}
+                />
+              )
+            ) : p.selectOptions ? (
+              <select value={values[p.name] ?? String(p.default ?? "")} onChange={e => onChange(p.name, e.target.value)} className={inputCls} style={{ ...inputStyle, ...errorBorderStyle }}>
+                {p.selectOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            ) : (
-              <input
-                type="text"
-                className={inputCls}
-                style={inputStyle}
-                value={values[p.name] ?? ""}
-                onChange={e => onChange(p.name, e.target.value)}
-                placeholder={p.placeholder ?? ""}
-              />
-            )
-          ) : p.selectOptions ? (
-            <select value={values[p.name] ?? String(p.default ?? "")} onChange={e => onChange(p.name, e.target.value)} className={inputCls} style={inputStyle}>
-              {p.selectOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          ) : (
-            <input
-              type={p.type === "number" || p.type === "integer" ? "number" : "text"}
-              className={inputCls}
-              style={inputStyle}
-              value={values[p.name] ?? ""}
-              onChange={e => onChange(p.name, e.target.value)}
-              placeholder={p.placeholder ?? (p.default !== null && p.default !== undefined ? String(p.default) : "")}
-              min={p.min}
-              max={p.max}
-              step={p.step ?? (p.type === "integer" ? 1 : undefined)}
-            />
-          )}
-          {p.hint && <p className="t-micro" style={{ color: "var(--fg-3)" }}>{p.hint}</p>}
-        </label>
-      ))}
+            ) : (() => {
+              const et = effectiveParamType(p);
+              return (
+                <input
+                  type={et === "number" || et === "integer" ? "number" : et === "date" ? "date" : "text"}
+                  className={inputCls}
+                  style={{ ...inputStyle, ...errorBorderStyle }}
+                  value={values[p.name] ?? ""}
+                  onChange={e => onChange(p.name, e.target.value)}
+                  placeholder={et === "date" ? "yyyy-mm-dd" : (p.placeholder ?? (p.default !== null && p.default !== undefined ? String(p.default) : ""))}
+                  min={et === "number" || et === "integer" ? p.min : undefined}
+                  max={et === "number" || et === "integer" ? p.max : undefined}
+                  step={et === "number" || et === "integer" ? (p.step ?? (et === "integer" ? 1 : undefined)) : undefined}
+                />
+              );
+            })()}
+            {p.hint && <p className="t-micro" style={{ color: "var(--fg-3)" }}>{p.hint}</p>}
+          </label>
+        );
+      })}
 
       {/* Unknown detector: fallback key-value display */}
       {!schema && Object.entries(values).filter(([k]) => k !== "warn_threshold" && k !== "fail_threshold").map(([k, v]) => (
@@ -1111,19 +1142,27 @@ function ParamSchemaEditor({
       {/* Thresholds */}
       {(() => {
         const scaleDefaults = SCALE_DEFAULTS[slug];
+        const warnInvalid = validationErrors?.has("warn_threshold");
+        const failInvalid = validationErrors?.has("fail_threshold");
         return (
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
-              <span className={labelCls} style={{ ...labelStyle, color: "var(--warn)" }}>Warn threshold</span>
-              <input type="number" step="any" className={inputCls} style={{ ...inputStyle, color: "var(--warn)" }}
+              <span className={labelCls} style={{ ...labelStyle, color: "var(--warn)" }}>
+                Warn threshold<span style={{ color: "var(--fail)", marginLeft: 3 }}>*</span>
+              </span>
+              <input type="number" step="any" className={inputCls}
+                style={{ ...inputStyle, color: "var(--warn)", ...(warnInvalid ? { borderColor: "var(--fail)" } : {}) }}
                 value={warnVal} onChange={e => onChange("warn_threshold", e.target.value)}
-                placeholder={scaleDefaults ? String(scaleDefaults.warn) : "default"} />
+                placeholder={scaleDefaults ? String(scaleDefaults.warn) : ""} />
             </label>
             <label className="block space-y-1">
-              <span className={labelCls} style={{ ...labelStyle, color: "var(--fail)" }}>Fail threshold</span>
-              <input type="number" step="any" className={inputCls} style={{ ...inputStyle, color: "var(--fail)" }}
+              <span className={labelCls} style={{ ...labelStyle, color: "var(--fail)" }}>
+                Fail threshold<span style={{ color: "var(--fail)", marginLeft: 3 }}>*</span>
+              </span>
+              <input type="number" step="any" className={inputCls}
+                style={{ ...inputStyle, color: "var(--fail)", ...(failInvalid ? { borderColor: "var(--fail)" } : {}) }}
                 value={failVal} onChange={e => onChange("fail_threshold", e.target.value)}
-                placeholder={scaleDefaults ? String(scaleDefaults.fail) : "default"} />
+                placeholder={scaleDefaults ? String(scaleDefaults.fail) : ""} />
             </label>
           </div>
         );
@@ -1256,17 +1295,27 @@ function CheckEditModal({ check, onClose, onSave }: { check: CheckRow; onClose: 
   const [detector, setDetector] = useState(check.check);
   const [enabled, setEnabled] = useState(check.enabled);
   const [saving, setSaving] = useState(false);
-  const [editColumns, setEditColumns] = useState<string[]>([]);
+  const [editColMeta, setEditColMeta] = useState<{ name: string; data_type: string }[]>([]);
+  const editColumns = useMemo(() => editColMeta.map(c => c.name), [editColMeta]);
 
   useEffect(() => {
     if (!check.dataset) return;
     fetch(`/api/v1/datasets/${encodeURIComponent(check.dataset)}/columns`)
       .then(r => r.ok ? r.json() : [])
-      .then((cols: { name: string }[]) => setEditColumns(cols.map(c => c.name)))
+      .then((cols: { name: string; data_type: string }[]) => setEditColMeta(cols))
       .catch(() => {});
   }, [check.dataset]);
 
+  const columnValueType: ValueType = useMemo(() => {
+    const meta = editColMeta.find(c => c.name === column);
+    if (meta) return normalizeValueType(meta.data_type);
+    // Fall back to stored value_type if the column isn't found live
+    return (check.params.value_type as ValueType | undefined) ?? "numeric";
+  }, [editColMeta, column, check.params.value_type]);
+
   const isFreshness = detector === "freshness_seconds_behind";
+
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
   // All non-freshness params (including thresholds) stored as string values
   const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
@@ -1280,6 +1329,12 @@ function CheckEditModal({ check, onClose, onSave }: { check: CheckRow; onClose: 
     Object.entries(check.params).forEach(([k, v]) => {
       if (v !== null && v !== undefined) result[k] = String(v);
     });
+    // Pre-fill thresholds from SCALE_DEFAULTS when not already set in stored params
+    const scaleDefaults = SCALE_DEFAULTS[check.check];
+    if (scaleDefaults) {
+      if (!result.warn_threshold) result.warn_threshold = String(scaleDefaults.warn);
+      if (!result.fail_threshold) result.fail_threshold = String(scaleDefaults.fail);
+    }
     return result;
   });
 
@@ -1306,14 +1361,34 @@ function CheckEditModal({ check, onClose, onSave }: { check: CheckRow; onClose: 
     const schema = DETECTOR_PARAMS[detector];
     const result: Record<string, unknown> = {};
     Object.entries(paramValues).forEach(([k, v]) => {
-      if (v === "" || v === null) return;
+      if (v === "" || v === null || k === "value_type") return;
+      // For value_in_range on non-numeric columns keep bound values as strings
+      if (detector === "value_in_range" && columnValueType !== "numeric" && (k === "min_value" || k === "max_value")) {
+        result[k] = v;
+        return;
+      }
       const pDef = schema?.find(p => p.name === k);
       result[k] = pDef ? (coerceSchemaValue(v, pDef) ?? v) : coerceParamValue(v);
     });
+    if (detector === "value_in_range") result.value_type = columnValueType;
     return result;
   }
 
   async function handleSave() {
+    if (!isFreshness) {
+      const errors = new Set<string>();
+      const schema = DETECTOR_PARAMS[detector];
+      schema?.forEach(p => {
+        if (p.required && !paramValues[p.name]?.trim()) errors.add(p.name);
+      });
+      if (!paramValues.warn_threshold?.trim()) errors.add("warn_threshold");
+      if (!paramValues.fail_threshold?.trim()) errors.add("fail_threshold");
+      if (errors.size > 0) {
+        setValidationErrors(errors);
+        return;
+      }
+      setValidationErrors(new Set());
+    }
     setSaving(true);
     const params = buildParams();
     await fetch(`/api/v1/checks/${check.id}`, {
@@ -1393,12 +1468,17 @@ function CheckEditModal({ check, onClose, onSave }: { check: CheckRow; onClose: 
             <ParamSchemaEditor
               slug={detector}
               values={paramValues}
-              onChange={(name, val) => setParamValues(prev => ({ ...prev, [name]: val }))}
+              onChange={(name, val) => {
+                setParamValues(prev => ({ ...prev, [name]: val }));
+                setValidationErrors(prev => { const next = new Set(prev); next.delete(name); return next; });
+              }}
               inputCls={inputCls}
               inputStyle={inputStyle}
               labelCls={labelCls}
               labelStyle={labelStyle}
               columns={editColumns}
+              columnValueType={columnValueType}
+              validationErrors={validationErrors}
             />
           )}
 
@@ -1758,6 +1838,11 @@ function RightPanel({ selectedCheckId, checks, onEditCheck, onRunSingle, running
   const [sqlLoading, setSqlLoading] = useState(false);
   const [sqlError, setSqlError] = useState<string | null>(null);
 
+  // Serialize the selected check's params so the SQL re-fetches whenever they change after a save.
+  const selectedParamsKey = JSON.stringify(
+    checks.find(c => c.id === selectedCheckId)?.params ?? {}
+  );
+
   useEffect(() => {
     if (!selectedCheckId) { setSql(null); setSqlError(null); return; }
     setSql(null); setSqlError(null); setSqlLoading(true);
@@ -1769,7 +1854,8 @@ function RightPanel({ selectedCheckId, checks, onEditCheck, onRunSingle, running
       .then(({ sql: s }: { sql: string }) => setSql(s))
       .catch((err: unknown) => setSqlError(typeof err === "string" ? err : "SQL not available for this check type."))
       .finally(() => setSqlLoading(false));
-  }, [selectedCheckId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCheckId, selectedParamsKey]);
 
   function downloadSqlContent(chk: CheckRow) {
     if (!sql) return;

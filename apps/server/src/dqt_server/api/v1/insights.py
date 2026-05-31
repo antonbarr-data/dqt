@@ -142,7 +142,7 @@ class MetricCreate(PydanticBaseModel):
 async def create_metric(body: MetricCreate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)) -> dict:
     import re
     slug = re.sub(r"[^a-z0-9_]", "_", body.display_name.lower())
-    fqn = f"custom.default.{body.dataset}.{slug}"
+    fqn = f"{body.dataset}.{slug}"
     existing = await db.get(MetricDefinition, fqn)
     if existing:
         raise HTTPException(409, detail=f"Metric '{fqn}' already exists")
@@ -190,7 +190,7 @@ async def create_metrics_batch(body: MetricBatchBody, background_tasks: Backgrou
     created = 0
     for item in body.metrics:
         slug = re.sub(r"[^a-z0-9_]", "_", item.display_name.lower())
-        fqn = f"custom.default.{item.dataset}.{slug}"
+        fqn = f"{item.dataset}.{slug}"
         existing = await db.get(MetricDefinition, fqn)
         if existing is None:
             db.add(MetricDefinition(

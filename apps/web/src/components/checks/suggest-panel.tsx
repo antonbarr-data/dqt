@@ -16,11 +16,10 @@ interface DetectorDef {
   params: Record<string, unknown>
 }
 
-interface CheckDef {
+interface ExistingCheck {
   id: string
   detector_slug: string
   params: Record<string, unknown>
-  rationale: string
 }
 
 const CONF_COLOR = (c: number) =>
@@ -31,16 +30,19 @@ const CONF_BG = (c: number) =>
 export function SuggestPanel({
   datasetId,
   column,
+  existingChecks,
   onCheckAdded,
+  onCheckDeleted,
 }: {
   datasetId: string
   column: string
-  onCheckAdded?: () => void
+  existingChecks: ExistingCheck[]
+  onCheckAdded?: (check: ExistingCheck) => void
+  onCheckDeleted?: (checkId: string) => void
 }) {
   const [tab, setTab] = useState<"suggested" | "all">("suggested")
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [allDetectors, setAllDetectors] = useState<DetectorDef[]>([])
-  const [checks, setChecks] = useState<CheckDef[]>([])
   const [loadingSugg, setLoadingSugg] = useState(true)
   const [loadingAll, setLoadingAll] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -50,7 +52,6 @@ export function SuggestPanel({
   const [addSlug, setAddSlug] = useState("")
   const [adding, setAdding] = useState(false)
 
-  // Load suggestions
   useEffect(() => {
     setLoadingSugg(true)
     fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}/suggest`)
@@ -60,7 +61,6 @@ export function SuggestPanel({
       .finally(() => setLoadingSugg(false))
   }, [datasetId, column])
 
-  // Load all detectors when tab switches
   useEffect(() => {
     if (tab !== "all" || allDetectors.length > 0) return
     setLoadingAll(true)
@@ -70,14 +70,6 @@ export function SuggestPanel({
       .catch(() => setAllDetectors([]))
       .finally(() => setLoadingAll(false))
   }, [tab, allDetectors.length])
-
-  // Load existing checks
-  useEffect(() => {
-    fetch(`/api/v1/datasets/${encodeURIComponent(datasetId)}/columns/${encodeURIComponent(column)}/checks`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setChecks)
-      .catch(() => setChecks([]))
-  }, [datasetId, column])
 
   async function acceptSuggestion(s: Suggestion) {
     const resp = await fetch(
@@ -90,9 +82,8 @@ export function SuggestPanel({
     )
     if (resp.ok) {
       const created = await resp.json()
-      setChecks((prev) => [...prev, created])
       setAccepted((prev) => new Set(Array.from(prev).concat(s.detector_slug)))
-      onCheckAdded?.()
+      onCheckAdded?.(created)
     }
   }
 
@@ -108,20 +99,22 @@ export function SuggestPanel({
     )
     if (resp.ok) {
       const created = await resp.json()
-      setChecks((prev) => [...prev, created])
       setAccepted((prev) => new Set(Array.from(prev).concat(slug)))
-      onCheckAdded?.()
+      onCheckAdded?.(created)
     }
     setAdding(false)
     setEditing(null)
   }
 
-  async function deleteCheck(id: string) {
+  async function deleteCheck(id: string, slug: string) {
     const resp = await fetch(`/api/v1/checks/${id}`, { method: "DELETE" })
-    if (resp.ok) setChecks((prev) => prev.filter((c) => c.id !== id))
+    if (resp.ok) {
+      setAccepted((prev) => { const s = new Set(prev); s.delete(slug); return s })
+      onCheckDeleted?.(id)
+    }
   }
 
-  const existingSlugs = new Set(checks.map((c) => c.detector_slug))
+  const existingSlugs = new Set(existingChecks.map((c) => c.detector_slug))
 
   const filteredDetectors = allDetectors.filter(
     (d) =>
@@ -131,7 +124,6 @@ export function SuggestPanel({
       d.group.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Group detectors by category
   const grouped: Record<string, DetectorDef[]> = {}
   filteredDetectors.forEach((d) => {
     if (!grouped[d.group]) grouped[d.group] = []
@@ -140,29 +132,6 @@ export function SuggestPanel({
 
   return (
     <div>
-      {/* Existing checks */}
-      {checks.length > 0 && (
-        <div className="px-4 py-2 border-b border-line flex flex-wrap gap-1.5">
-          {checks.map((c) => (
-            <span
-              key={c.id}
-              className="flex items-center gap-1 t-micro px-1.5 py-0.5 border border-line"
-              style={{ background: "var(--bg-2)", color: "var(--fg-1)", fontFamily: "var(--font-jetbrains-mono)" }}
-            >
-              {c.detector_slug}
-              <button
-                onClick={() => deleteCheck(c.id)}
-                className="hover:opacity-60"
-                style={{ color: "var(--fg-3)" }}
-                title="Remove check"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="flex border-b border-line">
         {(["suggested", "all"] as const).map((t) => (
@@ -198,6 +167,7 @@ export function SuggestPanel({
           ) : (
             suggestions.map((s) => {
               const isAccepted = accepted.has(s.detector_slug) || existingSlugs.has(s.detector_slug)
+              const matchingCheck = existingChecks.find((c) => c.detector_slug === s.detector_slug)
               return (
                 <div
                   key={s.detector_slug}
@@ -205,53 +175,40 @@ export function SuggestPanel({
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className="t-small"
-                        style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}
-                      >
+                      <span className="t-small" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}>
                         {s.detector_slug}
                       </span>
                       <span
                         className="t-micro px-1 py-0.5"
-                        style={{
-                          color: CONF_COLOR(s.confidence),
-                          background: CONF_BG(s.confidence),
-                          fontFamily: "var(--font-jetbrains-mono)",
-                        }}
+                        style={{ color: CONF_COLOR(s.confidence), background: CONF_BG(s.confidence), fontFamily: "var(--font-jetbrains-mono)" }}
                       >
                         {Math.round(s.confidence * 100)}%
                       </span>
                     </div>
-                    <p className="t-micro" style={{ color: "var(--fg-2)" }}>
-                      {s.rationale}
-                    </p>
+                    <p className="t-micro" style={{ color: "var(--fg-2)" }}>{s.rationale}</p>
                     {editing === s.detector_slug && (
                       <div className="mt-2 flex gap-2 items-center">
                         <input
                           value={editParams}
                           onChange={(e) => setEditParams(e.target.value)}
                           placeholder='{"threshold": 3.5}'
-                          className="flex-1 border border-line px-2 py-1 t-micro bg-transparent outline-none focus:border-accent"
+                          className="flex-1 border border-line px-2 py-1 t-micro bg-transparent outline-none"
                           style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}
                         />
                         <button
                           onClick={() => {
-                            try {
-                              const params = editParams ? JSON.parse(editParams) : s.params
-                              addCustom(s.detector_slug, params)
-                            } catch {
-                              addCustom(s.detector_slug, s.params)
-                            }
+                            try { addCustom(s.detector_slug, editParams ? JSON.parse(editParams) : s.params) }
+                            catch { addCustom(s.detector_slug, s.params) }
                           }}
                           className="t-micro px-2 py-1 border border-accent"
-                          style={{ color: "var(--accent)", background: "var(--accent-bg)" }}
+                          style={{ color: "var(--accent)", background: "var(--accent-bg)", cursor: "pointer" }}
                         >
                           Save
                         </button>
                         <button
                           onClick={() => setEditing(null)}
                           className="t-micro px-2 py-1 border border-line"
-                          style={{ color: "var(--fg-2)" }}
+                          style={{ color: "var(--fg-2)", cursor: "pointer" }}
                         >
                           Cancel
                         </button>
@@ -261,12 +218,9 @@ export function SuggestPanel({
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     {!isAccepted && (
                       <button
-                        onClick={() => {
-                          setEditing(s.detector_slug)
-                          setEditParams(JSON.stringify(s.params, null, 2))
-                        }}
+                        onClick={() => { setEditing(s.detector_slug); setEditParams(JSON.stringify(s.params, null, 2)) }}
                         className="t-micro px-2 py-1 border border-line transition-colors hover:border-accent"
-                        style={{ color: "var(--fg-2)" }}
+                        style={{ color: "var(--fg-2)", cursor: "pointer" }}
                       >
                         Edit
                       </button>
@@ -274,7 +228,7 @@ export function SuggestPanel({
                     <button
                       onClick={() => !isAccepted && acceptSuggestion(s)}
                       disabled={isAccepted}
-                      className="t-micro px-2 py-1 border flex-shrink-0 transition-colors"
+                      className="t-micro px-2 py-1 border flex-shrink-0"
                       style={{
                         borderColor: isAccepted ? "var(--pass)" : "var(--line)",
                         color: isAccepted ? "var(--pass)" : "var(--fg-0)",
@@ -284,6 +238,15 @@ export function SuggestPanel({
                     >
                       {isAccepted ? "added" : "Accept"}
                     </button>
+                    {isAccepted && matchingCheck && (
+                      <button
+                        onClick={() => deleteCheck(matchingCheck.id, s.detector_slug)}
+                        className="t-micro px-2 py-1 border border-line transition-colors hover:border-fail"
+                        style={{ color: "var(--fg-3)", cursor: "pointer" }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -300,24 +263,20 @@ export function SuggestPanel({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search detectors..."
-              className="w-full border border-line px-2 py-1 t-small bg-transparent outline-none focus:border-accent"
+              className="w-full border border-line px-2 py-1 t-small bg-transparent outline-none"
               style={{ color: "var(--fg-0)" }}
             />
           </div>
           {loadingAll ? (
-            <div className="px-4 py-3 t-small" style={{ color: "var(--fg-3)" }}>
-              Loading...
-            </div>
+            <div className="px-4 py-3 t-small" style={{ color: "var(--fg-3)" }}>Loading...</div>
           ) : (
             Object.entries(grouped).map(([group, dets]) => (
               <div key={group}>
                 <div
                   className="px-4 py-1.5 t-micro"
                   style={{
-                    color: "var(--fg-3)",
-                    background: "var(--bg-0)",
-                    letterSpacing: "0.10em",
-                    textTransform: "uppercase",
+                    color: "var(--fg-3)", background: "var(--bg-0)",
+                    letterSpacing: "0.10em", textTransform: "uppercase",
                     borderBottom: "1px solid var(--line)",
                   }}
                 >
@@ -325,38 +284,45 @@ export function SuggestPanel({
                 </div>
                 {dets.map((d) => {
                   const isAdded = existingSlugs.has(d.slug)
+                  const matchingCheck = existingChecks.find((c) => c.detector_slug === d.slug)
                   return (
                     <div
                       key={d.slug}
                       className="flex items-center justify-between px-4 py-2 border-b border-line last:border-0"
                     >
                       <div>
-                        <span
-                          className="t-small"
-                          style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}
-                        >
+                        <span className="t-small" style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}>
                           {d.slug}
                         </span>
                         {d.label && (
-                          <span className="t-micro ml-2" style={{ color: "var(--fg-3)" }}>
-                            {d.label}
-                          </span>
+                          <span className="t-micro ml-2" style={{ color: "var(--fg-3)" }}>{d.label}</span>
                         )}
                       </div>
-                      <button
-                        onClick={() => !isAdded && addCustom(d.slug, d.params)}
-                        disabled={isAdded || adding}
-                        className="t-micro px-2 py-1 border flex-shrink-0 transition-colors"
-                        style={{
-                          borderColor: isAdded ? "var(--pass)" : "var(--line)",
-                          color: isAdded ? "var(--pass)" : "var(--fg-1)",
-                          background: "transparent",
-                          cursor: isAdded || adding ? "default" : "pointer",
-                          opacity: adding ? 0.5 : 1,
-                        }}
-                      >
-                        {isAdded ? "added" : "+ Add"}
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => !isAdded && addCustom(d.slug, d.params)}
+                          disabled={isAdded || adding}
+                          className="t-micro px-2 py-1 border flex-shrink-0"
+                          style={{
+                            borderColor: isAdded ? "var(--pass)" : "var(--line)",
+                            color: isAdded ? "var(--pass)" : "var(--fg-1)",
+                            background: "transparent",
+                            cursor: isAdded || adding ? "default" : "pointer",
+                            opacity: adding ? 0.5 : 1,
+                          }}
+                        >
+                          {isAdded ? "added" : "+ Add"}
+                        </button>
+                        {isAdded && matchingCheck && (
+                          <button
+                            onClick={() => deleteCheck(matchingCheck.id, d.slug)}
+                            className="t-micro px-2 py-1 border border-line transition-colors hover:border-fail"
+                            style={{ color: "var(--fg-3)", cursor: "pointer" }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -368,18 +334,16 @@ export function SuggestPanel({
             <input
               value={addSlug}
               onChange={(e) => setAddSlug(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && addSlug.trim()) addCustom(addSlug.trim())
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter" && addSlug.trim()) addCustom(addSlug.trim()) }}
               placeholder="Custom detector slug..."
-              className="flex-1 border border-line px-2 py-1 t-small bg-transparent outline-none focus:border-accent"
+              className="flex-1 border border-line px-2 py-1 t-small bg-transparent outline-none"
               style={{ color: "var(--fg-0)", fontFamily: "var(--font-jetbrains-mono)" }}
             />
             <button
               onClick={() => addSlug.trim() && addCustom(addSlug.trim())}
               disabled={!addSlug.trim() || adding}
               className="t-small px-3 py-1 border border-line hover:border-accent transition-colors disabled:opacity-40"
-              style={{ color: "var(--fg-1)" }}
+              style={{ color: "var(--fg-1)", cursor: "pointer" }}
             >
               Add
             </button>

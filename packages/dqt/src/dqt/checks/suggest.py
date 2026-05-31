@@ -76,9 +76,8 @@ def suggest_checks_for_column(
         add("null_fraction", {"fail_threshold": 0.5},
             "Tracks what fraction of rows are NULL in this column.", 0.6)
 
-    if profile.is_likely_fk:
-        add("referential_integrity", {},
-            f"Column name '{profile.name}' suggests a foreign key; check referential integrity.", 0.75)
+    # referential_integrity_rate requires parent_table + parent_col which cannot be
+    # inferred from profiling alone — skip auto-suggestion to avoid misconfigured checks.
 
     if profile.is_likely_enum and profile.sample_values:
         add("set_membership", {"allowed_values": list(profile.sample_values)},

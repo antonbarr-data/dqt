@@ -171,3 +171,7 @@ class SnowflakeAdapter:
             cur.execute(f'SELECT {cols} FROM "{schema}"."{table}"')
             row = cur.fetchone()
         return dict(zip([e.name for e in exprs], row or [None] * len(exprs)))
+
+    def profile_column(self, schema: str, table: str, column: str) -> "ColumnProfileResult":
+        from dqt.adapters._pandas_profile import pandas_profile_column
+        return pandas_profile_column(self, schema, table, column, _log)

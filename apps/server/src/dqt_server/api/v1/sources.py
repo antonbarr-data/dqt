@@ -620,6 +620,145 @@ async def create_column_checks_batch(
 
 
 # ------------------------------------------------------------------
+# Detector category map (mirrors frontend DETECTOR_GROUP)
+# ------------------------------------------------------------------
+
+_DETECTOR_CATEGORY: dict[str, str] = {
+    "completeness": "completeness", "null_fraction": "completeness", "volume": "completeness",
+    "volume_anomaly": "completeness", "row_count_in_range": "completeness",
+    "freshness_seconds_behind": "completeness", "schema_change": "completeness",
+    "uniqueness": "validity", "validity": "validity", "set_membership": "validity",
+    "set_exclusion": "validity", "regex_match": "validity", "value_in_range": "validity",
+    "string_length_range": "validity", "date_format": "validity", "string_case": "validity",
+    "sql_assertion": "validity", "date_part_missing": "validity", "monotonicity": "validity",
+    "referential_integrity_rate": "validity", "referential_integrity": "validity",
+    "column_pair": "validity", "composite_uniqueness": "validity",
+    "max_in_range": "validity", "min_in_range": "validity", "median_in_range": "validity",
+    "stddev_in_range": "validity", "sum_in_range": "validity", "cardinality_in_range": "validity",
+    "quantile_in_range": "validity", "numeric_mean_shift": "validity", "numeric_mean": "validity",
+    "ks_pvalue": "drift", "ks_drift": "drift", "wasserstein_1": "drift", "psi": "drift",
+    "kl_divergence": "drift", "js_divergence": "drift", "chi_square_drift": "drift",
+    "cramers_v": "drift", "mmd": "drift", "mutual_information": "drift", "benford_law_fit": "drift",
+    "mad_outlier_fraction": "outliers", "double_mad_outlier_fraction": "outliers",
+    "zscore_outlier_fraction": "outliers", "adjusted_boxplot_fraction": "outliers",
+    "iqr_fence": "outliers", "grubbs": "outliers", "generalized_esd": "outliers",
+    "outlier_fraction_drift": "outliers",
+    "isolation_forest_fraction": "outliers", "mahalanobis_distance": "outliers",
+    "lof": "outliers", "one_class_svm": "outliers", "hbos": "outliers", "ecod": "outliers",
+    "stl_residual_zscore": "timeseries", "cusum": "timeseries", "page_hinkley": "timeseries",
+    "holt_winters": "timeseries", "prophet_anomaly": "timeseries", "adwin": "timeseries",
+    "bocpd": "timeseries", "matrix_profile": "timeseries",
+}
+
+
+# ------------------------------------------------------------------
+# Columns — all monitored columns across all datasets
+# ------------------------------------------------------------------
+
+@router.get("/columns")
+async def list_all_columns(db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Return every monitored column (has at least one ColumnCheck) with check counts and verdict counts."""
+    from collections import defaultdict  # noqa: PLC0415
+
+    checks_q = await db.execute(
+        select(ColumnCheck.dataset_id, ColumnCheck.column_name, ColumnCheck.detector_slug)
+        .where(ColumnCheck.column_name.isnot(None))
+        .order_by(ColumnCheck.dataset_id, ColumnCheck.column_name)
+    )
+    all_checks = checks_q.all()
+    if not all_checks:
+        return []
+
+    dataset_ids: set[str] = {r.dataset_id for r in all_checks}
+
+    datasets_q = await db.execute(select(Dataset).where(Dataset.id.in_(dataset_ids)))
+    datasets: dict[str, Dataset] = {d.id: d for d in datasets_q.scalars()}
+
+    source_ids = {d.source_id for d in datasets.values()}
+    sources_q = await db.execute(select(Source).where(Source.id.in_(source_ids)))
+    sources: dict[str, Source] = {s.id: s for s in sources_q.scalars()}
+
+    # Latest verdict per (dataset_id, column_name, detector_slug)
+    runs_q = await db.execute(
+        select(CheckRun.dataset_id, CheckRun.column_name, CheckRun.detector_slug, CheckRun.verdict, CheckRun.ran_at)
+        .where(CheckRun.dataset_id.in_(dataset_ids))
+        .order_by(desc(CheckRun.ran_at))
+        .limit(5000)
+    )
+    latest_det_verdict: dict[tuple[str, str | None, str], str] = {}
+    for row in runs_q.all():
+        det_key = (row.dataset_id, row.column_name, row.detector_slug)
+        if det_key not in latest_det_verdict:
+            latest_det_verdict[det_key] = row.verdict or "unknown"
+
+    verdict_counts_map: dict[tuple[str, str | None], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for (did, cn, _), v in latest_det_verdict.items():
+        verdict_counts_map[(did, cn)][v] += 1
+
+    # DQT score per column: verdict-based quality score (pass=100, warn=50, fail=0).
+    # Minimum across all latest check runs for the column.
+    _VERDICT_SCORE = {"pass": 100, "warn": 50, "fail": 0, "error": 0}
+    dqt_score_map: dict[tuple[str, str | None], int] = {}
+    for (did, cn, _), v in latest_det_verdict.items():
+        vs = _VERDICT_SCORE.get(v)
+        if vs is not None:
+            key = (did, cn)
+            if key not in dqt_score_map or vs < dqt_score_map[key]:
+                dqt_score_map[key] = vs
+
+    _RANK = {"fail": 3, "error": 3, "warn": 2, "pass": 1}
+    latest_verdict: dict[tuple[str, str | None], str] = {}
+    for (did, cn), vc in verdict_counts_map.items():
+        worst = "pending"
+        for v in ["fail", "error", "warn", "pass"]:
+            if vc.get(v, 0) > 0:
+                worst = v
+                break
+        latest_verdict[(did, cn)] = worst
+
+    # Metric indicator: column is a metric if a MetricDefinition exists with matching
+    # (dataset, column_name), or if a table-level metric exists (column_name IS NULL).
+    metrics_rows = (await db.execute(
+        select(MetricDefinition.dataset, MetricDefinition.column_name)
+        .where(MetricDefinition.dataset.in_(dataset_ids))
+    )).all()
+    col_metric_keys: set[tuple[str, str]] = {
+        (r.dataset, r.column_name) for r in metrics_rows if r.column_name is not None
+    }
+    table_metric_datasets: set[str] = {
+        r.dataset for r in metrics_rows if r.column_name is None
+    }
+
+    # Build per-column category counts
+    col_cats: dict[tuple[str, str], dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for r in all_checks:
+        cat = _DETECTOR_CATEGORY.get(r.detector_slug, "custom")
+        col_cats[(r.dataset_id, r.column_name)][cat] += 1
+
+    result = []
+    for (dataset_id, col_name), cat_counts in sorted(col_cats.items()):
+        d = datasets.get(dataset_id)
+        s = sources.get(d.source_id) if d else None
+        result.append({
+            "source_id": d.source_id if d else "",
+            "source_name": s.name if s else (d.source_id if d else ""),
+            "source_engine": s.engine if s else "",
+            "dataset_id": dataset_id,
+            "column": col_name,
+            "check_counts": dict(cat_counts),
+            "verdict_counts": dict(verdict_counts_map.get((dataset_id, col_name), {})),
+            "total_checks": sum(cat_counts.values()),
+            "is_metric": (
+                (dataset_id, col_name) in col_metric_keys or
+                dataset_id in table_metric_datasets
+            ),
+            "worst_verdict": latest_verdict.get((dataset_id, col_name), "pending"),
+            "dqt_score": dqt_score_map.get((dataset_id, col_name)),
+        })
+    return result
+
+
+# ------------------------------------------------------------------
 # Datasets
 # ------------------------------------------------------------------
 
@@ -649,24 +788,40 @@ async def get_dataset(dataset_id: str, db: AsyncSession = Depends(get_db)) -> di
     if d is None:
         raise HTTPException(404, detail=f"Dataset '{dataset_id}' not found")
 
+    # Compute live check_count and last_run_at from actual data (two separate queries to avoid join multiplication)
+    check_count_q = await db.execute(
+        select(func.count(ColumnCheck.id))
+        .where(ColumnCheck.dataset_id == dataset_id, ColumnCheck.enabled.is_(True))
+    )
+    live_check_count: int = check_count_q.scalar() or 0
+
+    last_run_q = await db.execute(
+        select(func.max(CheckRun.ran_at)).where(CheckRun.dataset_id == dataset_id)
+    )
+    live_last_run_at: datetime | None = last_run_q.scalar()
+
     runs_q = await db.execute(
         select(CheckRun)
         .where(CheckRun.dataset_id == dataset_id)
         .order_by(desc(CheckRun.ran_at))
-        .limit(200)
+        .limit(500)
     )
     runs = runs_q.scalars().all()
 
-    seen: set[str | None] = set()
+    # One result per (column, detector) pair — latest run
+    seen: set[tuple[str | None, str]] = set()
     latest_runs: list[CheckRun] = []
     for r in runs:
-        key = r.column_name
+        key = (r.column_name, r.detector_slug)
         if key not in seen:
             seen.add(key)
             latest_runs.append(r)
 
+    base = _dataset_dict(d)
+    base["check_count"] = live_check_count
+    base["last_run"] = _time_ago(live_last_run_at)
     return {
-        **_dataset_dict(d),
+        **base,
         "checks": [_run_dict(r) for r in latest_runs],
     }
 
@@ -920,6 +1075,38 @@ async def get_column_profile(
     return await loop.run_in_executor(
         None, check_runner._profile_column_sync, adapter, schema, dataset_id, column
     )
+
+
+@router.get("/datasets/{dataset_id}/columns/{column}/history")
+async def get_column_run_history(
+    dataset_id: str,
+    column: str,
+    days: int = 90,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """Return CheckRun history for a column over the last N days, for time-series charting."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    q = (
+        select(CheckRun)
+        .where(
+            CheckRun.dataset_id == dataset_id,
+            CheckRun.column_name == column,
+            CheckRun.ran_at >= cutoff,
+        )
+        .order_by(CheckRun.ran_at)
+        .limit(1000)
+    )
+    result = await db.execute(q)
+    return [
+        {
+            "id": r.id,
+            "detector": r.detector_slug,
+            "score": r.score,
+            "verdict": r.verdict,
+            "ran_at": r.ran_at.isoformat(),
+        }
+        for r in result.scalars().all()
+    ]
 
 
 @router.get("/incidents/{incident_id}")

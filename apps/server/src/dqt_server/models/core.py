@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -202,6 +202,60 @@ class LineageEdgeRecord(Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class ColumnStatsCache(Base):
+    __tablename__ = "column_stats_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    column_name: Mapped[str] = mapped_column(String, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False, default="unknown")
+    data_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    nullable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    null_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    zero_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    empty_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    distinct_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    p_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p_stddev: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p2: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p5: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p10: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p25: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p50: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p75: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p90: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p95: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p98: Mapped[float | None] = mapped_column(Float, nullable=True)
+    p99: Mapped[float | None] = mapped_column(Float, nullable=True)
+    histogram: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    top_values: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("dataset_id", "column_name", name="uq_col_stats"),
+    )
+
+
+class ColumnSchemaHistory(Base):
+    __tablename__ = "column_schema_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    column_name: Mapped[str] = mapped_column(String, nullable=False)
+    data_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    nullable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
 

@@ -18,7 +18,7 @@ Each row maps one column concept (e.g. *Email*, *Order total*, *Country code*) t
 
 - **1. Completeness** — null_fraction, row_count, completeness, empty_string_fraction, freshness_seconds_behind, volume_anomaly, date_part_missing_fraction
 - **2. Validity** — value_in_range, set_membership, regex_match, string_case, value_validity, numeric_bounds, value_check, cardinality_in_range, column_pair_comparison, pattern_check
-- **3. Integrity** — uniqueness, monotonicity, referential_integrity, column_pairs, sql_assertion
+- **3. Integrity** — uniqueness, monotonicity, referential_integrity_rate, column_pairs, sql_assertion
 - **4. Schema** — schema_changes, column_pair_check
 - **5. Univariate outliers** — mad_outlier_fraction, double_mad_outlier_fraction, z_score_outlier_fraction, iqr_outlier_fraction, adjusted_boxplot_fraction, grubbs, gesd, auto_outlier, benford
 - **6. Multivariate outliers** — isolation_forest_fraction, mahalanobis_distance, lof_outlier_fraction, ocsvm, hbos, ecod
@@ -64,7 +64,7 @@ Each row maps one column concept (e.g. *Email*, *Order total*, *Country code*) t
 | Column concept | Description | Recommended checks | Priority | Notes |
 |---|---|---|---|---|
 | **Entity ID (primary key)** | Primary key for users, freelancers, clients, gigs, orders. | `uniqueness`<br>`null_fraction (fail_threshold ≤ 0.0001)`<br>`regex_match (format guard)`<br>`row_count` | **must-have** | PKs should be 100% non-null and 100% unique. |
-| **Foreign key** | Reference to another entity (e.g. client_id, freelancer_id). | `referential_integrity (to parent table)`<br>`null_fraction`<br>`cardinality_in_range` | **must-have** | Most common silent bug: orphaned FKs after upstream deletes. |
+| **Foreign key** | Reference to another entity (e.g. client_id, freelancer_id). | `referential_integrity_rate (to parent table)`<br>`null_fraction`<br>`cardinality_in_range` | **must-have** | Most common silent bug: orphaned FKs after upstream deletes. |
 | **External ID** | IDs from external systems (Stripe, OAuth, partner integrations). | `uniqueness`<br>`null_fraction`<br>`regex_match (provider format)`<br>`set_membership (provider whitelist)` | **must-have** | Format often well-defined per provider — pattern checks catch corruption. |
 | **Slug / handle** | Human-readable identifiers (@username, URL fragments). | `uniqueness`<br>`regex_match (allowed charset)`<br>`string_case`<br>`null_fraction` | should-have | Lower-case + alphanumeric+dash is the typical contract. |
 | **Hash / idempotency key** | Deduplication keys, idempotency tokens. | `uniqueness`<br>`regex_match (hash format e.g. sha256 length)`<br>`null_fraction` | should-have | Length and hex-only charset are the obvious checks. |
@@ -211,7 +211,7 @@ Each row maps one column concept (e.g. *Email*, *Order total*, *Country code*) t
 | **Acquisition source** | Organic / paid / referral / direct. | `set_membership`<br>`null_fraction`<br>`cardinality_in_range` | **must-have** | Source drift = new channel turned on without instrumentation. |
 | **UTM parameters** | source, medium, campaign, term, content. | `null_fraction`<br>`regex_match (URL-safe charset)`<br>`cardinality_in_range` | should-have | UTM hygiene is a perennial discipline problem. |
 | **Referrer URL** | Where the user came from. | `regex_match (URL or empty)`<br>`null_fraction` | _nice-to-have_ | Watch self-referrers (your domain in the referrer). |
-| **Campaign ID** | Reference to a campaign. | `referential_integrity (to campaigns table)`<br>`null_fraction` | should-have | Orphaned campaign IDs are common after campaigns archive. |
+| **Campaign ID** | Reference to a campaign. | `referential_integrity_rate (to campaigns table)`<br>`null_fraction` | should-have | Orphaned campaign IDs are common after campaigns archive. |
 | **Cost per click / acquisition** | Ad spend efficiency. | `value_in_range (min: 0)`<br>`mad_outlier_fraction`<br>`bocpd` | should-have | CPC/CPA drift = ad market shift or budget event. |
 | **Conversion flag** | Did this visit convert? | `set_membership ({true, false})`<br>`null_fraction` | **must-have** | NULL on conversion flag breaks every funnel metric. |
 | **Attribution weight** | Fractional credit in multi-touch. | `value_in_range (0.0 to 1.0)`<br>`null_fraction`<br>`column_pair_comparison (weights sum to 1.0 per conversion)` | should-have | Weights not summing to 1.0 = attribution model bug. |
@@ -224,7 +224,7 @@ Each row maps one column concept (e.g. *Email*, *Order total*, *Country code*) t
 | **Star rating** | Per-review rating. | `value_in_range (1 to 5)`<br>`null_fraction`<br>`cardinality_in_range` | **must-have** | Same as quantity → ratings, applied per review row. |
 | **Recommendation flag** | Would-recommend yes/no. | `set_membership ({true, false})`<br>`null_fraction` | should-have | NULL on recommendation = survey UI bug. |
 | **Review helpfulness** | Upvotes on a review. | `value_in_range (min: 0)`<br>`monotonicity (only increases over time)` | _nice-to-have_ | Helpfulness should only grow per review. |
-| **Reviewer / reviewee ID** | Foreign keys to users. | `referential_integrity`<br>`column_pair_comparison (reviewer != reviewee)`<br>`null_fraction` | **must-have** | Self-reviews = fraud or test data leakage. |
+| **Reviewer / reviewee ID** | Foreign keys to users. | `referential_integrity_rate`<br>`column_pair_comparison (reviewer != reviewee)`<br>`null_fraction` | **must-have** | Self-reviews = fraud or test data leakage. |
 | **Review verified** | Did reviewer actually purchase? | `set_membership ({true, false})`<br>`null_fraction` | should-have | Verified-review rate is a trust signal. |
 
 ## Trust, Safety, Fraud
@@ -289,9 +289,9 @@ Each row maps one column concept (e.g. *Email*, *Order total*, *Country code*) t
 
 | Column concept | Description | Recommended checks | Priority | Notes |
 |---|---|---|---|---|
-| **Created by / updated by** | User who modified the record. | `referential_integrity (to users)`<br>`null_fraction (when audit required)` | should-have | NULL when audit policy requires = compliance gap. |
+| **Created by / updated by** | User who modified the record. | `referential_integrity_rate (to users)`<br>`null_fraction (when audit required)` | should-have | NULL when audit policy requires = compliance gap. |
 | **Source system** | Which service wrote this row. | `set_membership`<br>`cardinality_in_range` | should-have | New source systems should be approved before ingest. |
-| **ETL run ID** | Pipeline batch identifier. | `referential_integrity (to runs)`<br>`null_fraction`<br>`regex_match (run-id format)` | should-have | Orphaned run IDs = pipeline metadata corruption. |
+| **ETL run ID** | Pipeline batch identifier. | `referential_integrity_rate (to runs)`<br>`null_fraction`<br>`regex_match (run-id format)` | should-have | Orphaned run IDs = pipeline metadata corruption. |
 | **dbt model name** | For derived columns. | `set_membership (deployed model list)`<br>`cardinality_in_range` | _nice-to-have_ | Model name drift = release event. |
 
 ## URLs & External

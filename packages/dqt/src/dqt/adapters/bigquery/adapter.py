@@ -160,3 +160,7 @@ class BigQueryAdapter:
             return {e.name: None for e in exprs}
         row = df.iloc[0]
         return {e.name: row[e.name] for e in exprs}
+
+    def profile_column(self, schema: str, table: str, column: str) -> "ColumnProfileResult":
+        from dqt.adapters._pandas_profile import pandas_profile_column
+        return pandas_profile_column(self, schema, table, column, _log)
