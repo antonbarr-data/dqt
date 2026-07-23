@@ -150,9 +150,16 @@ async def _setup_db() -> None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.email == SEEDED_SYSADMIN_EMAIL))
         if result.scalar_one_or_none() is None:
-            db.add(User(email=SEEDED_SYSADMIN_EMAIL, role=ROLE_SYSADMIN, is_active=True))
+            from dqt_server.auth.service import hash_password
+            raw_pw = os.environ.get("ADMIN_PASSWORD")
+            db.add(User(
+                email=SEEDED_SYSADMIN_EMAIL,
+                role=ROLE_SYSADMIN,
+                is_active=True,
+                hashed_password=hash_password(raw_pw) if raw_pw else None,
+            ))
             await db.commit()
-            log.info("seeded_super_admin", email=SEEDED_SYSADMIN_EMAIL)
+            log.info("seeded_super_admin", email=SEEDED_SYSADMIN_EMAIL, has_password=bool(raw_pw))
 
 
 async def _scheduler_loop() -> None:

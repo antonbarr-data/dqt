@@ -20,6 +20,7 @@ help:
 	@echo "  make test             — full test suite"
 	@echo "  make dev              — server + worker + web with hot reload"
 	@echo "  make demo             — start local stack with demo data"
+	@echo "  make db-schema        — print ORM DDL to stdout for drift comparison (does not overwrite schema.sql)"
 	@echo ""
 	@echo "Codegen:"
 	@echo "  make stats-scales     — Python STAT_SCALES → TS"
@@ -120,11 +121,28 @@ reset: clean
 	docker compose -f run_local/docker-compose.yml down -v
 
 # ─── DB ─────────────────────────────────────────────────────────────
+db-schema:
+	@# Emit the ORM-only DDL to stdout for comparison — does NOT overwrite schema.sql.
+	@# schema.sql is the authoritative production schema; edit it by hand.
+	@cd apps/server && uv run python -c "\
+import sys; sys.path.insert(0,'src'); \
+from dqt_server.main import _load_dotenv; _load_dotenv(); \
+from sqlalchemy.dialects import postgresql; \
+from sqlalchemy.schema import CreateTable, CreateIndex; \
+from dqt_server.db.engine import Base; \
+from dqt_server.models import ref_data as _; \
+from dqt_server.auth.models import User; \
+lines = ['-- ORM-generated DDL (for drift comparison only — not the authoritative schema)', '']; \
+[lines.extend([str(CreateTable(t).compile(dialect=postgresql.dialect())).strip()+';','']) \
+for t in Base.metadata.sorted_tables]; \
+print('\n'.join(lines))"
+
 db-migrate:
-	cd apps/server && uv run alembic upgrade head
+	@echo "This project does not use Alembic. Schema is managed by SQLAlchemy create_all on server startup."
+	@echo "Run: make dev-server"
 
 db-revision:
-	cd apps/server && uv run alembic revision --autogenerate -m "$(MSG)"
+	@echo "This project does not use Alembic migrations."
 
 db-er:
 	uv run python shared/generators/er_diagram.py > docs/architecture/er.svg

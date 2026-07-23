@@ -31,11 +31,13 @@ CREATE TABLE IF NOT EXISTS tenants (
 CREATE TABLE IF NOT EXISTS users (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     email           TEXT        UNIQUE NOT NULL,
+    name            TEXT,
     hashed_password TEXT,
     google_id       TEXT        UNIQUE,
     role            TEXT        NOT NULL DEFAULT 'viewer',  -- viewer/editor/admin/oncall/sysadmin
     tenant_id       TEXT        NOT NULL DEFAULT 'default',
     is_active       BOOLEAN     NOT NULL DEFAULT true,
+    oncall_eligible BOOLEAN     NOT NULL DEFAULT false,
     preferred_language TEXT     NOT NULL DEFAULT 'en',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -118,8 +120,10 @@ CREATE INDEX IF NOT EXISTS idx_columns_tenant  ON columns(tenant_id);
 -- Requires at least one row before building; create after initial data load.
 -- CREATE INDEX ON columns USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
+-- TimescaleDB requires the time column in the PK for tables converted to hypertables.
+-- column_profiles uses a composite PK (id, profiled_at) to satisfy that constraint.
 CREATE TABLE IF NOT EXISTS column_profiles (
-    id              UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+    id              UUID             NOT NULL DEFAULT gen_random_uuid(),
     column_id       UUID             NOT NULL REFERENCES columns(id) ON DELETE CASCADE,
     profiled_at     TIMESTAMPTZ      NOT NULL,
     row_count       BIGINT           NOT NULL,
@@ -134,7 +138,8 @@ CREATE TABLE IF NOT EXISTS column_profiles (
     p75             DOUBLE PRECISION,
     histogram_bins  JSONB,           -- [{edge, count}]
     top_values      JSONB,           -- [{value, count, fraction}]
-    data_type_group TEXT             -- numeric/string/date/boolean
+    data_type_group TEXT,            -- numeric/string/date/boolean
+    PRIMARY KEY (id, profiled_at)
 );
 CREATE INDEX IF NOT EXISTS idx_column_profiles_col ON column_profiles(column_id, profiled_at DESC);
 
@@ -179,6 +184,9 @@ CREATE TABLE IF NOT EXISTS baselines (
 );
 CREATE INDEX IF NOT EXISTS idx_baselines_check ON baselines(check_id, created_at DESC);
 
+-- check_runs has inbound FKs (incidents.run_id, metric_runs.source_run_id) so it
+-- cannot be converted to a TimescaleDB hypertable without dropping those FKs.
+-- It remains a regular partitioned-by-index table.
 CREATE TABLE IF NOT EXISTS check_runs (
     id               UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id        TEXT             NOT NULL,
@@ -196,13 +204,15 @@ CREATE TABLE IF NOT EXISTS check_runs (
     triggered_by     TEXT             NOT NULL DEFAULT 'schedule',  -- schedule/manual/api
     proof_commitment TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_check_runs_check  ON check_runs(check_id, finished_at DESC);
-CREATE INDEX IF NOT EXISTS idx_check_runs_tenant ON check_runs(tenant_id, finished_at DESC);
+CREATE INDEX IF NOT EXISTS idx_check_runs_check    ON check_runs(check_id, finished_at DESC);
+CREATE INDEX IF NOT EXISTS idx_check_runs_tenant   ON check_runs(tenant_id, finished_at DESC);
 
 -- ---------------------------------------------------------------------------
 -- Incidents (full lifecycle)
 -- ---------------------------------------------------------------------------
 
+-- incidents has inbound FKs (incident_comments, incident_tasks, postmortems,
+-- agent_explanations) so it cannot be a TimescaleDB hypertable.
 CREATE TABLE IF NOT EXISTS incidents (
     id                     UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id              TEXT             NOT NULL,
@@ -296,14 +306,17 @@ CREATE TABLE IF NOT EXISTS metric_dimensions (
     expr      TEXT NOT NULL
 );
 
+-- metric_runs has no inbound FKs so it can be a hypertable.
+-- Composite PK includes measured_at as required by TimescaleDB.
 CREATE TABLE IF NOT EXISTS metric_runs (
-    id                UUID             PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                UUID             NOT NULL DEFAULT gen_random_uuid(),
     metric_id         UUID             NOT NULL REFERENCES metrics(id),
     tenant_id         TEXT             NOT NULL,
     measured_at       TIMESTAMPTZ      NOT NULL,
     value             DOUBLE PRECISION NOT NULL,
     dimension_filters JSONB            NOT NULL DEFAULT '{}',
-    source_run_id     UUID             REFERENCES check_runs(id)
+    source_run_id     UUID             REFERENCES check_runs(id),
+    PRIMARY KEY (id, measured_at)
 );
 CREATE INDEX IF NOT EXISTS idx_metric_runs_metric ON metric_runs(metric_id, measured_at DESC);
 
@@ -371,8 +384,11 @@ CREATE TABLE IF NOT EXISTS policies (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- audit_log has no inbound FKs so it can be a hypertable.
+-- BIGSERIAL auto-creates the sequence; composite PK (id, occurred_at) satisfies
+-- TimescaleDB's requirement that the partition key appear in the primary key.
 CREATE TABLE IF NOT EXISTS audit_log (
-    id          BIGSERIAL   PRIMARY KEY,
+    id          BIGSERIAL   NOT NULL,
     tenant_id   TEXT        NOT NULL,
     actor_id    UUID        REFERENCES users(id),
     act_as_id   UUID        REFERENCES users(id),   -- sysadmin emulation target
@@ -384,7 +400,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
     ip          TEXT,
     user_agent  TEXT,
     trace_id    TEXT,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (id, occurred_at)
 );
 CREATE INDEX IF NOT EXISTS idx_audit_log_tenant ON audit_log(tenant_id, occurred_at DESC);
 
@@ -470,8 +487,8 @@ ALTER TABLE incidents
 
 -- ---------------------------------------------------------------------------
 -- Library-level store tables (used by the standalone dqt library)
--- These are created by PostgresStore._ensure_schema() but included here
--- so a fresh DB has everything in one shot.
+-- Created by PostgresStore._ensure_schema() but included here so a fresh DB
+-- has everything in one shot.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS dqt_runs (
@@ -529,12 +546,10 @@ CREATE INDEX IF NOT EXISTS idx_dqt_causal_reviews_edge ON dqt_causal_reviews(edg
 
 -- ---------------------------------------------------------------------------
 -- TimescaleDB hypertables
--- Convert the five time-series-heavy tables after initial creation.
--- Safe to run multiple times (if_not_exists => true).
+-- Only tables with no inbound FKs and a composite PK (id, time_col) can be
+-- converted. check_runs and incidents are excluded due to inbound FK references.
 -- ---------------------------------------------------------------------------
 
-SELECT create_hypertable('check_runs',      'finished_at', if_not_exists => true);
-SELECT create_hypertable('metric_runs',     'measured_at',  if_not_exists => true);
-SELECT create_hypertable('column_profiles', 'profiled_at',  if_not_exists => true);
-SELECT create_hypertable('incidents',       'opened_at',    if_not_exists => true);
-SELECT create_hypertable('audit_log',       'occurred_at',  if_not_exists => true);
+SELECT create_hypertable('column_profiles', 'profiled_at', if_not_exists => true);
+SELECT create_hypertable('metric_runs',     'measured_at', if_not_exists => true);
+SELECT create_hypertable('audit_log',       'occurred_at', if_not_exists => true);

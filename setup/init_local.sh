@@ -124,6 +124,19 @@ prompt_required "DQT_CREDS_KEY" \
   "Warehouse credential encryption key." \
   'python3 -c "import os,base64; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"'
 
+# ─── super-admin account ──────────────────────────────────────────────────────
+step "Super-admin account"
+echo -e "  Created on first server start if the email is not already in the database."
+echo ""
+
+prompt_required "ADMIN_EMAIL" \
+  "Email address for the default sysadmin account." \
+  'echo "admin@localhost"'
+
+prompt_required "ADMIN_PASSWORD" \
+  "Password for the default sysadmin account (used for email/password login)." \
+  'python3 -c "import secrets; print(secrets.token_urlsafe(16))"'
+
 # ─── optional: Google OAuth ───────────────────────────────────────────────────
 echo ""
 echo -e "  ${YELLOW}Optional: Google OAuth (social login). Press Enter to skip.${NC}"
@@ -254,12 +267,6 @@ uv sync --all-packages
 step "Installing Node dependencies (pnpm install)"
 
 cd "$REPO_ROOT/apps/web" && pnpm install --frozen-lockfile
-cd "$REPO_ROOT"
-
-# ─── database migrations ──────────────────────────────────────────────────────
-step "Running database migrations (alembic upgrade head)"
-
-cd "$REPO_ROOT/apps/server" && uv run alembic upgrade head
 cd "$REPO_ROOT"
 
 # ─── demo seed ────────────────────────────────────────────────────────────────

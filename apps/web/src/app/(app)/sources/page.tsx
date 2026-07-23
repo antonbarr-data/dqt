@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Download, Trash2, Loader2 } from "lucide-react";
 import { EngineIcon } from "@/components/connections/engine-icon";
 
+
 interface Source {
   id: string;
   name: string;
@@ -69,60 +70,6 @@ function StatusDot({ status }: { status: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// First-source blocking overlay
-// ---------------------------------------------------------------------------
-
-function ConnectWarehouseOverlay() {
-  const router = useRouter();
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "var(--bg-0)",
-        zIndex: 100,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px 24px",
-      }}
-    >
-      <div style={{ maxWidth: 900, width: "100%" }}>
-        <p
-          className="t-micro mb-3"
-          style={{ color: "var(--fg-3)", letterSpacing: "0.14em", textTransform: "uppercase" }}
-        >
-          Connect a Warehouse
-        </p>
-        <p className="t-small mb-8" style={{ color: "var(--fg-2)", maxWidth: 540, lineHeight: 1.6 }}>
-          dqt only needs read access. We&apos;ll create a least-privilege user and verify the connection before saving.
-        </p>
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-          {ENGINE_CARDS.map((e) => (
-            <button
-              key={e.id}
-              onClick={() => router.push(`/sources/new/${e.id}` as never)}
-              className="p-4 border border-line text-left transition-colors hover:bg-bg-2 hover:border-line-3"
-              style={{ background: "var(--bg-1)" }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <EngineIcon engine={e.id} size={24} />
-                <span className="t-small font-medium" style={{ color: "var(--fg-0)" }}>{e.name}</span>
-              </div>
-              <p className="t-micro mb-1" style={{ color: "var(--fg-3)", fontFamily: "var(--font-jetbrains-mono)" }}>
-                {e.scheme}
-              </p>
-              <p className="t-micro" style={{ color: "var(--fg-2)", lineHeight: 1.5 }}>{e.desc}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -161,9 +108,6 @@ export default function SourcesPage() {
 
   return (
     <>
-      {/* Blocking overlay when no sources connected */}
-      {!loading && sources.length === 0 && <ConnectWarehouseOverlay />}
-
       <div className="p-6 max-w-5xl space-y-8">
         {/* header */}
         <div>

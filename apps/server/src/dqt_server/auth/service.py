@@ -3,29 +3,27 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import jwt
-from passlib.context import CryptContext
 
 from dqt_server.auth.models import User
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _ALGORITHM = "HS256"
 _EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-SEEDED_SYSADMIN_EMAIL = "antonbar@gmail.com"
+SEEDED_SYSADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@localhost")
 
 
 def _secret() -> str:
-    s = os.environ.get("JWT_SECRET", "dev-secret-change-in-prod")
-    return s
+    return os.environ.get("JWT_SECRET", "dev-secret-change-in-prod")
 
 
 def hash_password(password: str) -> str:
-    return _pwd.hash(password)
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return _pwd.verify(password, hashed)
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 def create_token(user: User, picture: str | None = None) -> str:
