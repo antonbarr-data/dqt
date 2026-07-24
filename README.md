@@ -110,6 +110,7 @@ All adapters are cost-guarded (`dryRun`/`EXPLAIN` before any query) and read-onl
 - **dbt** - reads `manifest.json` and `semantic_models.yml` directly
 - **Airflow / Dagster / Prefect** - runs as one Python task
 - **OpenLineage** - ingests events from any non-dbt pipeline
+- **Slack** - post check suite results to a channel via Incoming Webhook ([docs/api/notifications.md](docs/api/notifications.md))
 - **Claude Code** - [Context7 plugin](https://claude.com/plugins/context7) for live dqt docs, [Superpowers](https://claude.com/plugins/superpowers) for agentic check-suite builds
 
 ---
@@ -135,6 +136,7 @@ All adapters are cost-guarded (`dryRun`/`EXPLAIN` before any query) and read-onl
 | [YAML check format](docs/api/yaml-reference.md) | Complete YAML config reference |
 | [CLI reference](docs/api/cli-reference.md) | All CLI commands including `dqt wiki`, `dqt report` |
 | [Python API](docs/api/checks-and-runner.md) | Check model, CheckScope, Runner, MemoryStore |
+| [Notifications](docs/api/notifications.md) | Slack suite reports, EmailNotifier, webhook setup |
 | [LLM Wiki](docs/wiki.md) | Semantic layer synthesis from raw docs |
 | [Adapters](docs/api/adapters.md) | Warehouse adapter protocol |
 | [Local dashboard](docs/dashboard.md) | Browser UI for check results |

@@ -8,6 +8,13 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-07-24
+
+### Added (dqt library)
+- `SlackNotifier.send_suite_report(suite, *, title, level)` -- sends a `SuiteResult` as a Slack Block Kit message to an Incoming Webhook. `level` controls which check rows appear: `"all"`, `"warn"` (default), or `"fail"`.
+- `suite_to_slack_blocks(suite, *, title, level)` -- builds the Block Kit payload from a `SuiteResult` without sending; importable from `dqt.notifications`.
+- `docs/api/notifications.md` -- full reference for Slack and email notifications including scheduler integration examples.
+
 ## [1.3.1] - 2026-05-17
 
 ### Added (dqt library)

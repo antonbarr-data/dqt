@@ -43,6 +43,34 @@ Six adapters ship in v1.0. Nightly CI runs against live credentials for the clou
 | Databricks | ![databricks](https://github.com/antonbarr-data/dqt/actions/workflows/live-adapter-tests.yml/badge.svg?job=databricks) |
 | Local (DuckDB) | bundled — no credentials needed |
 
+## Slack alerts
+
+Run a check suite and post results to Slack in three lines:
+
+```python
+from dqt import Runner, MemoryStore
+from dqt.notifications import SlackNotifier
+
+suite = Runner(MemoryStore()).run_suite(checks, adapter)
+SlackNotifier().send_suite_report(suite, title="nightly orders checks")
+# set SLACK_WEBHOOK_URL env var — no bot token required
+```
+
+Control which checks appear in the message with `level`:
+
+```python
+# only failures
+SlackNotifier().send_suite_report(suite, level="fail")
+
+# warnings + failures (default)
+SlackNotifier().send_suite_report(suite, level="warn")
+
+# every check including passes
+SlackNotifier().send_suite_report(suite, level="all")
+```
+
+Full reference: [docs/api/notifications.md](https://github.com/antonbarr-data/dqt/blob/main/docs/api/notifications.md)
+
 ## Detector documentation
 
 64 statistical detectors across 10 groups — drift, outliers, time series, distribution, information theory, pattern, referential, schema, basic, and custom.

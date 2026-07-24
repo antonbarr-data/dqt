@@ -1,6 +1,6 @@
 [project]
 name = "dqtlib"
-version = "1.4.1"
+version = "1.4.2"
 description = "Data questioning, observability, semantic, and causality library"
 readme = "README.md"
 requires-python = ">=3.12"
