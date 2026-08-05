@@ -1,12 +1,29 @@
 """Ask API -- natural language question resolution."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from dqt.insights.ask import resolve, AskResult, DisambiguationResult, _classify_intent, _extract_window
+from dqt_server.api.v1.ingest import knowledge_for_source
+from dqt_server.db.engine import get_db
+from dqt_server.models.core import MetricDefinition
 
 router = APIRouter(prefix="/api/v1/ask", tags=["ask"])
+
+
+async def _attach_knowledge(resp: dict, db: AsyncSession) -> dict:
+    """Enrich an answer with agent knowledge (OKF prose) for the metric's source."""
+    fqn = resp.get("metric_fqn")
+    if not fqn:
+        return resp
+    md = await db.get(MetricDefinition, fqn)
+    if md is not None and md.source_id:
+        kn = await knowledge_for_source(md.source_id, db)
+        if kn:
+            resp["knowledge"] = kn
+    return resp
 
 
 class AskRequest(BaseModel):
@@ -58,18 +75,18 @@ def _resolve_to_response(question: str, catalog: list[dict]) -> dict:
 
 
 @router.post("")
-async def ask(body: AskRequest) -> dict:
+async def ask(body: AskRequest, db: AsyncSession = Depends(get_db)) -> dict:
     catalog = _catalog_from_registry()
-    return _resolve_to_response(body.question, catalog)
+    return await _attach_knowledge(_resolve_to_response(body.question, catalog), db)
 
 
 @router.post("/clarify")
-async def clarify(body: ClarifyRequest) -> dict:
+async def clarify(body: ClarifyRequest, db: AsyncSession = Depends(get_db)) -> dict:
     catalog = _catalog_from_registry()
     chosen = next((m for m in catalog if m["fqn"] == body.chosen_fqn), None)
     if chosen is None:
-        return _resolve_to_response(body.question, catalog)
-    return {
+        return await _attach_knowledge(_resolve_to_response(body.question, catalog), db)
+    return await _attach_knowledge({
         "type": "answer",
         "intent": _classify_intent(body.question),
         "metric_fqn": chosen["fqn"],
@@ -77,4 +94,4 @@ async def clarify(body: ClarifyRequest) -> dict:
         "window_days": _extract_window(body.question),
         "confidence": 100.0,
         "explanation": None,
-    }
+    }, db)

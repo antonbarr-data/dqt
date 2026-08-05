@@ -1,11 +1,17 @@
 """Synthesise wiki entries from raw documents using the configured LLM.
 
+DEPRECATED: LLM Wiki AI-synthesis is superseded by Google OKF / Apache Ossie repo
+ingestion (`dqt repo add`, dqt.ingest). Prose concepts now come from OKF bundles and
+land in the server-side knowledge store (KnowledgeArtifact) instead of being synthesised
+here. This module is kept for backward compatibility until cutover.
+
 Provider + keys come from the environment via dqt.llm.get_llm (DQT_LLM_PROVIDER).
 See dqt.llm for provider setup (anthropic needs dqt[wiki]; litellm needs dqt[llm]).
 """
 from __future__ import annotations
 
 import hashlib
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -73,6 +79,12 @@ def synthesize_entries(
     Returns the list of newly generated (or regenerated) WikiEntry objects.
     Changed entries are added to manifest.entries in-place.
     """
+    warnings.warn(
+        "LLM Wiki AI-synthesis is deprecated; use Google OKF / Apache Ossie ingest "
+        "(`dqt repo add`, dqt.ingest) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     from dqt.llm import get_llm
 
     llm = get_llm()

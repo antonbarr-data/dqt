@@ -364,6 +364,24 @@ async def sync_repo(repo_id: str, db: AsyncSession = Depends(get_db)) -> dict:
     return {"repo_id": repo.id, "proposal_id": proposal.id, "status": "pending"}
 
 
+async def knowledge_for_source(source_id: str, db: AsyncSession) -> list[dict]:
+    """Agent knowledge (OKF prose concepts) attached to a source. Shared by ask enrichment."""
+    q = await db.execute(
+        select(KnowledgeArtifact).where(KnowledgeArtifact.source_id == source_id)
+        .order_by(KnowledgeArtifact.created_at.desc())
+    )
+    return [
+        {"id": a.id, "title": a.title, "kind": a.kind, "body": a.body}
+        for a in q.scalars().all()
+    ]
+
+
+@router.get("/sources/{source_id}/knowledge")
+async def list_knowledge(source_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """List agent-knowledge artifacts imported from Google OKF / Apache Ossie repos."""
+    return await knowledge_for_source(source_id, db)
+
+
 @router.get("/sources/{source_id}/repos")
 async def list_repos(source_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
     q = await db.execute(
