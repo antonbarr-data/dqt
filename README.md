@@ -136,9 +136,9 @@ All adapters are cost-guarded (`dryRun`/`EXPLAIN` before any query) and read-onl
 
 ## About
 
-[Anton Barr](https://www.linkedin.com/in/antonbar/) is an engineer and data geek with 25+ years building data systems. dqt is a personal project built by a practitioner who believes craft and precision are the same thing, and got tired of tools that answer *what* but never *why*.
+[Anton Barr](https://www.linkedin.com/in/antonbar/) is an engineer and data geek with 25+ years building data systems. dqt is a personal project, built by someone who got tired of tools that answer *what* but never *why*.
 
-質 (shitsu) - quality, substance, the inner nature of a thing. The kanji points to what something truly is, not how it appears. dqt is meant to work the same way: concerned with the truth of the data, not its surface. The mark is also a quiet acknowledgment of a tradition I have learned much from, one in which quality is one of its most distinguishing characteristics, and craft and precision are understood to be the same thing.
+質 (shitsu) - quality, substance, the inner nature of a thing: what it truly is, not how it appears. dqt aims to work the same way, concerned with the truth of the data rather than its surface, and a quiet nod to a tradition where craft and precision are one and the same.
 
 ---
 
