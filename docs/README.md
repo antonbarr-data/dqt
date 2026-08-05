@@ -1,6 +1,6 @@
-# dqt — data questioning, observability, and causality
+# dqt: data quality, observability, and causality for Agentic BI
 
-dqt is an open-source Python library for questioning your SQL warehouses. It detects drift, anomalies, schema changes, and freshness violations — and explains *why* metrics moved using column-level lineage and a causal discovery layer. The library runs standalone in notebooks and CI pipelines; the FastAPI server adds multi-tenancy, scheduling, and a power-user web UI.
+dqt is an open-source Python library for data quality on your SQL warehouses. It detects drift, anomalies, schema changes, and freshness violations, and explains *why* metrics moved using column-level lineage and a causal discovery layer. It imports Google OKF and Apache Ossie semantic repos to auto-populate datasets, metrics, and checks. The library runs standalone in notebooks and CI pipelines; the FastAPI server adds multi-tenancy, scheduling, and a power-user web UI.
 
 ## Architecture
 

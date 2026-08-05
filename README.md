@@ -1,6 +1,6 @@
 # 質 dqt
 
-**A Data Questioning Tool that tells you the what and surfaces the why.**
+**The Data Quality Tool for Agentic BI. Tells you the what and surfaces the why.**
 
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
@@ -38,7 +38,7 @@ Causal candidate: stg_payments -> orders.amount (E-value 3.2, pending human revi
 
 - **Statistical detectors** - MAD, double-MAD, isolation forest, KS, STL residuals, adjusted boxplot fences. Plus completeness, validity, freshness, schema-change, and SQL-assertion checks. Every detector returns `(verdict, score, plain_english)`.
 - **Column-level lineage** - walks your dbt manifest and warehouse DDL with sqlglot. From any incident, automatic blast radius across downstream tables and metrics.
-- **LLM Wiki + Semantic layer** - dump tickets, SQL, and BI reports into `raw/`. Point Claude Code at the vault. It synthesises dataset descriptions, metric definitions, and causal edges into `wiki/` from the artifacts your team already has. Based on [Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+- **Google OKF / Apache Ossie import** - connect a Git repo of [Google OKF](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing) bundles or [Apache Ossie](https://ossie.apache.org) files. An LLM extracts datasets, columns, metrics, and playbooks; you review and select what to import against a live source. Datasets, metrics, and disabled checks land automatically via `dqt repo add`.
 - **Causal discovery** - Granger causality, PCMCI+, Transfer Entropy across your metric time series. Edges are proposed, human-reviewed, then enter the production DAG annotated with lag, confidence, and E-values.
 
 ---
@@ -77,7 +77,8 @@ dqt run checks.yaml
 
 ```bash
 pip install dqtlib                # core library + CLI
-pip install "dqtlib[wiki]"        # + LLM Wiki synthesis (Anthropic Claude)
+pip install "dqtlib[llm]"         # + LiteLLM provider (OKF/Ossie extraction; any LLM)
+pip install "dqtlib[wiki]"        # + direct Anthropic Claude provider (deprecated LLM Wiki)
 pip install "dqtlib[dashboard]"   # + local browser dashboard
 pip install "dqtlib[reports]"     # + HTML profiling reports
 pip install "dqtlib[causal]"      # + PCMCI+ causal discovery
@@ -137,7 +138,7 @@ All adapters are cost-guarded (`dryRun`/`EXPLAIN` before any query) and read-onl
 | [CLI reference](docs/api/cli-reference.md) | All CLI commands including `dqt wiki`, `dqt report` |
 | [Python API](docs/api/checks-and-runner.md) | Check model, CheckScope, Runner, MemoryStore |
 | [Notifications](docs/api/notifications.md) | Slack suite reports, EmailNotifier, webhook setup |
-| [LLM Wiki](docs/wiki.md) | Semantic layer synthesis from raw docs |
+| [Semantic import](docs/wiki.md) | Google OKF / Apache Ossie ingest (replaces LLM Wiki) |
 | [Adapters](docs/api/adapters.md) | Warehouse adapter protocol |
 | [Local dashboard](docs/dashboard.md) | Browser UI for check results |
 | [Benchmarks](docs/benchmarks.md) | F1, recall, precision across 30 trials |
