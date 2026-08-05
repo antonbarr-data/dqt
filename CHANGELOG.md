@@ -8,6 +8,14 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-08-05
+
+### Changed
+- Rebrand to "Data Quality Tool for Agentic BI" across README, package description, and docs; replace the LLM Wiki narrative with the Google OKF / Apache Ossie import story (both linked). Add the `dqtlib[llm]` extra note.
+
+### Fixed
+- CI: install `pytest-asyncio` in the benchmarks job so pytest recognises the shared asyncio config options (fixes a chronic INTERNALERROR at collection).
+
 ## [1.5.0] - 2026-08-05
 
 ### Added (dqt library)

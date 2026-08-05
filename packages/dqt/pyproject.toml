@@ -1,6 +1,6 @@
 [project]
 name = "dqtlib"
-version = "1.5.0"
+version = "1.5.1"
 description = "Data quality, observability, semantic, and causality library for Agentic BI"
 readme = "README.md"
 requires-python = ">=3.12"
