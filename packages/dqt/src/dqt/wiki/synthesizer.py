@@ -1,20 +1,23 @@
-"""Synthesise wiki entries from raw documents using the Anthropic Claude API.
+"""Synthesise wiki entries from raw documents using the configured LLM.
 
-Requires: pip install dqtlib[wiki]  (adds anthropic>=0.26)
-API key:  ANTHROPIC_API_KEY env var
+DEPRECATED: LLM Wiki AI-synthesis is superseded by Google OKF / Apache Ossie repo
+ingestion (`dqt repo add`, dqt.ingest). Prose concepts now come from OKF bundles and
+land in the server-side knowledge store (KnowledgeArtifact) instead of being synthesised
+here. This module is kept for backward compatibility until cutover.
+
+Provider + keys come from the environment via dqt.llm.get_llm (DQT_LLM_PROVIDER).
+See dqt.llm for provider setup (anthropic needs dqt[wiki]; litellm needs dqt[llm]).
 """
 from __future__ import annotations
 
 import hashlib
-import json
-import os
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from dqt.wiki.models import RawDocument, SyncManifest, WikiEntry
 
-_DEFAULT_MODEL = "claude-opus-4-7"
 _MAX_TOKENS = 2048
 
 _SYSTEM_PROMPT = """\
@@ -64,7 +67,7 @@ def synthesize_entries(
     docs: list[RawDocument],
     manifest: SyncManifest,
     *,
-    model: str = _DEFAULT_MODEL,
+    model: str | None = None,
     force: bool = False,
     progress: Callable[[str], None] | None = None,
 ) -> list[WikiEntry]:
@@ -76,22 +79,20 @@ def synthesize_entries(
     Returns the list of newly generated (or regenerated) WikiEntry objects.
     Changed entries are added to manifest.entries in-place.
     """
-    try:
-        import anthropic
-    except ImportError as exc:
-        raise ImportError(
-            "dqt[wiki] extra is required for AI synthesis. "
-            "Run: pip install dqtlib[wiki]"
-        ) from exc
+    warnings.warn(
+        "LLM Wiki AI-synthesis is deprecated; use Google OKF / Apache Ossie ingest "
+        "(`dqt repo add`, dqt.ingest) instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    from dqt.llm import get_llm
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
+    llm = get_llm()
+    if llm is None:
         raise EnvironmentError(
-            "ANTHROPIC_API_KEY environment variable is not set. "
-            "Export it before running dqt wiki sync."
+            "No LLM is configured. Set DQT_LLM_PROVIDER and the matching key "
+            "(ANTHROPIC_API_KEY, or LITELLM_MODEL + a LiteLLM key) before running dqt wiki sync."
         )
-
-    client = anthropic.Anthropic(api_key=api_key)
 
     # Group docs: one wiki entry per top-level subfolder, individual entries for root files
     groups: dict[str, list[RawDocument]] = {}
@@ -126,13 +127,12 @@ def synthesize_entries(
                 progress(f"synthesising {title!r} ({len(batch)} doc(s))")
 
             user_msg = _build_user_message(batch)
-            response = client.messages.create(
+            body = llm.complete(
+                [{"role": "user", "content": user_msg}],
+                system=_SYSTEM_PROMPT,
                 model=model,
                 max_tokens=_MAX_TOKENS,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_msg}],
             )
-            body = response.content[0].text.strip()
 
             entry = WikiEntry(
                 id=entry_id,

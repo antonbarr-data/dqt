@@ -37,6 +37,7 @@ from dqt_server.auth.service import SEEDED_SYSADMIN_EMAIL
 from dqt_server.dashboard import router as dashboard_router
 from dqt_server.db.engine import AsyncSessionLocal, Base, engine
 from dqt_server.models import ref_data as _ref_models  # noqa: F401 -- registers ORM models with Base
+from dqt_server.models import ingest as _ingest_models  # noqa: F401 -- registers ingest ORM models with Base
 from dqt_server.ref_data import ISO_COUNTRIES, ISO_CURRENCIES
 from dqt_server.ref_data_languages import ISO_LANGUAGES
 from dqt_server.ref_data_timezones import ISO_TIMEZONES
@@ -232,6 +233,7 @@ from dqt_server.api.v1.causal_compute import router as causal_compute_router
 from dqt_server.api.v1.schedules import router as schedules_router
 from dqt_server.api.v1.oncall import router as oncall_router
 from dqt_server.api.v1.column_profile import router as column_profile_router
+from dqt_server.api.v1.ingest import router as ingest_router
 
 app.include_router(auth_router)
 app.include_router(dashboard_router)
@@ -250,6 +252,7 @@ app.include_router(causal_compute_router)
 app.include_router(schedules_router)
 app.include_router(oncall_router)
 app.include_router(column_profile_router)
+app.include_router(ingest_router)
 
 
 @app.get("/health", tags=["ops"])

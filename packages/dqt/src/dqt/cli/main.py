@@ -351,6 +351,91 @@ def _cmd_compile(args: argparse.Namespace) -> None:
 # Entry point
 # ---------------------------------------------------------------------------
 
+_FORMAT_LABEL = {"okf": "Google OKF", "ossie": "Apache Ossie"}
+
+
+def _repo_poll(httpx, base: str, proposal_id: str) -> dict:
+    import time
+    for _ in range(80):
+        r = httpx.get(f"{base}/api/v1/proposals/{proposal_id}", timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        if data["status"] in ("ready", "failed"):
+            return data
+        time.sleep(1.5)
+    raise SystemExit("Timed out waiting for extraction.")
+
+
+def _repo_print(payload: dict) -> None:
+    print(f"\nExtracted from {len(payload.get('sources_seen', []))} file(s):")
+    for d in payload.get("datasets", []):
+        badge = "in source" if d.get("available") else "NOT IN SOURCE"
+        fmt = _FORMAT_LABEL.get((d.get("provenance") or [{}])[0].get("format", ""), "")
+        print(f"  dataset {d['id']}  [{fmt}] [{badge}]")
+        for c in d.get("columns", []):
+            flags = " ".join(f for f, on in (("pk", c["primary_key"]), ("time", c["is_time"]), ("metric", c["is_metric"])) if on)
+            avail = "" if c.get("available") else "  (not in source)"
+            print(f"      col {c['name']}: {c.get('live_data_type') or c.get('data_type') or ''} {flags}{avail}")
+        for m in d.get("metrics", []):
+            print(f"      metric {m['name']} ({m['kind']}) {m.get('expression') or ''}")
+    print(f"  checks (disabled): {len(payload.get('checks', []))}")
+    kn = payload.get("knowledge", [])
+    if kn:
+        print(f"  knowledge: {', '.join(k['title'] for k in kn)}")
+    if payload.get("conflicts"):
+        print(f"  conflicts: {len(payload['conflicts'])}")
+
+
+def _repo_apply_all(httpx, base: str, proposal_id: str, payload: dict) -> None:
+    datasets = [d for d in payload.get("datasets", []) if d.get("available")]
+    ids = {d["id"] for d in datasets}
+    body = {
+        "dataset_ids": list(ids),
+        "metric_ids": [m["id"] for d in datasets for m in d.get("metrics", [])],
+        "check_ids": [c["id"] for c in payload.get("checks", []) if c["dataset"] in ids],
+        "knowledge_ids": [k["id"] for k in payload.get("knowledge", [])],
+    }
+    r = httpx.post(f"{base}/api/v1/proposals/{proposal_id}/apply", json=body, timeout=60)
+    r.raise_for_status()
+    c = r.json().get("created", {})
+    print(f"\nImported: {c.get('datasets',0)} dataset(s), {c.get('metrics',0)} metric(s), "
+          f"{c.get('checks',0)} check(s), {c.get('knowledge',0)} note(s).")
+
+
+def _cmd_repo(args: argparse.Namespace) -> None:
+    """Connect Google OKF / Apache Ossie repos to a Source and import from them."""
+    import httpx
+    base = args.server.rstrip("/")
+    if args.repo_command == "list":
+        r = httpx.get(f"{base}/api/v1/sources/{args.source}/repos", timeout=30)
+        r.raise_for_status()
+        repos = r.json()
+        if not repos:
+            print("No repos connected.")
+            return
+        for repo in repos:
+            print(f"{repo['id']}  {repo['status']:<10}  {repo['git_url']}  (commit {repo.get('last_commit') or '-'})")
+        return
+
+    if args.repo_command == "add":
+        r = httpx.post(f"{base}/api/v1/sources/{args.source}/repos",
+                       json={"git_url": args.git_url, "branch": args.branch, "subpath": args.subpath}, timeout=60)
+    else:  # sync
+        r = httpx.post(f"{base}/api/v1/repos/{args.repo_id}/sync", timeout=60)
+    if r.status_code >= 400:
+        raise SystemExit(f"ERROR: {r.status_code} {r.text}")
+    proposal_id = r.json()["proposal_id"]
+    print(f"Extracting (proposal {proposal_id})...")
+    data = _repo_poll(httpx, base, proposal_id)
+    if data["status"] == "failed":
+        raise SystemExit(f"Extraction failed: {data.get('error')}")
+    _repo_print(data["payload"])
+    if getattr(args, "all", False):
+        _repo_apply_all(httpx, base, proposal_id, data["payload"])
+    else:
+        print("\nRe-run with --all to import, or use the web UI to select a subset.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="dqt", description="dqt data quality CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -395,8 +480,8 @@ def main() -> None:
     p_wiki_sync = wiki_sub.add_parser("sync", help="Synthesise wiki entries from raw documents")
     p_wiki_sync.add_argument("raw_dir", help="Path to raw/ source documents folder")
     p_wiki_sync.add_argument("wiki_dir", help="Path to wiki/ output folder")
-    p_wiki_sync.add_argument("--model", default="claude-opus-4-7",
-                             help="Anthropic model (default: claude-opus-4-7)")
+    p_wiki_sync.add_argument("--model", default=None,
+                             help="Override the model (default: the configured LLM's model)")
     p_wiki_sync.add_argument("--force", action="store_true",
                              help="Re-synthesise all entries even if unchanged")
 
@@ -404,7 +489,32 @@ def main() -> None:
     p_wiki_status.add_argument("raw_dir", help="Path to raw/ source documents folder")
     p_wiki_status.add_argument("wiki_dir", help="Path to wiki/ output folder")
 
+    # repo (Google OKF / Apache Ossie ingest)
+    repo_parser = sub.add_parser("repo", help="Connect Google OKF / Apache Ossie repos to a Source")
+    repo_sub = repo_parser.add_subparsers(dest="repo_command", required=True)
+
+    p_repo_add = repo_sub.add_parser("add", help="Register a repo against a Source and extract a proposal")
+    p_repo_add.add_argument("git_url", help="Git URL (or local path) of a Google OKF / Apache Ossie repo")
+    p_repo_add.add_argument("--source", required=True, help="Existing Source id to bind and import into")
+    p_repo_add.add_argument("--branch", default=None, help="Git branch")
+    p_repo_add.add_argument("--subpath", default=None, help="Subdirectory within the repo")
+    p_repo_add.add_argument("--server", "-s", default="http://localhost:8000", help="dqt server URL")
+    p_repo_add.add_argument("--all", action="store_true", help="Import all source-present items (default: print only)")
+
+    p_repo_sync = repo_sub.add_parser("sync", help="Re-pull a repo and re-extract a proposal")
+    p_repo_sync.add_argument("repo_id", help="Knowledge repo id")
+    p_repo_sync.add_argument("--server", "-s", default="http://localhost:8000", help="dqt server URL")
+    p_repo_sync.add_argument("--all", action="store_true", help="Import all source-present items after re-extraction")
+
+    p_repo_list = repo_sub.add_parser("list", help="List repos connected to a Source")
+    p_repo_list.add_argument("--source", required=True, help="Source id")
+    p_repo_list.add_argument("--server", "-s", default="http://localhost:8000", help="dqt server URL")
+
     args = parser.parse_args()
+
+    if args.command == "repo":
+        _cmd_repo(args)
+        return
 
     if args.command == "wiki":
         if args.wiki_command == "sync":

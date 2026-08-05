@@ -1,4 +1,12 @@
-# LLM Wiki: AI-assisted knowledge synthesis
+# LLM Wiki: AI-assisted knowledge synthesis (deprecated)
+
+> **Deprecated.** LLM Wiki AI-synthesis is superseded by importing open semantic
+> formats: [Google OKF](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing)
+> and [Apache Ossie](https://ossie.apache.org). Instead of synthesising a wiki from
+> raw docs, connect a Git repo of Google OKF bundles or Apache Ossie files to a source
+> with `dqt repo add <git-url> --source <id>`: dqt extracts datasets, columns, metrics,
+> and prose playbooks, you review and select what to import, and the prose lands in the
+> agent knowledge store. See the ingest docs. This page is kept as legacy reference.
 
 dqt ships a pipeline that turns a folder of raw source documents into a structured, AI-written knowledge wiki, then renders it as a shareable HTML report.
 

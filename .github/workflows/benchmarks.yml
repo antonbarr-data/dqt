@@ -20,7 +20,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install dqtlib (base deps only) and pytest
-        run: pip install -e packages/dqt pytest
+        # pytest-asyncio is required because the shared pyproject pytest config sets
+        # asyncio_mode/asyncio_default_fixture_loop_scope and treats warnings as errors;
+        # without it pytest raises "Unknown config option" and aborts (exit 3).
+        run: pip install -e packages/dqt pytest pytest-asyncio
 
       - name: Run benchmark suite (quick)
         run: python scripts/run_benchmark_suite.py --quick

@@ -18,10 +18,10 @@ def sync_command(
     raw_dir: str = typer.Argument(..., help="Path to raw/ source documents folder."),
     wiki_dir: str = typer.Argument(..., help="Path to wiki/ output folder."),
     model: str = typer.Option(
-        "claude-opus-4-7",
+        None,
         "--model",
         "-m",
-        help="Anthropic model to use for synthesis.",
+        help="Override the model (default: the configured LLM's model).",
     ),
     force: bool = typer.Option(
         False,
