@@ -1,7 +1,8 @@
 """Narrative generation pipeline.
 
-Tries to generate prose via Claude claude-haiku-4-5-20251001. Falls back to template prose when:
-- ANTHROPIC_API_KEY is not set
+Tries to generate prose via the configured LLM (see dqt.llm.get_llm). Falls back to
+template prose when:
+- no LLM is configured (provider key unset)
 - LLM is unavailable
 - Post-processor rejects all 3 attempts (every number must trace to an EvidenceRow)
 
@@ -11,10 +12,10 @@ evidence rows that produced it.
 from __future__ import annotations
 
 import json
-import os
 import re
 
 from dqt.insights.models import EvidenceRow, MovementExplanation
+from dqt.llm import LLMProvider, get_llm
 
 _MAX_RETRIES = 3
 _MAX_WORDS_INSIGHT = 200
@@ -22,15 +23,15 @@ _MAX_WORDS_INSIGHT = 200
 
 def generate(explanation: MovementExplanation) -> MovementExplanation:
     """Populate summary_paragraph and citations on explanation, return it."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
+    llm = get_llm()
+    if llm is None:
         return _apply_template(explanation)
 
     evidence_by_id = _build_evidence_index(explanation)
 
     for attempt in range(_MAX_RETRIES):
         try:
-            prose = _call_llm(explanation, evidence_by_id, api_key)
+            prose = _call_llm(explanation, evidence_by_id, llm)
             citations, valid_citations = _post_process_citations(prose, evidence_by_id)
             if valid_citations or attempt == _MAX_RETRIES - 1:
                 explanation.summary_paragraph = _strip_citations(prose)
@@ -91,10 +92,8 @@ def _build_evidence_index(explanation: MovementExplanation) -> dict[str, Evidenc
 def _call_llm(
     explanation: MovementExplanation,
     evidence_by_id: dict[str, EvidenceRow],
-    api_key: str,
+    llm: LLMProvider,
 ) -> str:
-    import anthropic
-
     evidence_json = json.dumps(
         [
             {
@@ -128,13 +127,10 @@ RULES:
 
 Write the paragraph now:"""
 
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    return llm.complete(
+        [{"role": "user", "content": prompt}],
         max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
     )
-    return message.content[0].text.strip()
 
 
 def _post_process_citations(

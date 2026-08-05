@@ -395,8 +395,8 @@ def main() -> None:
     p_wiki_sync = wiki_sub.add_parser("sync", help="Synthesise wiki entries from raw documents")
     p_wiki_sync.add_argument("raw_dir", help="Path to raw/ source documents folder")
     p_wiki_sync.add_argument("wiki_dir", help="Path to wiki/ output folder")
-    p_wiki_sync.add_argument("--model", default="claude-opus-4-7",
-                             help="Anthropic model (default: claude-opus-4-7)")
+    p_wiki_sync.add_argument("--model", default=None,
+                             help="Override the model (default: the configured LLM's model)")
     p_wiki_sync.add_argument("--force", action="store_true",
                              help="Re-synthesise all entries even if unchanged")
 

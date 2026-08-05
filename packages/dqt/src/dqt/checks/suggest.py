@@ -121,14 +121,12 @@ def suggest_checks_for_column(
 
 
 def _llm_suggestions(profile: ColumnProfile) -> list[SuggestedCheck]:
-    """Semantic suggestions via LLM. No-ops gracefully if API key absent."""
+    """Semantic suggestions via LLM. No-ops gracefully if no LLM is configured."""
     try:
-        import anthropic as _anthropic
-        import os as _os
-        api_key = _os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
+        from dqt.llm import get_llm
+        llm = get_llm()
+        if llm is None:
             return []
-        client = _anthropic.Anthropic(api_key=api_key)
         prompt = (
             f"Column: {profile.name}, type: {profile.data_type}, "
             f"null_fraction: {profile.null_fraction:.3f}, "
@@ -138,12 +136,8 @@ def _llm_suggestions(profile: ColumnProfile) -> list[SuggestedCheck]:
             "Reply as JSON: [{\"detector_slug\": str, \"params\": dict, \"rationale\": str, \"confidence\": float}]. "
             "Only include checks with confidence > 0.6. Return [] if nothing to add."
         )
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001", max_tokens=512,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        raw = llm.complete([{"role": "user", "content": prompt}], max_tokens=512)
         import json as _json
-        raw = msg.content[0].text.strip()
         parsed = _json.loads(raw)
         return [
             SuggestedCheck(
