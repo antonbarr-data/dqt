@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { serverFetch } from "@/lib/server-api";
 import { SourceEditForm } from "./source-edit-form";
+import { ConnectRepo } from "./connect-repo";
 
 interface SourceDetail {
   id: string;
@@ -86,6 +87,19 @@ export default async function SourceDetailPage({
               port: String(source.port),
             }}
           />
+        </div>
+      </div>
+
+      {/* knowledge repositories (Google OKF / Apache Ossie ingest) */}
+      <div className="border border-line mb-6" style={{ background: "var(--bg-1)" }}>
+        <div className="px-4 py-3 border-b border-line">
+          <p className="t-small font-medium" style={{ color: "var(--fg-0)" }}>Knowledge repositories</p>
+          <p className="t-micro mt-0.5" style={{ color: "var(--fg-2)" }}>
+            Connect a Google OKF or Apache Ossie repo to import datasets, metrics, and checks.
+          </p>
+        </div>
+        <div className="px-4 py-5">
+          <ConnectRepo sourceId={source.id} />
         </div>
       </div>
     </div>
