@@ -1,7 +1,7 @@
 [project]
 name = "dqtlib"
-version = "1.4.2"
-description = "Data questioning, observability, semantic, and causality library"
+version = "1.5.0"
+description = "Data quality, observability, semantic, and causality library for Agentic BI"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }

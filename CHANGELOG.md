@@ -8,6 +8,22 @@ The library (`dqt`) and the server (`dqt-server`) version independently. Library
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-05
+
+### Added (dqt library)
+- Canonical LLM layer (`dqt.llm`): `get_llm()` factory selecting **LiteLLM** or direct **Claude (Anthropic)** via `DQT_LLM_PROVIDER` (default `anthropic`); returns `None` when unconfigured so AI features degrade off. `LiteLLMProvider` routes to a LiteLLM proxy via `custom_llm_provider="litellm_proxy"` when `LITELLM_API_BASE` is set. New `llm` extra (`litellm`).
+- Google OKF / Apache Ossie ingest (`dqt.ingest`): recursive repo discovery, deterministic pre-parse, LLM extraction into a validated `IngestProposal` (datasets, columns, metrics, prose knowledge) with merge/dedupe and conflict reporting; metadata-driven derivation of disabled checks (`derive_checks`).
+- `dqt repo add | sync | list` CLI to connect a Git repo of Google OKF / Apache Ossie files to a source, extract a reviewable proposal, and import.
+
+### Changed (dqt library)
+- LLM calls (narrative, check suggestion, wiki) now route through `dqt.llm.get_llm()` (one canonical provider path).
+
+### Deprecated (dqt library)
+- LLM Wiki AI-synthesis (`dqt.wiki.synthesizer`) is superseded by Google OKF / Apache Ossie ingest; emits a `DeprecationWarning`.
+
+### Added (server)
+- Repo ingest endpoints: register a Git repo against a Source, LLM-extract a reviewable `ImportProposal`, and apply a selected subset (datasets, metrics, disabled checks). Prose concepts land in a server-side agent knowledge store (`KnowledgeArtifact`), surfaced through the Ask API. Web review-and-select UI on the Source page.
+
 ## [1.4.2] - 2026-07-24
 
 ### Added (dqt library)
