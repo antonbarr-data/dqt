@@ -370,11 +370,15 @@ export default function RootPage() {
         </div>
 
         <h1 style={{ fontSize: "clamp(44px, 5.6vw, 78px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.05, color: "var(--fg-0)", maxWidth: 740 }}>
-          Data quality for <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Agentic BI</em>. The <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
+          Data Quality Tool for <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Agentic BI</em>. The <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
         <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 620, lineHeight: 1.7 }}>
           Unifies your scattered data into <strong style={{ color: "#ffffff" }}>one source of truth</strong>. Upgrades your existing models, dashboards, and queries into a <strong style={{ color: "#ffffff" }}>causal semantic layer</strong> you didn&apos;t have to write. Picks up on <strong style={{ color: "#ffffff" }}>trends</strong> and surfaces <strong style={{ color: "#ffffff" }}>business insights</strong>, all wrapped in a quality harness that puts <strong style={{ color: "#ffffff" }}>guardrails on the AI</strong> so the reports it generates stay <strong style={{ color: "#ffffff" }}>on-spec</strong>.
+        </p>
+
+        <p className="mt-4" style={{ fontSize: 14, color: "var(--fg-1)", maxWidth: 620, lineHeight: 1.7, borderLeft: "2px solid var(--accent)", paddingLeft: 12 }}>
+          Every other data quality tool tells you <em style={{ fontStyle: "normal", color: "var(--fg-0)" }}>that</em> a metric broke. dqt is the open, gap-free superset that also tells you <em style={{ fontStyle: "normal", color: "var(--accent)" }}>why</em> - the only one with a causal layer that Great Expectations, Soda, Elementary, Dataplex, and Monte Carlo lack.
         </p>
 
         <p className="mt-3 flex items-center gap-2 flex-wrap" style={{ fontSize: 12, color: "var(--fg-2)" }}>

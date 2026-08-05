@@ -1,6 +1,6 @@
 # dqtlib
 
-**Data quality for Agentic BI. The what and the why.**
+**Data Quality Tool for Agentic BI. The what and the why.**
 
 Unifies your scattered data into one source of truth. Upgrades your existing models, dashboards, and queries into a causal semantic layer you didn't have to write. Picks up on trends and surfaces business insights, all wrapped in a quality harness that puts guardrails on the AI so the reports it generates stay on-spec.
 
