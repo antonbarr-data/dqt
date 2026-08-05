@@ -482,6 +482,7 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
   const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedBQDatasets, setSelectedBQDatasets] = useState<Set<string>>(new Set());
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
+  const [tableSearch, setTableSearch] = useState("");
 
   // Step 4 state
   const [suggestions, setSuggestions] = useState<CheckSuggestion[]>([]);
@@ -861,6 +862,24 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
   const visibleTables = isBQ
     ? tables.filter((t) => selectedBQDatasets.has(t.schema))
     : tables;
+
+  // "Choose Tables" search + bulk select/unselect (scoped to the filtered list)
+  const tableKeyOf = (t: TableItem) => (isBQ ? `${t.schema}.${t.name}` : t.name);
+  const tableQuery = tableSearch.trim().toLowerCase();
+  const filteredTables = tableQuery
+    ? visibleTables.filter((t) => tableKeyOf(t).toLowerCase().includes(tableQuery))
+    : visibleTables;
+  const filteredTableKeys = filteredTables.map(tableKeyOf);
+  const allFilteredSelected =
+    filteredTableKeys.length > 0 && filteredTableKeys.every((k) => selectedTables.has(k));
+  function toggleAllFiltered() {
+    setSelectedTables((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) filteredTableKeys.forEach((k) => next.delete(k));
+      else filteredTableKeys.forEach((k) => next.add(k));
+      return next;
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // Render
@@ -1257,7 +1276,31 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
               Select the tables you want to monitor. You can change this later.
             </p>
 
-            <div className="border border-line" style={{ background: "var(--bg-1)" }}>
+            {!tablesLoading && visibleTables.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  placeholder="Search tables"
+                  className="flex-1 px-3 py-2 border t-small outline-none"
+                  style={{ background: "var(--bg-1)", color: "var(--fg-0)", borderColor: "var(--line)", minWidth: 180 }}
+                />
+                <button
+                  onClick={toggleAllFiltered}
+                  disabled={filteredTableKeys.length === 0}
+                  className="px-3 py-2 t-small border border-line transition-colors hover:bg-bg-2"
+                  style={{ color: "var(--fg-1)", opacity: filteredTableKeys.length === 0 ? 0.4 : 1 }}
+                >
+                  {allFilteredSelected ? "Unselect all" : "Select all"}
+                  {tableQuery ? " (filtered)" : ""}
+                </button>
+                <span className="t-micro" style={{ color: "var(--fg-2)", whiteSpace: "nowrap" }}>
+                  {selectedTables.size} selected · {filteredTables.length} shown
+                </span>
+              </div>
+            )}
+
+            <div className="border border-line" style={{ background: "var(--bg-1)", maxHeight: 340, overflowY: "auto" }}>
               {tablesLoading ? (
                 <div className="px-4 py-4 flex items-center gap-2 t-small" style={{ color: "var(--fg-2)" }}>
                   <Loader2 size={13} strokeWidth={1.6} className="animate-spin" />
@@ -1265,8 +1308,10 @@ function WizardCreate({ engine, sourceId, initialValues = {}, mode = "create" }:
                 </div>
               ) : visibleTables.length === 0 ? (
                 <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>No tables found.</div>
+              ) : filteredTables.length === 0 ? (
+                <div className="px-4 py-4 t-small" style={{ color: "var(--fg-2)" }}>No tables match &quot;{tableSearch}&quot;.</div>
               ) : (
-                visibleTables.map((t, i) => {
+                filteredTables.map((t, i) => {
                   const key = isBQ ? `${t.schema}.${t.name}` : t.name;
                   return (
                     <label
