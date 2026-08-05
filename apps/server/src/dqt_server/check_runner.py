@@ -48,10 +48,20 @@ class TableCheckResult:
     error: str | None = None
 
 
+def _sanitize_json_text(s: str) -> str:
+    """Normalize whitespace that editors/chat inject and that json.loads rejects.
+
+    Service-account keys are often pasted through tools that substitute regular spaces
+    with non-breaking / narrow / figure spaces, or prepend a BOM. json.loads treats
+    these as invalid, so translate them to plain spaces (or drop) before parsing.
+    """
+    _BAD = {0x00A0: " ", 0x2007: " ", 0x202F: " ", 0x2060: None, 0xFEFF: None}
+    return s.translate(_BAD)
+
 def _bq_credentials_from_json(json_str: str):
     """Build Google credentials from either a service-account or authorized_user JSON."""
     import json as _json
-    info = _json.loads(json_str)
+    info = _json.loads(_sanitize_json_text(json_str))
     cred_type = info.get("type", "")
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
     if cred_type == "service_account":
@@ -94,7 +104,7 @@ def _bq_project_from_json(json_str: str) -> str | None:
     """Extract the GCP project ID from a credentials JSON string, or None."""
     try:
         import json as _json
-        info = _json.loads(json_str)
+        info = _json.loads(_sanitize_json_text(json_str))
         return info.get("quota_project_id") or info.get("project_id")
     except Exception:
         return None
