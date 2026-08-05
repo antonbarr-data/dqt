@@ -1,6 +1,6 @@
 # 質 dqt
 
-**The Data Quality Tool for Agentic BI. Tells you the what and surfaces the why.**
+**Data quality for Agentic BI. The what and the why.**
 
 [![Python ≥3.12](https://img.shields.io/badge/python-%E2%89%A53.12-blue?style=flat-square)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
