@@ -108,10 +108,10 @@ const CAPABILITIES = [
     labelColor: "var(--warn)",
   },
   {
-    label: "LLM Wiki · Semantic layer",
-    slugline: "raw/ holds facts. wiki/ holds knowledge.",
-    desc: "dqt uses Karpathy's LLM Wiki pattern. Dump your Trello tickets, SQL files, and BI reports into raw/. Point Claude Code at the vault. It synthesises wiki/ — dataset descriptions, metric definitions, causal edges — from the artifacts your team already has. YAML contracts compatible with dbt's semantic_models.yml.",
-    mono: "raw/tickets/ · raw/sql/ · raw/reports/ → wiki/metrics/ · wiki/lineage/",
+    label: "Google OKF / Apache Ossie · Semantic layer",
+    slugline: "Point dqt at a repo. It imports the semantic layer.",
+    desc: "Connect a Git repo of Google OKF bundles or Apache Ossie files. dqt walks the tree, an LLM extracts the datasets, columns, metrics, and playbooks, and you review and select what to import against a live source. Datasets, metrics, and disabled checks land automatically.",
+    mono: "okf/tables/ · okf/metrics/ · ossie/*.yaml → datasets · metrics · checks",
     borderColor: "var(--fg-3)",
     labelColor: "var(--fg-2)",
   },
@@ -370,7 +370,7 @@ export default function RootPage() {
         </div>
 
         <h1 style={{ fontSize: "clamp(44px, 5.6vw, 78px)", fontWeight: 200, letterSpacing: "-0.03em", lineHeight: 1.05, color: "var(--fg-0)", maxWidth: 740 }}>
-          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Questioning</em> Tool that tells you the <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
+          A <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Data Quality</em> Tool for <em style={{ fontStyle: "normal", color: "var(--accent)" }}>Agentic BI</em> that tells you the <em style={{ fontStyle: "normal", color: "var(--warn)" }}>what</em> and the <em style={{ fontStyle: "normal", color: "var(--fail)" }}>why</em>.
         </h1>
 
         <p className="mt-4" style={{ fontSize: 16, color: "var(--fg-1)", maxWidth: 620, lineHeight: 1.7 }}>
@@ -398,26 +398,26 @@ export default function RootPage() {
 
         <div className="mt-5 border-l-2 pl-4 py-1" style={{ borderColor: "var(--accent)", maxWidth: 560 }}>
           <p style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500, marginBottom: 6 }}>
-            New · LLM Wiki semantic layer
+            New · Google OKF / Apache Ossie import
           </p>
           <p style={{ fontSize: 15, color: "var(--fg-0)", fontWeight: 400, lineHeight: 1.55, marginBottom: 8 }}>
-            Your task board is already a semantic layer. dqt extracts it.
+            Your semantic layer already exists in an open format. dqt imports it.
           </p>
           <p style={{ fontSize: 13, color: "var(--fg-1)", lineHeight: 1.7, marginBottom: 10 }}>
-            Dump tickets, SQL, and BI reports into{" "}
-            <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>raw/</span>.
-            Point Claude Code at the vault — it synthesises dataset descriptions, metric definitions, and causal edges into{" "}
-            <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>wiki/</span>.
-            No manual YAML authoring.
+            Connect a Git repo of{" "}
+            <a href="https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-0)", borderBottom: "1px solid var(--line)" }}>Google OKF</a>{" "}
+            bundles or{" "}
+            <a href="https://ossie.apache.org" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-0)", borderBottom: "1px solid var(--line)" }}>Apache Ossie</a>{" "}
+            files. An LLM extracts datasets, metrics, and playbooks. You review and select what to import. No manual YAML authoring.
           </p>
           <a
-            href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f"
+            href="https://ossie.apache.org"
             target="_blank"
             rel="noopener noreferrer"
             style={{ fontSize: 12, color: "var(--fg-1)", textDecoration: "none" }}
             className="transition-opacity hover:opacity-70"
           >
-            Based on Karpathy&apos;s LLM Wiki pattern ↗
+            Built on Google OKF and Apache Ossie ↗
           </a>
         </div>
 
@@ -522,7 +522,7 @@ export default function RootPage() {
                   <p style={{ fontSize: 11, color: "var(--fg-2)", fontFamily: "var(--font-jetbrains-mono)", lineHeight: 1.8, paddingTop: 4 }}>{c.mono}</p>
                 )}
                 {c.highlight && (
-                  <p style={{ fontSize: 11, color: "var(--pass)", paddingTop: 4, fontWeight: 500 }}>The only data questioning tool that ships causal discovery.</p>
+                  <p style={{ fontSize: 11, color: "var(--pass)", paddingTop: 4, fontWeight: 500 }}>The only data quality tool for Agentic BI that ships causal discovery.</p>
                 )}
               </div>
             ))}
@@ -530,21 +530,21 @@ export default function RootPage() {
         </div>
       </section>
 
-      {/* ── LLM Wiki ── */}
+      {/* ── Google OKF / Apache Ossie import ── */}
       <section className="border-t border-line px-8 py-14 max-w-5xl mx-auto">
         <div className="grid grid-cols-2 gap-12 items-start">
           <div>
             <p style={{ fontSize: 10, color: "var(--fg-1)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
-              <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-1)", borderBottom: "1px solid var(--line)" }}>Karpathy&apos;s LLM Wiki pattern</a>
+              <a href="https://ossie.apache.org" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-1)", borderBottom: "1px solid var(--line)" }}>Google OKF and Apache Ossie</a>
             </p>
             <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", fontWeight: 300, letterSpacing: "-0.02em", lineHeight: 1.2, marginBottom: 16 }}>
-              Your data warehouse<br />already has documentation.<br />It&apos;s in your Trello board.
+              Your semantic layer<br />is already written<br />in an open format.
             </h2>
             <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 12 }}>
-              Every BI request your GTM team filed is a semantic definition waiting to be extracted. The ticket says what the metric means. The SQL says how it&apos;s computed. The report says what thresholds matter.
+              <a href="https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-0)", borderBottom: "1px solid var(--line)" }}>Google OKF</a> captures tables, metrics, and playbooks as markdown with YAML frontmatter. <a href="https://ossie.apache.org" target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-0)", borderBottom: "1px solid var(--line)" }}>Apache Ossie</a> is a vendor neutral semantic model. Both are just files in a Git repo.
             </p>
             <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 20 }}>
-              dqt uses Karpathy&apos;s LLM Wiki structure: <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>raw/</span> for atomic source documents, <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 12, color: "var(--fg-0)" }}>wiki/</span> for synthesised knowledge. Point Claude Code at the vault and it writes the semantic layer for you — from the artifacts your team already has.
+              Point dqt at the repo. An LLM extracts every dataset, column, metric, and playbook, reconciles them against your live warehouse, and you review and select what to import. Datasets, metrics, and a set of disabled checks land automatically. No manual YAML authoring.
             </p>
             <a
               href={GITHUB_URL + "/blob/main/docs/semantic-layer.md"}
@@ -557,11 +557,11 @@ export default function RootPage() {
           </div>
           <div className="space-y-0 border border-line" style={{ background: "var(--bg-1)" }}>
             {[
-              { step: "1", label: "Export Trello tickets + attachments", sub: "SQL files, report HTMLs, metric definitions", color: "var(--fg-3)" },
-              { step: "2", label: "Put them in raw/", sub: "raw/tickets/ · raw/sql/ · raw/reports/ · raw/schema/", color: "var(--fg-3)" },
-              { step: "3", label: "Point Claude Code at the vault", sub: "cd vault && claude .", color: "var(--accent)" },
-              { step: "4", label: "Claude Code synthesises wiki/", sub: "datasets, metrics, lineage, causal edges — grounded in your actual data", color: "var(--accent)" },
-              { step: "5", label: "dqt generates per-column docs + checks", sub: "write_vault() · dqt run checks.yaml", color: "var(--pass)" },
+              { step: "1", label: "Author or clone a semantic repo", sub: "Google OKF bundles or Apache Ossie files in Git", color: "var(--fg-3)" },
+              { step: "2", label: "Connect it to a source", sub: "dqt repo add <git-url> --source <id>", color: "var(--fg-3)" },
+              { step: "3", label: "dqt extracts a proposal", sub: "an LLM normalises datasets, columns, metrics, and playbooks", color: "var(--accent)" },
+              { step: "4", label: "Review and select what to import", sub: "reconciled against your live warehouse schema", color: "var(--accent)" },
+              { step: "5", label: "Datasets, metrics, and checks land", sub: "checks created disabled, armed after review", color: "var(--pass)" },
             ].map((s, i) => (
               <div key={i} className="flex items-start gap-4 px-5 py-4 border-b border-line last:border-0">
                 <span style={{ fontFamily: "var(--font-jetbrains-mono)", fontSize: 11, color: s.color, minWidth: 16, paddingTop: 1 }}>{s.step}</span>
@@ -585,7 +585,7 @@ export default function RootPage() {
             Use dqt with Claude Code.
           </h2>
           <p style={{ fontSize: 14, color: "var(--fg-1)", lineHeight: 1.75, marginBottom: 32, maxWidth: 600 }}>
-            Three plugins turn Claude Code into a grounded data questioning engineer that knows your warehouse, knows the dqt API, and can run checks from natural language.
+            Three plugins turn Claude Code into a grounded data quality engineer that knows your warehouse, knows the dqt API, and can run checks from natural language.
           </p>
 
           <div className="grid grid-cols-3 gap-0 border border-line">
