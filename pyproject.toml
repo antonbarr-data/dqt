@@ -134,6 +134,8 @@ filterwarnings = [
     "ignore::DeprecationWarning:pkg_resources",
     "ignore::pytest.PytestUnraisableExceptionWarning",
     "ignore::DeprecationWarning:pytest_asyncio",
+    # testcontainers emits this at import of ClickHouseContainer; not actionable here.
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning",
 ]
 
 # ─── coverage ───────────────────────────────────────────────────────

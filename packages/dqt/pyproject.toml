@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-postgres   = ["psycopg2-binary>=2.9", "ibis-framework[postgres]>=9.0"]
+postgres   = ["psycopg2-binary>=2.9", "ibis-framework[postgres]>=9.0", "sqlalchemy>=2.0"]
 clickhouse = ["clickhouse-connect>=0.7"]
 bigquery   = ["google-cloud-bigquery>=3.19", "db-dtypes>=1.2"]
 snowflake  = ["snowflake-connector-python>=3.9"]
